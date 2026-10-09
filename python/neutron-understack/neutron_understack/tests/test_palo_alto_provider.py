@@ -558,6 +558,52 @@ class TestParentVifAttach:
         ):
             provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
 
+    def test_recovery_logs_original_attach_error(self, mocker, caplog):
+        node = mocker.Mock(id="node-1")
+        provider, ironic = self._provider(mocker, node, vif_ids=[])
+        ironic.node_vif_ids.side_effect = [[], ["parent-1"]]
+        error = RuntimeError("rpc timeout")
+        ironic.attach_vif_to_node.side_effect = error
+
+        with caplog.at_level(logging.WARNING, logger=palo_alto.__name__):
+            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+
+        [record] = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert "raised, but the VIF is attached" in record.getMessage()
+        assert record.exc_info[1] is error
+
+    def test_recovery_raises_when_landed_vif_is_not_annotated(self, mocker):
+        node = mocker.Mock(id="node-1")
+        unannotated = {"id": "parent-1", "binding:host_id": "", "binding:profile": {}}
+        provider, ironic = self._provider(
+            mocker, node, vif_ids=[], fresh_port=unannotated
+        )
+        ironic.node_vif_ids.side_effect = [[], ["parent-1"]]
+        ironic.attach_vif_to_node.side_effect = RuntimeError("rpc timeout")
+
+        with pytest.raises(palo_alto.PaloAltoParentNotAnnotated):
+            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+
+    def test_reraises_attach_error_when_recheck_fails(self, mocker):
+        node = mocker.Mock(id="node-1")
+        provider, ironic = self._provider(mocker, node, vif_ids=[])
+        ironic.node_vif_ids.side_effect = [[], RuntimeError("ironic unavailable")]
+        ironic.attach_vif_to_node.side_effect = RuntimeError("rpc timeout")
+
+        with pytest.raises(RuntimeError, match="rpc timeout"):
+            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+
+    def test_raises_when_already_attached_parent_is_not_annotated(self, mocker):
+        node = mocker.Mock(id="node-1")
+        unannotated = {"id": "parent-1", "binding:host_id": "", "binding:profile": {}}
+        provider, ironic = self._provider(
+            mocker, node, vif_ids=["parent-1"], fresh_port=unannotated
+        )
+
+        with pytest.raises(palo_alto.PaloAltoParentNotAnnotated):
+            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+        ironic.attach_vif_to_node.assert_not_called()
+
 
 class TestMissingBindingFields:
     def test_none_missing_when_annotated(self):

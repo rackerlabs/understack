@@ -116,10 +116,8 @@ def _parse_metainfo(raw) -> dict:
     """Service-profile metainfo is stored as a JSON string."""
     if not raw:
         return {}
-    # already a dict return as-is
     if isinstance(raw, dict):
         return raw
-    # parse the string; malformed JSON
     try:
         parsed = json.loads(raw)
     except (TypeError, ValueError):
@@ -458,10 +456,10 @@ class PaloAlto(base.L3ServiceProvider):
         admin_context = n_context.get_admin_context()
         return core_plugin.get_port(admin_context, port_id)
 
-    def _confirm_parent_vif_attach_after_error(
+    def _vif_landed_after_error(
         self, router_id: str, node, parent_port_id: str
-    ) -> dict | None:
-        """Return the fresh parent port if an errored attach actually landed.
+    ) -> bool:
+        """Return True if an errored attach actually attached the VIF.
 
         Ironic VIF attach can time out waiting for the conductor/RPC reply even
         after the conductor has applied the binding.
@@ -475,13 +473,8 @@ class PaloAlto(base.L3ServiceProvider):
                 router_id,
                 exc_info=True,
             )
-            return None
-        if parent_port_id not in vif_ids:
-            return None
-
-        fresh = self._fresh_port(parent_port_id)
-        self._verify_parent_annotated(router_id, fresh)
-        return fresh
+            return False
+        return parent_port_id in vif_ids
 
     def _ensure_parent_vif_attached(self, router: dict, parent_port: dict) -> dict:
         """VIF-attach the parent port to the router's node (idempotent).
@@ -508,21 +501,16 @@ class PaloAlto(base.L3ServiceProvider):
             try:
                 self._ironic.attach_vif_to_node(node, parent_port_id)
             except Exception:
-                fresh = self._confirm_parent_vif_attach_after_error(
-                    router_id, node, parent_port_id
-                )
-                if fresh is None:
+                if not self._vif_landed_after_error(router_id, node, parent_port_id):
                     raise
                 LOG.warning(
                     "Ironic VIF attach for Palo Alto router %s parent port %s "
-                    "on node %s raised, but the VIF is attached and annotated; "
-                    "continuing",
+                    "on node %s raised, but the VIF is attached; continuing",
                     router_id,
                     parent_port_id,
-                    getattr(node, "id", node),
+                    node.id,
                     exc_info=True,
                 )
-                return fresh
 
         fresh = self._fresh_port(parent_port_id)
         self._verify_parent_annotated(router_id, fresh)
