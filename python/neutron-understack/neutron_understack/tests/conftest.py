@@ -279,13 +279,17 @@ def port_context(network_context, port_dict, port_binding, ml2_plugin) -> PortCo
 
 
 @pytest.fixture
-def understack_driver(oslo_config) -> UnderstackDriver:
+def understack_driver(mocker, oslo_config) -> UnderstackDriver:
     """The understack driver, which must never reach out to Undersync.
 
     No ``undersync`` attribute is injected on purpose, so a reintroduced
     ``self.undersync.sync(...)`` fails loudly instead of passing against a mock.
+    The trunk collaborator is mocked because these unit tests do not call the
+    driver's production ``initialize()`` hook.
     """
-    return UnderstackDriver()
+    driver = UnderstackDriver()
+    driver.trunk_driver = mocker.create_autospec(UnderstackTrunkDriver, instance=True)
+    return driver
 
 
 @pytest.fixture
