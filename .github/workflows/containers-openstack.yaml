@@ -35,7 +35,6 @@ jobs:
         project:
           - cinder
           - glance
-          - horizon
           - ironic
           - keystone
           - nova
@@ -51,3 +50,16 @@ jobs:
       dockerfile_path: containers/${{ matrix.project }}/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
       latest_name: "2026.1"
+
+  openstack-2026-2:
+    strategy:
+      matrix:
+        project:
+          - horizon
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: ${{ matrix.project }}
+      dockerfile_path: containers/${{ matrix.project }}/Dockerfile
+      build_args: OPENSTACK_VERSION=2026.2
+      latest_name: "2026.2"
