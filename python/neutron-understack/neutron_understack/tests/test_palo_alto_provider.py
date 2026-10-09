@@ -672,6 +672,17 @@ class TestGatewaySubport:
         tp.add_subports.assert_not_called()
         self.clear.assert_not_called()
 
+    def test_restores_device_id_when_add_fails(self, mocker):
+        provider, tp = self._provider(mocker)
+        tp.add_subports.side_effect = RuntimeError("trunk rejected")
+        trunk = {"id": "trunk-1", "sub_ports": []}
+
+        with pytest.raises(RuntimeError, match="trunk rejected"):
+            provider._add_gateway_subport({"id": "r1"}, trunk, dict(_GATEWAY_PORT))
+
+        self.clear.assert_called_once_with("gw-1")
+        self.restore.assert_called_once_with("gw-1", "r1", "network:router_gateway")
+
 
 class TestSubportVlanAllocation:
     def _provider(self, mocker, ranges):
@@ -843,6 +854,24 @@ class TestInterfaceSubport:
         tp.add_subports.assert_not_called()
         self.clear.assert_not_called()
 
+    def test_vlan_exhaustion_raises_before_device_id_is_cleared(self, mocker):
+        provider, tp = self._provider(mocker)
+        mocker.patch.object(
+            provider,
+            "_next_available_subport_vlan",
+            side_effect=palo_alto.NoPaloAltoSubportVlanAvailable(
+                router_id="r1", trunk_id="trunk-1", network_segment_ranges="200"
+            ),
+        )
+        trunk = {"id": "trunk-1", "sub_ports": []}
+
+        with pytest.raises(palo_alto.NoPaloAltoSubportVlanAvailable):
+            provider._add_interface_subport({"id": "r1"}, trunk, dict(_INTERFACE_PORT))
+
+        tp.add_subports.assert_not_called()
+        self.clear.assert_not_called()
+        self.restore.assert_not_called()
+
 
 class TestGatewayCreateHandler:
     def _payload(self, mocker, router_id="r1"):
@@ -990,7 +1019,7 @@ class TestGatewayTeardown:
         provider, tp, _, _ = self._provider(mocker, trunk_after_removal={})
         trunk = {"id": "trunk-1", "sub_ports": [{"port_id": "gw-1"}]}
 
-        provider._remove_gateway_subport(trunk, "gw-1")
+        provider._remove_router_port_subport(trunk, "gw-1", "gateway")
 
         tp.remove_subports.assert_called_once()
         _ctx, tid, body = tp.remove_subports.call_args[0]
@@ -1001,7 +1030,7 @@ class TestGatewayTeardown:
         provider, tp, _, _ = self._provider(mocker, trunk_after_removal={})
         trunk = {"id": "trunk-1", "sub_ports": []}
 
-        provider._remove_gateway_subport(trunk, "gw-1")
+        provider._remove_router_port_subport(trunk, "gw-1", "gateway")
 
         tp.remove_subports.assert_not_called()
 
@@ -1009,7 +1038,7 @@ class TestGatewayTeardown:
         provider, tp, _, _ = self._provider(mocker, trunk_after_removal={})
         trunk = {"id": "trunk-1", "sub_ports": [{"port_id": "intf-1"}]}
 
-        provider._remove_interface_subport(trunk, "intf-1")
+        provider._remove_router_port_subport(trunk, "intf-1", "interface")
 
         tp.remove_subports.assert_called_once()
         _ctx, tid, body = tp.remove_subports.call_args[0]
@@ -1647,7 +1676,7 @@ class TestRouterInterfaceLifecycle:
     ):
         env = interface_lifecycle
         env.state.fail = "subport_postcommit"
-        cleanup = env.provider._remove_interface_subport
+        cleanup = env.provider._remove_router_port_subport
         attempts = []
 
         def fail_once(*args):
@@ -1657,7 +1686,7 @@ class TestRouterInterfaceLifecycle:
             return cleanup(*args)
 
         mocker.patch.object(
-            env.provider, "_remove_interface_subport", side_effect=fail_once
+            env.provider, "_remove_router_port_subport", side_effect=fail_once
         )
         with pytest.raises(
             l3_exc.RouterInterfaceAttachmentConflict, match="subport_postcommit"
