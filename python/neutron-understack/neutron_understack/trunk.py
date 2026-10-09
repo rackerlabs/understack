@@ -160,8 +160,9 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
     def _add_subports_networks_to_parent_port_switchport(
         self, parent_port: Port, subports: list[SubPort]
     ) -> None:
-        binding_profile = parent_port.bindings[0].profile
-        binding_host = parent_port.bindings[0].host
+        parent_binding = utils.active_port_binding(parent_port)
+        binding_profile = parent_binding.profile
+        binding_host = parent_binding.host
 
         physnet = binding_profile.get("physical_network")
         if not physnet:
@@ -182,7 +183,8 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         parent_port_obj = utils.fetch_port_object(trunk.port_id)
         if not utils.parent_port_is_bound(parent_port_obj):
             return
-        self._handle_segment_deallocation(subports, parent_port_obj.bindings[0].host)
+        parent_binding = utils.active_port_binding(parent_port_obj)
+        self._handle_segment_deallocation(subports, parent_binding.host)
 
     def _delete_unused_segment(self, segment_id: str) -> NetworkSegment:
         network_segment = utils.network_segment_by_id(segment_id)
