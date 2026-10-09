@@ -144,7 +144,7 @@ class UndersyncDriver(MechanismDriver):
         parent_port = utils.fetch_port_object(trunk.port_id)
         if not utils.parent_port_is_bound(parent_port):
             return
-        if not parent_port.bindings[0].profile.get("physical_network"):
+        if not utils.active_port_binding(parent_port).profile.get(api.PHYSICAL_NETWORK):
             raise exc.BadRequest(
                 resource="port", msg=_missing_physnet_msg(parent_port.id)
             )
@@ -165,7 +165,9 @@ class UndersyncDriver(MechanismDriver):
         if not utils.parent_port_is_bound(parent_port):
             return
 
-        physnet = parent_port.bindings[0].profile.get("physical_network")
+        physnet = utils.active_port_binding(parent_port).profile.get(
+            api.PHYSICAL_NETWORK
+        )
         if not physnet:
             # _validate_parent_physnet rejects this while it is still
             # abortable, so the binding profile changed underneath us. Raising
@@ -192,7 +194,7 @@ class UndersyncDriver(MechanismDriver):
         binding_profile = port.get(portbindings.PROFILE) or {}
         if not binding_profile.get("physical_network"):
             LOG.debug(
-                "Skipping port %s without a physical_network in its " "binding_profile",
+                "Skipping port %s without a physical_network in its binding_profile",
                 port["id"],
             )
             return

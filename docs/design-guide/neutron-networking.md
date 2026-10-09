@@ -499,6 +499,49 @@ Neutron based on certain data provided to port creation and update API calls.
 - the port has a binding host
 - the port is either unbound or has previously failed to bind
 
+### Port Representations
+
+Neutron exposes a port in three different shapes and you will see all of them
+in the Neutron source and in our drivers:
+
+| Representation | How you get it | Notes |
+| -------------- | -------------- | ----- |
+| Dict | `core_plugin.get_port()`, `PortContext.current` | API-shaped. Binding fields appear flattened as `binding:vif_type`, `binding:vnic_type`, `binding:host_id`, etc. |
+| OVO | `neutron.objects.ports.Port.get_object()` | Typed versioned object. Bindings are in `port.bindings`, binding levels in `port.binding_levels`. |
+| SQLAlchemy model | `payload.metadata["port_db"]`, `ml2.db.get_port()` | ML2 internal. Bindings are in `port.port_bindings`. Don't go looking for these; use them when Neutron hands one to you. |
+
+Use the representation that matches where the port came from, and don't
+re-fetch a port just to change its shape:
+
+- If Neutron hands you a dict (`PortContext.current`) or a SQLAlchemy model
+  (for example `payload.metadata["port_db"]` in a registry callback), work with
+  that directly.
+- When we have only a port ID, as with a trunk's parent port, fetch the **OVO**
+  with `utils.fetch_port_object()`. It is typed, and it is what Neutron's own
+  newer code uses when it needs binding details. We don't use `get_port()` for
+  this.
+
+#### Selecting a binding
+
+A port can have several bindings (one `ACTIVE`, any number of `INACTIVE` ones
+during live migration), so never index with `port.bindings[0]`. Select the
+binding with `get_port_binding_by_status_and_host()` from
+`neutron_lib.plugins.utils`, then read `vif_type`, `vnic_type`, `profile` and
+`host` from the result. For an OVO port, `utils.active_port_binding()` wraps
+this and returns the `ACTIVE` binding, or `None` if there isn't one:
+
+```python
+binding = utils.active_port_binding(port)
+if binding and binding.vnic_type == portbindings.VNIC_BAREMETAL:
+    ...
+```
+
+For a SQLAlchemy model, call the neutron-lib helper directly with
+`port.port_bindings` (the model's attribute name) instead of `port.bindings`.
+The helper only subscripts each binding (`binding["status"]`,
+`binding["host"]`), so it works on either. Pass `raise_if_not_found=True` to get
+`PortBindingNotFound` instead of `None`.
+
 ### Router Interface Lifecycle
 
 When a subnet is attached to a router, the understack ML2 driver sets up a path

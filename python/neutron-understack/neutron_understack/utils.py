@@ -15,6 +15,7 @@ from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
+from neutron_lib.plugins import utils as plugin_utils
 from neutron_lib.plugins.ml2 import api
 from oslo_config import cfg
 
@@ -472,8 +473,15 @@ def release_segment_if_unused(segment: NetworkSegment) -> None:
         release_dynamic_segment(segment.id)
 
 
+def active_port_binding(port: port_obj.Port) -> port_obj.PortBinding | None:
+    """The port's ACTIVE binding, or None if it has none."""
+    return plugin_utils.get_port_binding_by_status_and_host(
+        port.bindings, constants.ACTIVE, port_id=port.id
+    )
+
+
 def parent_port_is_bound(port: port_obj.Port) -> bool:
-    port_binding = port.bindings[0]
+    port_binding = active_port_binding(port)
     return bool(
         port_binding
         and port_binding.vif_type == portbindings.VIF_TYPE_OTHER
