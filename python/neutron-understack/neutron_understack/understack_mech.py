@@ -401,7 +401,9 @@ class UnderstackDriver(MechanismDriver):
             physnet,
         )
 
+        freshly_allocated_segment = None
         current_vlan_segment = utils.vlan_segment_for_physnet(context, physnet)
+
         if current_vlan_segment:
             LOG.info(
                 "vlan segment: %(segment)s already preset for physnet: %(physnet)s",
@@ -409,24 +411,33 @@ class UnderstackDriver(MechanismDriver):
             )
             dynamic_segment = current_vlan_segment
         else:
-            dynamic_segment = context.allocate_dynamic_segment(
+            freshly_allocated_segment = context.allocate_dynamic_segment(
                 segment={
                     "network_type": p_const.TYPE_VLAN,
                     "physical_network": physnet,
                 },
             )
+            dynamic_segment = freshly_allocated_segment
 
         LOG.debug("bind_port_segment: Native VLAN segment %s", dynamic_segment)
 
         trunk_details = context.current.get("trunk_details") or {}
         port_id = context.current["id"]
-        if trunk_details:
-            self.trunk_driver.configure_trunk(
-                trunk_details=trunk_details,
-                port_id=port_id,
-                physical_network=physnet,
-                native_vlan_id=dynamic_segment[api.SEGMENTATION_ID],
-            )
+        try:
+            if trunk_details:
+                self.trunk_driver.configure_trunk(
+                    trunk_details=trunk_details,
+                    port_id=port_id,
+                    physical_network=physnet,
+                    native_vlan_id=dynamic_segment[api.SEGMENTATION_ID],
+                )
+        except Exception:
+            # Don't leak the dynamic segment we just allocated
+            if freshly_allocated_segment and not utils.ports_bound_to_segment(
+                freshly_allocated_segment[api.ID]
+            ):
+                utils.release_dynamic_segment(freshly_allocated_segment[api.ID])
+            raise
 
         LOG.debug("continue_binding for segment: %s", segment)
         context.continue_binding(
