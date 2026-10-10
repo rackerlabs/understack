@@ -24,8 +24,15 @@ SUPPORTED_SEGMENTATION_TYPES = (trunk_consts.SEGMENTATION_TYPE_VLAN,)
 class SubportSegmentationIDError(exc.NeutronException):
     message = (
         "Segmentation ID: %(seg_id)s cannot be set to the Subport: "
-        "%(subport_id)s as it falls outside of allowed ranges: "
-        "%(network_segment_ranges)s. Please use different Segmentation ID."
+        "%(subport_id)s because it matches the native VLAN on physical "
+        "network: %(physical_network)s. Please use a different Segmentation ID."
+    )
+
+
+class SubportSegmentationIDRangeError(exc.NeutronException):
+    message = (
+        "VLAN %(seg_id)s for subport %(subport_id)s is outside the configured "
+        "tenant trunk VLAN range %(minimum)s-%(maximum)s."
     )
 
 
@@ -87,8 +94,8 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
     def _handle_tenant_vlan_id_and_switchport_config(
         self, subports: list[SubPort], trunk: Trunk
     ) -> None:
-        self._check_subports_segmentation_id(subports, trunk.id)
         parent_port_obj = utils.fetch_port_object(trunk.port_id)
+        self._check_subports_segmentation_id(subports, trunk.id, parent_port_obj)
 
         if utils.parent_port_is_bound(parent_port_obj):
             self._add_subports_networks_to_parent_port_switchport(
@@ -96,37 +103,89 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
             )
 
     def _check_subports_segmentation_id(
-        self, subports: list[SubPort], trunk_id: str
+        self, subports: list[SubPort], trunk_id: str, parent_port: Port
     ) -> None:
-        """Checks if a subport's segmentation_id is within the allowed range.
+        """Validate tenant tags and reject a parent native VLAN collision.
 
         A switchport cannot have a mapped VLAN ID equal to the native VLAN ID.
-        Since the user specifies the VLAN ID (segmentation_id) when adding a
-        subport, an error is raised if it falls within any VLAN network segment
-        range, as these ranges are used to allocate VLAN tags for all VLAN
-        segments, including native VLANs.
+        Resolve the native VLAN from the parent port's network and physical
+        network so that multi-segment networks are checked against the segment
+        used on this particular switch.
 
-        The only case where this check is not required is for a network node
-        trunk, since its subport segmentation_ids are the same as the network
-        segment VLAN tags allocated to the subports. Therefore, there is no
-        possibility of conflict with the native VLAN.
+        The network-node trunk is exempt because its segmentation IDs are
+        internally allocated fabric VLANs, not tenant-selected mapped VLANs.
+        They are the same tags as the subports' network segments, so they also
+        cannot conflict with the parent through VLAN mapping.
         """
         if trunk_id == utils.fetch_network_node_trunk_id():
             return
 
-        ns_ranges = utils.allowed_tenant_vlan_id_ranges()
+        minimum, maximum = cfg.CONF.ml2_understack.default_tenant_vlan_id_range
         for subport in subports:
-            seg_id = subport.segmentation_id
-            if not utils.segmentation_id_in_ranges(seg_id, ns_ranges):
-                raise SubportSegmentationIDError(
+            seg_id = int(subport["segmentation_id"])
+            if not minimum <= seg_id <= maximum:
+                raise SubportSegmentationIDRangeError(
                     seg_id=seg_id,
-                    subport_id=subport.port_id,
-                    network_segment_ranges=utils.printable_ranges(ns_ranges),
+                    subport_id=subport["port_id"],
+                    minimum=minimum,
+                    maximum=maximum,
                 )
 
-    def configure_trunk(self, trunk_details: dict, port_id: str) -> None:
+        if not utils.parent_port_is_bound(parent_port):
+            return
+
+        physical_network = parent_port.bindings[0].profile.get("physical_network")
+        if not physical_network:
+            # The create path reports the more specific missing-physnet error
+            # when it attempts to configure the parent switchport.
+            return
+
+        native_segment = utils.network_segment_by_physnet(
+            network_id=parent_port.network_id,
+            physnet=physical_network,
+        )
+        if native_segment is None:
+            return
+
+        native_vlan_id = int(native_segment.segmentation_id)
+        self._check_subports_native_vlan(subports, physical_network, native_vlan_id)
+
+    def _check_subports_native_vlan(
+        self,
+        subports: list[SubPort] | list[dict],
+        physical_network: str,
+        native_vlan_id: int,
+    ) -> None:
+        for subport in subports:
+            seg_id = int(subport["segmentation_id"])
+            if seg_id == native_vlan_id:
+                raise SubportSegmentationIDError(
+                    seg_id=seg_id,
+                    subport_id=subport["port_id"],
+                    physical_network=physical_network,
+                )
+
+    def configure_trunk(self, port_id: str, native_segment: dict) -> None:
+        """Configure a trunk when its parent acquires a native VLAN.
+
+        Resolve the trunk from the database rather than relying on the
+        ``trunk_details`` API extension. That extension is not guaranteed to
+        be present in the port dictionary used by ML2 during binding.
+        """
+        trunk = utils.fetch_trunk_by_parent_port(port_id)
+        if trunk is None:
+            return
+
         parent_port_obj = utils.fetch_port_object(port_id)
-        subports = trunk_details.get("sub_ports", [])
+        subports = trunk.sub_ports
+
+        if subports and str(trunk.id) != utils.fetch_network_node_trunk_id():
+            self._check_subports_native_vlan(
+                subports,
+                native_segment["physical_network"],
+                int(native_segment["segmentation_id"]),
+            )
+
         self._add_subports_networks_to_parent_port_switchport(
             parent_port=parent_port_obj, subports=subports
         )

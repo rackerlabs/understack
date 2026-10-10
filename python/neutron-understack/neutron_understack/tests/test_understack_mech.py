@@ -310,12 +310,11 @@ class TestBindPort:
             next_segments_to_bind=[vlan_network_segment],
         )
 
-    def test_with_no_trunk(
+    def test_without_trunk_details_still_checks_for_trunk(
         self,
         mocker,
         port_context,
         understack_driver,
-        understack_trunk_driver,
         vlan_network_segment,
     ):
         mocker.patch.object(
@@ -325,9 +324,12 @@ class TestBindPort:
         port_context._prepare_to_bind(port_context.network.network_segments)
 
         understack_driver.bind_port(port_context)
-        understack_driver.trunk_driver = understack_trunk_driver
 
         port_context.allocate_dynamic_segment.assert_called_once()
+        understack_driver.trunk_driver.configure_trunk.assert_called_once_with(
+            port_context.current["id"],
+            vlan_network_segment,
+        )
         vxlan_segment = next(
             s
             for s in port_context.network.network_segments
@@ -371,19 +373,26 @@ class TestBindPort:
         assert port_context.current["id"] in caplog.text
 
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
-    def test_with_trunk_details(
-        self, mocker, understack_driver, port_context, understack_trunk_driver
+    def test_checks_for_trunk_with_port_dict_extension(
+        self,
+        mocker,
+        understack_driver,
+        port_context,
+        vlan_network_segment,
     ):
-        mocker.patch(
-            "neutron_understack.utils.fetch_subport_network_id", return_value="112233"
+        mocker.patch.object(
+            port_context,
+            "allocate_dynamic_segment",
+            return_value=vlan_network_segment,
         )
         mocker.patch.object(port_context, "continue_binding")
         port_context._prepare_to_bind(port_context.network.network_segments)
 
-        understack_driver.trunk_driver = understack_trunk_driver
-        mocker.patch.object(understack_driver.trunk_driver, "configure_trunk")
         understack_driver.bind_port(port_context)
-        understack_driver.trunk_driver.configure_trunk.assert_called_once()
+        understack_driver.trunk_driver.configure_trunk.assert_called_once_with(
+            port_context.current["id"],
+            vlan_network_segment,
+        )
         port_context.continue_binding.assert_called_once()
 
 

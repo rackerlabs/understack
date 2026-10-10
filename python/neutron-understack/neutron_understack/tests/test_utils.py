@@ -14,6 +14,19 @@ from sqlalchemy.orm import sessionmaker
 from neutron_understack import utils
 
 
+class TestFetchTrunkByParentPort:
+    def test_fetches_by_parent_port_id(self, mocker):
+        context = mocker.patch(
+            "neutron_understack.utils.n_context.get_admin_context"
+        ).return_value
+        get_object = mocker.patch("neutron_understack.utils.trunk_obj.Trunk.get_object")
+
+        result = utils.fetch_trunk_by_parent_port("parent-port-id")
+
+        assert result is get_object.return_value
+        get_object.assert_called_once_with(context, port_id="parent-port-id")
+
+
 class TestParentPortIsBound:
     def test_truthy_conditions(self, port_object):
         """Truthy conditions.
