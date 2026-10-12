@@ -1,4 +1,5 @@
 #!/bin/sh
+set -eu
 echo "Received Secret Event ${EVENT_TYPE} for ${SECRET_NAME}"
 set -x
 # roles are a comma separated annotation; fall back to the legacy label
