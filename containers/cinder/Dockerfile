@@ -6,7 +6,7 @@ FROM quay.io/airshipit/cinder:${OPENSTACK_VERSION}-ubuntu_noble AS build
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # renovate: name=openstack/cinder repo=https://github.com/rackerlabs/cinder.git branch=understack/2026.1
-ARG CINDER_GIT_REF=bccccd4b4c2baab05b3620679499c474bb5b4c52
+ARG CINDER_GIT_REF=809e5c68c6bf7f84e9b4b8b201e41f1834afbfe2
 ADD --keep-git-dir=true https://github.com/rackerlabs/cinder.git#${CINDER_GIT_REF} /src/cinder
 RUN git -C /src/cinder fetch --unshallow --tags
 
