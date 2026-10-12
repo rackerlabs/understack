@@ -21,6 +21,16 @@ Possible roles are:
 - `infra-read` which allows read access to infrastructure resources
 - `infra-readwrite` which allows read and write access to infrastructure resources
 
+A role can also be written as `DOMAIN.ROLE`, which grants the Keystone role
+`ROLE` on the Keystone domain `DOMAIN`, inherited by every project in that
+domain. Both forms can be mixed in one list.
+
+If any entry uses the `DOMAIN.ROLE` form, the account is created in the
+`machine` Keystone domain, and that domain must already exist. Otherwise it is
+created in the `service` domain. Changing which form a Secret uses therefore
+creates a new account in the other domain rather than moving the old one, and
+the credentials' `user_domain_name` must be updated to match.
+
 Roles can be comma separated, for example `tenant-read,infra-read`.
 Whitespace around the commas is ignored and unknown roles are logged and
 skipped.

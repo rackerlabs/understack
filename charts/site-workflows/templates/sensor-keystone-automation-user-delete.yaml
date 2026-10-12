@@ -39,7 +39,12 @@ spec:
                             set -x
                             SVC_USER=$(python -c "import json,os; print(json.loads(os.environ.get('LABELS') or '{}').get('understack.rackspace.com/keystone-user',''))")
                             SVC_USER=${SVC_USER:-$SECRET_NAME}
-                            openstack user delete --domain service "${SVC_USER}"
+                            # DOMAIN.ROLE entries mean the user lives in the machine domain
+                            case ${ROLES_ANNOTATION} in
+                            *.*) USER_DOMAIN=machine ;;
+                            *) USER_DOMAIN=service ;;
+                            esac
+                            openstack user delete --domain "${USER_DOMAIN}" "${SVC_USER}"
                         env:
                           - name: EVENT_TYPE
                             value: "placeholder"
@@ -47,6 +52,8 @@ spec:
                             value: "placeholder"
                           - name: LABELS
                             value: "placeholder"
+                          - name: ROLES_ANNOTATION
+                            value: ""
                         envFrom:
                           - secretRef:
                               name: keystone-keystone-admin
@@ -64,6 +71,11 @@ spec:
                 dependencyName: secret-dep
                 dataKey: body.metadata.labels
               dest: spec.template.spec.containers.0.env.2.value
+            - src:
+                dependencyName: secret-dep
+                dataKey: body.metadata.annotations.understack\.rackspace\.com/keystone-role
+                value: ""
+              dest: spec.template.spec.containers.0.env.3.value
       retryStrategy:
         steps: 3
         duration: 5s
