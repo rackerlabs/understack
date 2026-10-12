@@ -10,6 +10,9 @@ keystone_domains_projects_list:
     projects:
       - project_name: baremetal
         description: 'Ironic resources'
+  # holds machine/automation users that use DOMAIN.ROLE grants
+  - domain_name: machine
+    description: 'Machine Accounts'
   # Example of domain without projects:
   # - domain_name: example
   #   description: 'Example domain with no projects'
