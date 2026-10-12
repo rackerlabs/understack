@@ -43,6 +43,8 @@ spec:
                             value: "placeholder"
                           - name: LABELS
                             value: "placeholder"
+                          - name: ROLES_ANNOTATION
+                            value: ""
                         envFrom:
                           - secretRef:
                               name: keystone-keystone-admin
@@ -67,6 +69,13 @@ spec:
                 dependencyName: secret-dep
                 dataKey: body.metadata.labels
               dest: spec.template.spec.containers.0.env.2.value
+            # only this one annotation is passed on; others (e.g.
+            # last-applied-configuration) may contain secret data
+            - src:
+                dependencyName: secret-dep
+                dataKey: body.metadata.annotations.understack\.rackspace\.com/keystone-role
+                value: ""
+              dest: spec.template.spec.containers.0.env.3.value
             - src:
                 dependencyName: secret-dep
                 dataKey: body.metadata.name

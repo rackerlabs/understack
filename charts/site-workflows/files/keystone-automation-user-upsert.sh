@@ -1,7 +1,9 @@
 #!/bin/sh
 echo "Received Secret Event ${EVENT_TYPE} for ${SECRET_NAME}"
 set -x
-SVC_ROLES=$(python -c "import json,os; print(json.loads(os.environ.get('LABELS') or '{}').get('understack.rackspace.com/keystone-role',''))")
+# roles are a comma separated annotation; fall back to the legacy label
+SVC_ROLES=${ROLES_ANNOTATION:-$(python -c "import json,os; print(json.loads(os.environ.get('LABELS') or '{}').get('understack.rackspace.com/keystone-role',''))")}
+SVC_ROLES=$(printf '%s' "${SVC_ROLES}" | tr -d '[:space:]')
 SVC_USER=$(python -c "import json,os; print(json.loads(os.environ.get('LABELS') or '{}').get('understack.rackspace.com/keystone-user',''))")
 SVC_USER=${SVC_USER:-$SECRET_NAME}
 PROJ_ID=$(openstack project create --or-show --domain service automation -f value -c id)
@@ -21,6 +23,8 @@ else
 fi
 set -x
 openstack role add --user "${SVC_ID}" --project "${PROJ_ID}" reader
+set -f
+OLD_IFS=${IFS}
 IFS=','
 for svc_role in ${SVC_ROLES}; do
   case ${svc_role} in
@@ -48,3 +52,5 @@ for svc_role in ${SVC_ROLES}; do
     ;;
   esac
 done
+IFS=${OLD_IFS}
+set +f
