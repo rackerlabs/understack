@@ -40,7 +40,6 @@ jobs:
           - nova
           - neutron
           - placement
-          - skyline
           - openstack-client
           - octavia
     uses: ./.github/workflows/build-container-reuse.yaml
@@ -56,6 +55,7 @@ jobs:
       matrix:
         project:
           - horizon
+          - skyline
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
