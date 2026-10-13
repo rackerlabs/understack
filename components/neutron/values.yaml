@@ -194,7 +194,7 @@ pod:
         memory: "2048Mi"
         cpu: "500m"
       limits:
-        memory: "4096Mi"
+        memory: "8192Mi"
         cpu: null
     rpc_server:
       limits:
