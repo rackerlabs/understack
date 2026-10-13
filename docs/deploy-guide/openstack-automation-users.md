@@ -4,11 +4,15 @@ Should you need to an account in OpenStack for automation, you can do so
 by creating a Kubernetes Secret in the `openstack` namespace with
 the following metadata:
 
-`understack.rackspace.com/keystone-user` (label):
-  Defines the username in OpenStack Keystone in the `service` domain
-  which will be created.
+`keystone.understack.rackspace.com/account` (label):
+  Triggers the creation of the account. Only its presence is checked, not
+  its value, so set it to `"true"`.
 
-`understack.rackspace.com/keystone-role` (annotation):
+`understack.rackspace.com/keystone-user` (label):
+  Defines the username in OpenStack Keystone which will be created. When
+  absent, the name of the Secret is used.
+
+`understack.rackspace.com/keystone-roles` (annotation):
   Defines what this account will have access to do. This is an annotation
   rather than a label so that it can hold a comma separated list of roles,
   which label values do not allow.
@@ -37,7 +41,8 @@ skipped.
 
 !!! note
     Reading the roles from a `understack.rackspace.com/keystone-role` label is
-    deprecated but still supported when the annotation is absent. A single
+    deprecated but still supported when the annotation is absent. The Secret
+    still needs the `keystone.understack.rackspace.com/account` label. A single
     role can still be given that way, but new Secrets should use the
     annotation.
 
@@ -49,8 +54,9 @@ kind: Secret
 metadata:
   name: mysvc
   annotations:
-    understack.rackspace.com/keystone-role: tenant-read,infra-read
+    understack.rackspace.com/keystone-roles: tenant-read,infra-read
   labels:
+    keystone.understack.rackspace.com/account: "true"
     understack.rackspace.com/keystone-user: mysvc
 type: Opaque
 dataString:
