@@ -271,6 +271,9 @@ pod:
       - secret:
           name: network-device-credentials-ini
           optional: true
+      - secret:
+          name: ironic-bmc-sso-oidc-ini
+          optional: true
     ironic_novncproxy:
       - secret:
           name: ironic-ks-etc
