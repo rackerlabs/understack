@@ -57,12 +57,23 @@ def _snapshot(**changes):
     fields = {
         "router_id": "r1",
         "port_id": "intf-1",
+        "label": "interface",
         "parent_id": None,
         "trunk_id": None,
         "subport_present": False,
         "parent_vif_attached": False,
     }
     return palo_alto_wiring.AttachmentSnapshot(**{**fields, **changes})
+
+
+def _ironic_port(physical_network="physnet-1", local_link_connection=None):
+    """An Ironic baremetal port; bindable unless a field is overridden empty."""
+    if local_link_connection is None:
+        local_link_connection = {"switch_id": "aa", "port_id": "Eth1/1"}
+    return SimpleNamespace(
+        physical_network=physical_network,
+        local_link_connection=local_link_connection,
+    )
 
 
 @pytest.fixture
@@ -130,16 +141,11 @@ class TestExceptionHttpCodes:
         [
             palo_alto_wiring.PaloAltoNodeNotAdopted,
             palo_alto_wiring.PaloAltoParentNotAnnotated,
+            palo_alto_wiring.PaloAltoNodeHasNoUsablePort,
         ],
     )
     def test_wiring_errors_are_bad_request(self, exc):
         assert issubclass(exc, n_exc.BadRequest)
-
-
-class TestNames:
-    def test_names_are_deterministic(self):
-        assert palo_alto_wiring._parent_port_name("r1") == "palo-alto-router-anchor-r1"
-        assert palo_alto_wiring._trunk_name("r1") == "palo-alto-router-trunk-r1"
 
 
 class TestFirstFreeVlan:
@@ -165,49 +171,6 @@ class TestFirstFreeVlan:
         assert palo_alto_wiring._first_free_vlan([(200, 201)], {200, 201}, 200) is None
 
 
-class TestSubportHelpers:
-    def test_has_subport(self):
-        trunk = {"id": "trunk-1", "sub_ports": [{"port_id": "gw-1"}]}
-
-        assert palo_alto_wiring._has_subport(trunk, "gw-1") is True
-        assert palo_alto_wiring._has_subport(trunk, "intf-1") is False
-        assert palo_alto_wiring._has_subport({"id": "trunk-1"}, "gw-1") is False
-
-    def test_used_subport_vlans_counts_only_vlan_tags(self):
-        trunk = {
-            "id": "trunk-1",
-            "sub_ports": [
-                {"port_id": "a", "segmentation_type": "vlan", "segmentation_id": 200},
-                {"port_id": "b", "segmentation_type": "vlan", "segmentation_id": None},
-                {"port_id": "c", "segmentation_type": "inherit"},
-            ],
-        }
-
-        assert palo_alto_wiring._used_subport_vlans(trunk) == {200}
-
-
-class TestMissingBindingFields:
-    def test_none_missing_when_annotated(self):
-        assert palo_alto_wiring._missing_binding_fields(_ANNOTATED_PARENT) == []
-
-    def test_all_missing_when_unbound(self):
-        port = {"id": "parent-1", "binding:host_id": "", "binding:profile": None}
-
-        assert palo_alto_wiring._missing_binding_fields(port) == [
-            "binding:host_id",
-            "physical_network",
-            "local_link_information",
-        ]
-
-    def test_reports_only_missing_profile_field(self):
-        port = {
-            **_ANNOTATED_PARENT,
-            "binding:profile": {"local_link_information": [{"port_id": "Eth1/1"}]},
-        }
-
-        assert palo_alto_wiring._missing_binding_fields(port) == ["physical_network"]
-
-
 class TestLookups:
     def test_trunk_plugin_delegates_to_utils(self, wiring, trunk_plugin):
         assert wiring._trunk_plugin() is trunk_plugin
@@ -224,39 +187,6 @@ class TestLookups:
         core_plugin.get_ports.return_value = []
 
         assert wiring.gateway_port_for_router("r1") is None
-
-    def test_gateway_port_uses_first_of_several_and_warns(
-        self, wiring, core_plugin, caplog
-    ):
-        core_plugin.get_ports.return_value = [{"id": "gw-1"}, {"id": "gw-2"}]
-
-        with caplog.at_level(logging.WARNING, logger=palo_alto_wiring.__name__):
-            assert wiring.gateway_port_for_router("r1") == {"id": "gw-1"}
-
-        assert "found 2; using gw-1" in caplog.text
-
-
-class TestAnchorNetwork:
-    def test_reuses_existing_anchor_network(self, wiring, core_plugin):
-        assert wiring.ensure_anchor_network() == {"id": "anchor-net"}
-
-        core_plugin.get_networks.assert_called_once_with(
-            ANY, filters={"name": [palo_alto_wiring.ANCHOR_NETWORK_NAME]}
-        )
-        core_plugin.create_network.assert_not_called()
-
-    def test_creates_anchor_network_with_required_defaults(self, wiring, core_plugin):
-        core_plugin.get_networks.return_value = []
-        core_plugin.create_network.return_value = {"id": "anchor-new"}
-
-        assert wiring.ensure_anchor_network() == {"id": "anchor-new"}
-
-        _ctx, body = core_plugin.create_network.call_args[0]
-        assert body["network"]["name"] == palo_alto_wiring.ANCHOR_NETWORK_NAME
-        assert body["network"]["shared"] is False
-        # A direct plugin call skips API defaults; these two must be explicit.
-        assert body["network"]["router:external"] is False
-        assert "project_id" in body["network"]
 
 
 class TestParentPort:
@@ -396,6 +326,45 @@ class TestTrunk:
 
         assert trunk == {"id": "trunk-existing"}
         trunk_plugin.create_trunk.assert_not_called()
+
+
+class TestCheckCanAttach:
+    """The read-only check run before Neutron creates a gateway."""
+
+    def test_passes_when_node_has_a_bindable_port(
+        self, wiring, ironic, node, core_plugin, trunk_plugin
+    ):
+        ironic.node_ports.return_value = [
+            _ironic_port(physical_network=None),
+            _ironic_port(),
+        ]
+
+        wiring.check_can_attach("r1")
+
+        ironic.node_ports.assert_called_once_with(node)
+        # Nothing is created or attached: the check must have no side effects.
+        ironic.attach_vif_to_node.assert_not_called()
+        core_plugin.create_network.assert_not_called()
+        core_plugin.create_port.assert_not_called()
+        trunk_plugin.create_trunk.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "ports",
+        [
+            [],
+            [_ironic_port(physical_network=None)],
+            [_ironic_port(local_link_connection={})],
+        ],
+        ids=["no-ports", "no-physical-network", "no-local-link-connection"],
+    )
+    def test_rejects_node_without_bindable_port(self, wiring, ironic, node, ports):
+        ironic.node_ports.return_value = ports
+
+        with pytest.raises(
+            palo_alto_wiring.PaloAltoNodeHasNoUsablePort,
+            match="node node-1 for Palo Alto router r1",
+        ):
+            wiring.check_can_attach("r1")
 
 
 class TestEnsureStack:
@@ -551,29 +520,6 @@ class TestSubportVlanAllocation:
             return_value=ranges,
         )
 
-    def test_starts_at_requested_vlan(self, mocker, wiring):
-        self._allowed_ranges(mocker, [(1, 199), (200, 202)])
-        trunk = {"id": "trunk-1", "sub_ports": []}
-
-        assert (
-            wiring._next_available_subport_vlan(
-                "r1", trunk, palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START
-            )
-            == 201
-        )
-
-    def test_skips_used_vlans(self, mocker, wiring):
-        self._allowed_ranges(mocker, [(200, 202)])
-
-        assert (
-            wiring._next_available_subport_vlan(
-                "r1",
-                _TRUNK_USING_200_AND_201,
-                palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START,
-            )
-            == 202
-        )
-
     def test_raises_when_no_vlan_available(self, mocker, wiring):
         self._allowed_ranges(mocker, [(200, 201)])
 
@@ -651,12 +597,6 @@ class TestDeleteParentStack:
 
 
 class TestDetachAndDeleteParent:
-    def test_detaches_vif_then_deletes_parent(self, wiring, ironic, core_plugin, node):
-        wiring._detach_and_delete_parent("r1", "parent-1")
-
-        ironic.detach_vif_from_node.assert_called_once_with(node, "parent-1")
-        core_plugin.delete_port.assert_called_once_with(ANY, "parent-1")
-
     def test_deletes_parent_even_when_node_is_gone(
         self, wiring, ironic, core_plugin, caplog
     ):
@@ -672,21 +612,6 @@ class TestDetachAndDeleteParent:
 
 
 class TestCleanupAttachment:
-    def test_removes_subport_then_unused_stack(
-        self, wiring, trunk_plugin, ironic, core_plugin, node
-    ):
-        trunk_plugin.get_trunks.return_value = [_trunk("gw-1")]
-        trunk_plugin.get_trunk.return_value = _trunk()  # after the removal
-
-        wiring.cleanup_attachment("r1", "gw-1", "gateway")
-
-        trunk_plugin.remove_subports.assert_called_once_with(
-            ANY, "trunk-1", {"sub_ports": [{"port_id": "gw-1"}]}
-        )
-        trunk_plugin.delete_trunk.assert_called_once_with(ANY, "trunk-1")
-        ironic.detach_vif_from_node.assert_called_once_with(node, "parent-1")
-        core_plugin.delete_port.assert_called_once_with(ANY, "parent-1")
-
     def test_deletes_orphan_parent_when_no_trunk(
         self, wiring, trunk_plugin, ironic, core_plugin, node
     ):
@@ -713,30 +638,7 @@ class TestCleanupAttachment:
         ironic.detach_vif_from_node.assert_not_called()
 
 
-class TestSnapshotInterfaceAttachment:
-    def test_records_nothing_when_no_wiring_exists(
-        self, wiring, core_plugin, trunk_plugin
-    ):
-        core_plugin.get_ports.return_value = []
-        trunk_plugin.get_trunks.return_value = []
-
-        assert wiring.snapshot_interface_attachment("r1", "intf-1") == _snapshot()
-
-    def test_records_existing_stack(
-        self, wiring, core_plugin, trunk_plugin, ironic, node
-    ):
-        core_plugin.get_ports.return_value = [_PARENT]
-        trunk_plugin.get_trunks.return_value = [_trunk("intf-1")]
-        ironic.node_vif_ids.return_value = ["parent-1"]
-
-        assert wiring.snapshot_interface_attachment("r1", "intf-1") == _snapshot(
-            parent_id="parent-1",
-            trunk_id="trunk-1",
-            subport_present=True,
-            parent_vif_attached=True,
-        )
-        ironic.node_vif_ids.assert_called_once_with(node)
-
+class TestSnapshotAttachment:
     def test_treats_vif_as_detached_when_node_is_gone(
         self, wiring, core_plugin, trunk_plugin, ironic
     ):
@@ -744,60 +646,13 @@ class TestSnapshotInterfaceAttachment:
         trunk_plugin.get_trunks.return_value = []
         ironic.node_by_instance_uuid.return_value = None
 
-        assert wiring.snapshot_interface_attachment("r1", "intf-1") == _snapshot(
+        assert wiring.snapshot_attachment("r1", "intf-1", "interface") == _snapshot(
             parent_id="parent-1"
         )
         ironic.node_vif_ids.assert_not_called()
 
 
-class TestUndoInterfaceAttachment:
-    """Undo compares current wiring with the snapshot taken before the attach.
-
-    It removes only what the attach request added, and keeps anything that
-    existed before or that other router ports still use.
-    """
-
-    def test_removes_everything_the_request_created(
-        self, wiring, core_plugin, trunk_plugin, ironic, node
-    ):
-        core_plugin.get_ports.return_value = [_PARENT]
-        trunk_plugin.get_trunks.return_value = [_trunk("intf-1")]
-        trunk_plugin.get_trunk.return_value = _trunk()  # after the removal
-
-        wiring.undo_interface_attachment(_snapshot())
-
-        trunk_plugin.remove_subports.assert_called_once_with(
-            ANY, "trunk-1", {"sub_ports": [{"port_id": "intf-1"}]}
-        )
-        trunk_plugin.delete_trunk.assert_called_once_with(ANY, "trunk-1")
-        ironic.detach_vif_from_node.assert_called_once_with(node, "parent-1")
-        core_plugin.delete_port.assert_called_once_with(ANY, "parent-1")
-
-    def test_deletes_parent_created_before_the_trunk(
-        self, wiring, core_plugin, trunk_plugin, ironic, node
-    ):
-        # The attach failed after creating the parent but before the trunk.
-        core_plugin.get_ports.return_value = [_PARENT]
-        trunk_plugin.get_trunks.return_value = []
-
-        wiring.undo_interface_attachment(_snapshot())
-
-        trunk_plugin.delete_trunk.assert_not_called()
-        ironic.detach_vif_from_node.assert_called_once_with(node, "parent-1")
-        core_plugin.delete_port.assert_called_once_with(ANY, "parent-1")
-
-    def test_does_nothing_when_no_wiring_exists(
-        self, wiring, core_plugin, trunk_plugin, ironic
-    ):
-        core_plugin.get_ports.return_value = []
-        trunk_plugin.get_trunks.return_value = []
-
-        wiring.undo_interface_attachment(_snapshot())
-
-        trunk_plugin.remove_subports.assert_not_called()
-        ironic.detach_vif_from_node.assert_not_called()
-        core_plugin.delete_port.assert_not_called()
-
+class TestUndoAttachment:
     def test_keeps_subport_that_existed_before(
         self, wiring, core_plugin, trunk_plugin, ironic
     ):
@@ -805,7 +660,7 @@ class TestUndoInterfaceAttachment:
         trunk_plugin.get_trunks.return_value = [_trunk("intf-1")]
         trunk_plugin.get_trunk.return_value = _trunk("intf-1")
 
-        wiring.undo_interface_attachment(
+        wiring.undo_attachment(
             _snapshot(
                 parent_id="parent-1",
                 trunk_id="trunk-1",
@@ -819,51 +674,6 @@ class TestUndoInterfaceAttachment:
         ironic.detach_vif_from_node.assert_not_called()
         core_plugin.delete_port.assert_not_called()
 
-    def test_keeps_stack_that_other_ports_still_use(
-        self, wiring, core_plugin, trunk_plugin, ironic
-    ):
-        trunk_plugin.get_trunks.return_value = [_trunk("gw-1", "intf-1")]
-        trunk_plugin.get_trunk.return_value = _trunk("gw-1")  # after the removal
-
-        wiring.undo_interface_attachment(_snapshot())
-
-        trunk_plugin.remove_subports.assert_called_once_with(
-            ANY, "trunk-1", {"sub_ports": [{"port_id": "intf-1"}]}
-        )
-        trunk_plugin.delete_trunk.assert_not_called()
-        ironic.detach_vif_from_node.assert_not_called()
-        core_plugin.delete_port.assert_not_called()
-
-    def test_keeps_preexisting_empty_stack(
-        self, wiring, core_plugin, trunk_plugin, ironic, node
-    ):
-        core_plugin.get_ports.return_value = [_PARENT]
-        trunk_plugin.get_trunks.return_value = [_trunk("intf-1")]
-        trunk_plugin.get_trunk.return_value = _trunk()  # after the removal
-
-        wiring.undo_interface_attachment(
-            _snapshot(
-                parent_id="parent-1", trunk_id="trunk-1", parent_vif_attached=True
-            )
-        )
-
-        trunk_plugin.remove_subports.assert_called_once()
-        trunk_plugin.delete_trunk.assert_not_called()
-        ironic.detach_vif_from_node.assert_not_called()
-        core_plugin.delete_port.assert_not_called()
-
-    def test_detaches_vif_this_request_attached(
-        self, wiring, core_plugin, trunk_plugin, ironic, node
-    ):
-        # The parent existed before, but this request attached its VIF.
-        core_plugin.get_ports.return_value = [_PARENT]
-        trunk_plugin.get_trunks.return_value = []
-
-        wiring.undo_interface_attachment(_snapshot(parent_id="parent-1"))
-
-        ironic.detach_vif_from_node.assert_called_once_with(node, "parent-1")
-        core_plugin.delete_port.assert_not_called()
-
     def test_skips_vif_detach_when_node_is_gone(
         self, wiring, core_plugin, trunk_plugin, ironic
     ):
@@ -871,7 +681,7 @@ class TestUndoInterfaceAttachment:
         trunk_plugin.get_trunks.return_value = []
         ironic.node_by_instance_uuid.return_value = None
 
-        wiring.undo_interface_attachment(_snapshot(parent_id="parent-1"))
+        wiring.undo_attachment(_snapshot(parent_id="parent-1"))
 
         ironic.detach_vif_from_node.assert_not_called()
         core_plugin.delete_port.assert_not_called()

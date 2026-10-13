@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 import weakref
@@ -7,13 +8,16 @@ from neutron.services.l3_router.service_providers import base
 from neutron_lib import constants as const
 from neutron_lib import exceptions as n_exc
 from neutron_lib.callbacks import events
+from neutron_lib.callbacks import exceptions as callback_exc
 from neutron_lib.callbacks import priority_group
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
+from neutron_lib.db import api as db_api
 from neutron_lib.plugins import constants as plugin_constants
 from neutron_lib.plugins import directory
 
 from neutron_understack.ironic import IronicClient
+from neutron_understack.l3_router.palo_alto_wiring import AttachmentSnapshot
 from neutron_understack.l3_router.palo_alto_wiring import PaloAltoWiring
 
 LOG = logging.getLogger(__name__)
@@ -52,6 +56,28 @@ class PaloAltoInterfacePortMissing(n_exc.BadRequest):
     )
 
 
+# Conflict -> HTTP 409: a transient error interrupted gateway wiring. The wiring
+# was rolled back, but Neutron keeps the gateway, so it must be set again.
+class PaloAltoGatewayWiringFailed(n_exc.Conflict):
+    message = (
+        "Router %(router_id)s gateway was created but could not be wired "
+        "(%(reason)s); any Palo Alto wiring was rolled back. Unset and set the "
+        "gateway again to retry."
+    )
+
+
+def _registry_would_retry(error: Exception) -> bool:
+    """Return True if the callback registry would turn this error into a retry.
+
+    Checked on the CallbackFailure wrapper, as the registry does: that check
+    ignores the "retries exhausted" flag that is_retriable(error) honours.
+    """
+    wrapped = callback_exc.CallbackFailure(
+        errors=[callback_exc.NotificationError(None, error)]
+    )
+    return db_api.is_retriable(wrapped)
+
+
 def _parse_metainfo(raw) -> dict:
     """Service-profile metainfo is stored as a JSON string."""
     if not raw:
@@ -85,6 +111,14 @@ class PaloAlto(base.L3ServiceProvider):
         self._palo_alto_provider = f"{__name__}.{self.__class__.__name__}"
         self._interface_snapshots = weakref.WeakKeyDictionary()
         self._wiring = PaloAltoWiring(ironic=lambda: self._ironic)
+        # Check the appliance can be wired on BEFORE_CREATE, before Neutron
+        # creates the gateway port: rejecting there leaves nothing behind and
+        # the request can be retried. BEFORE events always re-raise errors.
+        registry.subscribe(
+            self._validate_gateway_create,
+            resources.ROUTER_GATEWAY,
+            events.BEFORE_CREATE,
+        )
         # Gateway attach must run on AFTER_CREATE (the gateway port does not
         # exist earlier) and must be cancellable so a wiring failure returns a
         # real API error instead of a swallowed 200. @registry.receives cannot
@@ -131,23 +165,15 @@ class PaloAlto(base.L3ServiceProvider):
             self._palo_alto_provider,
         )
 
-    @property
+    @functools.cached_property
     def _flavor_plugin(self):
-        try:
-            return self._flavor_plugin_ref
-        except AttributeError:
-            self._flavor_plugin_ref = directory.get_plugin(plugin_constants.FLAVORS)
-            return self._flavor_plugin_ref
+        return directory.get_plugin(plugin_constants.FLAVORS)
 
-    @property
+    @functools.cached_property
     def _ironic(self) -> IronicClient:
         # Instantiated lazily so importing/loading this provider does not require
         # Ironic credentials in environments that never create such a router.
-        try:
-            return self._ironic_ref
-        except AttributeError:
-            self._ironic_ref = IronicClient()
-            return self._ironic_ref
+        return IronicClient()
 
     def _is_palo_alto_provider(self, context, router) -> bool:
         flavor_id = router.get("flavor_id")
@@ -173,12 +199,10 @@ class PaloAlto(base.L3ServiceProvider):
         )
         return matched
 
-    def _palo_alto_router(self, context, router_id: str) -> dict | None:
-        """Return the router if it uses the Palo Alto flavor, else None."""
+    def _is_palo_alto_router(self, context, router_id: str) -> bool:
+        """Look the router up by id; return True if it uses the Palo Alto flavor."""
         router = self.l3plugin.get_router(context, router_id)
-        if not self._is_palo_alto_provider(context, router):
-            return None
-        return router
+        return self._is_palo_alto_provider(context, router)
 
     def _resource_class_for_router(self, context, router) -> str:
         """Read the target resource_class from the flavor's profile metainfo.
@@ -274,31 +298,55 @@ class PaloAlto(base.L3ServiceProvider):
             router["id"],
         )
 
+    def _validate_gateway_create(self, resource, event, trigger, payload=None):
+        """ROUTER_GATEWAY / BEFORE_CREATE: reject gateways that cannot be wired."""
+        router_id = payload.resource_id
+        if not self._is_palo_alto_router(payload.context, router_id):
+            return
+
+        self._wiring.check_can_attach(router_id)
+
     def _process_gateway_create(self, resource, event, trigger, payload=None):
         """ROUTER_GATEWAY / AFTER_CREATE (cancellable): wire the gateway.
 
         Orders the building blocks so the parent port is VIF-bound before the
         subport is added -- the trunk driver only programs the switchport once
         the parent is bound.
+
+        Neutron has already committed the gateway port here and does not undo
+        it when this raises, so a failure rolls back the wiring this request
+        added before re-raising.
         """
         router_id = payload.resource_id
-        if self._palo_alto_router(payload.context, router_id) is None:
+        try:
+            self._wire_gateway(payload.context, router_id)
+        except Exception as error:
+            if _registry_would_retry(error):
+                # Neutron would retry update_router; the retry finds the
+                # gateway already created, skips this event and reports
+                # success for a gateway that is not wired.
+                raise PaloAltoGatewayWiringFailed(
+                    router_id=router_id, reason=type(error).__name__
+                ) from error
+            raise
+
+    def _wire_gateway(self, context, router_id: str) -> None:
+        """Wire a Palo Alto router's gateway; undo this request's wiring on error."""
+        if not self._is_palo_alto_router(context, router_id):
             return
 
         gateway_port = self._wiring.gateway_port_for_router(router_id)
         if gateway_port is None:
             raise PaloAltoGatewayPortNotFound(router_id=router_id)
 
-        stack = self._wiring.ensure_stack(router_id)
-        self._wiring.add_gateway_subport(router_id, stack.trunk, gateway_port)
-
-        LOG.info(
-            "Attached Palo Alto router %s gateway port %s via parent %s trunk %s",
-            router_id,
-            gateway_port["id"],
-            stack.parent["id"],
-            stack.trunk["id"],
+        snapshot = self._wiring.snapshot_attachment(
+            router_id, gateway_port["id"], "gateway"
         )
+        try:
+            self._wiring.attach_port(router_id, gateway_port, "gateway")
+        except Exception:
+            self._undo_attachment(snapshot)
+            raise
 
     def _process_gateway_delete(self, resource, event, trigger, payload=None):
         """ROUTER_GATEWAY / BEFORE_DELETE (cancellable): tear down the wiring.
@@ -307,7 +355,7 @@ class PaloAlto(base.L3ServiceProvider):
         remove its subport before Neutron deletes it.
         """
         router_id = payload.resource_id
-        if self._palo_alto_router(payload.context, router_id) is None:
+        if not self._is_palo_alto_router(payload.context, router_id):
             return
 
         gateway_port = self._wiring.gateway_port_for_router(router_id)
@@ -328,7 +376,7 @@ class PaloAlto(base.L3ServiceProvider):
     def _process_router_interface_create(self, resource, event, trigger, payload=None):
         """Wire the interface before Neutron commits its RouterPort association."""
         router_id = payload.resource_id
-        if self._palo_alto_router(payload.context, router_id) is None:
+        if not self._is_palo_alto_router(payload.context, router_id):
             return
 
         interface_port = payload.metadata.get("port")
@@ -337,44 +385,41 @@ class PaloAlto(base.L3ServiceProvider):
         if interface_port.get("device_owner") not in const.ROUTER_INTERFACE_OWNERS:
             return
 
-        self._interface_snapshots[payload] = self._wiring.snapshot_interface_attachment(
-            router_id, interface_port["id"]
+        self._interface_snapshots[payload] = self._wiring.snapshot_attachment(
+            router_id, interface_port["id"], "interface"
         )
         try:
-            stack = self._wiring.ensure_stack(router_id)
-            self._wiring.add_interface_subport(router_id, stack.trunk, interface_port)
+            self._wiring.attach_port(router_id, interface_port, "interface")
         except Exception:
             # Attach-by-port is reverted with a port update by Neutron, so it
             # cannot rely on PORT/BEFORE_DELETE to undo partial realization.
             self._rollback_interface_attachment(payload)
             raise
 
-        LOG.info(
-            "Attached Palo Alto router %s interface port %s via parent %s trunk %s",
-            router_id,
-            interface_port["id"],
-            stack.parent["id"],
-            stack.trunk["id"],
-        )
-
     def _rollback_interface_attachment(self, payload) -> None:
         """Undo this request's changes, including calls that failed postcommit."""
         snapshot = self._interface_snapshots.get(payload)
         if snapshot is None:
             return
+        # Preserve the original attach error. Keep the snapshot so the
+        # subsequent ABORT_CREATE can retry compensation if it failed here.
+        if self._undo_attachment(snapshot):
+            self._interface_snapshots.pop(payload, None)
+
+    def _undo_attachment(self, snapshot: AttachmentSnapshot) -> bool:
+        """Undo an attach's wiring. A failed undo is logged and returns False."""
         try:
-            self._wiring.undo_interface_attachment(snapshot)
+            self._wiring.undo_attachment(snapshot)
         except Exception:
-            # Preserve the original attach error. Keep the snapshot so the
-            # subsequent ABORT_CREATE can retry compensation if it failed here.
             LOG.exception(
-                "Failed to roll back Palo Alto router %s interface port %s; "
+                "Failed to roll back Palo Alto router %s %s port %s; "
                 "attachment cleanup is incomplete",
                 snapshot.router_id,
+                snapshot.label,
                 snapshot.port_id,
             )
-            return
-        self._interface_snapshots.pop(payload, None)
+            return False
+        return True
 
     def _process_router_interface_abort(self, resource, event, trigger, payload=None):
         # The registry continues invoking callbacks after validation errors. An
@@ -403,7 +448,7 @@ class PaloAlto(base.L3ServiceProvider):
             return
 
         try:
-            router = self._palo_alto_router(context, router_id)
+            is_palo_alto = self._is_palo_alto_router(context, router_id)
         except Exception:
             LOG.debug(
                 "Skipping Palo Alto interface cleanup for port %s; router %s "
@@ -414,7 +459,7 @@ class PaloAlto(base.L3ServiceProvider):
             )
             return
 
-        if router is None:
+        if not is_palo_alto:
             return
 
         # Neutron also deletes newly-created ports when attachment aborts. That
