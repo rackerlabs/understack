@@ -73,7 +73,7 @@ spec:
               dest: spec.template.spec.containers.0.env.2.value
             - src:
                 dependencyName: secret-dep
-                dataKey: body.metadata.annotations.understack\.rackspace\.com/keystone-role
+                dataKey: body.metadata.annotations.understack\.rackspace\.com/keystone-roles
                 value: ""
               dest: spec.template.spec.containers.0.env.3.value
       retryStrategy:
