@@ -27,7 +27,8 @@ Possible roles are:
 
 A role can also be written as `DOMAIN.ROLE`, which grants the Keystone role
 `ROLE` on the Keystone domain `DOMAIN`, inherited by every project in that
-domain. Both forms can be mixed in one list.
+domain. The one exception is `DOMAIN.manager`, which is granted on the domain
+only and is not inherited by its projects. Both forms can be mixed in one list.
 
 If any entry uses the `DOMAIN.ROLE` form, the account is created in the
 `machine` Keystone domain, and that domain must already exist. Otherwise it is
