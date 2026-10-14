@@ -31,6 +31,22 @@ conductor:
       volumeMounts:
         - name: pod-data
           mountPath: /var/lib/openstack-helm
+    # Bootstraps ironic-oidc-https-cert ConfigMap with the current dex TLS cert
+    # so that oidc_https_certificate_file is populated before the first
+    # set_oidc_config step.  Kept fresh by ironic-oidc-cert-refresh CronJob.
+    # No-op on sites without BMC SSO OIDC: exits 0 when bmc-sso-oidc.conf
+    # is absent (ironic-bmc-sso-oidc-ini secret is optional).
+    - name: bmc-sso-cert-init
+      image: ghcr.io/flant/shell-operator:v1.20.6
+      imagePullPolicy: IfNotPresent
+      command: [python3, /scripts/refresh-oidc-cert.py]
+      volumeMounts:
+        - name: ironic-etc-snippets
+          mountPath: /etc/ironic/ironic.conf.d
+          readOnly: true
+        - name: ironic-oidc-cert-fetch
+          mountPath: /scripts
+          readOnly: true
 
 labels:
   conductor:
@@ -293,6 +309,10 @@ pod:
           - name: ironic-trait-based-networking
             mountPath: /etc/ironic/trait-based-networking/
             readOnly: true
+          # dex TLS cert for oidc_https_certificate_file
+          - name: ironic-oidc-https-cert
+            mountPath: /etc/ironic/oidc-https-cert
+            readOnly: true
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
@@ -310,6 +330,18 @@ pod:
           - name: ironic-trait-based-networking
             configMap:
               name: ironic-trait-based-networking
+          # dex TLS cert for oidc_https_certificate_file; written by
+          # bmc-sso-cert-init and kept fresh by ironic-oidc-cert-refresh.
+          # optional: empty on sites without BMC SSO OIDC.
+          - name: ironic-oidc-https-cert
+            configMap:
+              name: ironic-oidc-https-cert
+              optional: true
+          # Shared refresh script used by bmc-sso-cert-init.
+          - name: ironic-oidc-cert-fetch
+            configMap:
+              name: ironic-oidc-cert-fetch
+              defaultMode: 365
   replicas:
     api: 4
     conductor: 1
