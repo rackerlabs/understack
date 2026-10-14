@@ -1,0 +1,173 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: diff-nautobot
+  annotations:
+    workflows.argoproj.io/title: Diff OpenStack and Nautobot (Dry-Run)
+    workflows.argoproj.io/description: |
+      Shows differences between OpenStack (Keystone, Neutron, Ironic) and Nautobot
+      without making any changes. Use this as a dry-run before running
+      resync-nautobot.
+
+      Usage:
+      ```
+      argo -n argo-events submit --from workflowtemplate/diff-nautobot
+      ```
+
+      To actually apply changes, use:
+      ```
+      argo -n argo-events submit --from workflowtemplate/resync-nautobot
+      ```
+
+      Defined in `workflows/argo-events/workflowtemplates/diff-nautobot.yaml`
+spec:
+  entrypoint: main
+  serviceAccountName: workflow
+  templates:
+    - name: main
+      steps:
+        - - name: diff-projects
+            template: diff-projects
+            continueOn:
+              failed: true
+        - - name: diff-networks
+            template: diff-networks
+            continueOn:
+              failed: true
+        - - name: diff-subnets
+            template: diff-subnets
+            continueOn:
+              failed: true
+        - - name: diff-devices
+            template: diff-devices
+            continueOn:
+              failed: true
+
+    - name: diff-projects
+      container:
+        image: ghcr.io/rackerlabs/understack/diff-nautobot-understack:latest
+        command:
+          - uc-diff
+          - projects
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        env:
+          - name: NAUTOBOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: token
+          - name: NAUTOBOT_URL
+            valueFrom:
+              configMapKeyRef:
+                name: cluster-metadata
+                key: nautobot_url
+          - name: OS_CLIENT_CONFIG_FILE
+            value: /etc/openstack/clouds.yaml
+          - name: OS_CLOUD
+            value: understack
+
+    - name: diff-networks
+      container:
+        image: ghcr.io/rackerlabs/understack/diff-nautobot-understack:latest
+        command:
+          - uc-diff
+          - network
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        env:
+          - name: NAUTOBOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: token
+          - name: NAUTOBOT_URL
+            valueFrom:
+              configMapKeyRef:
+                name: cluster-metadata
+                key: nautobot_url
+          - name: OS_CLIENT_CONFIG_FILE
+            value: /etc/openstack/clouds.yaml
+          - name: OS_CLOUD
+            value: understack
+
+    - name: diff-subnets
+      container:
+        image: ghcr.io/rackerlabs/understack/diff-nautobot-understack:latest
+        command:
+          - uc-diff
+          - subnets
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        env:
+          - name: NAUTOBOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: token
+          - name: NAUTOBOT_URL
+            valueFrom:
+              configMapKeyRef:
+                name: cluster-metadata
+                key: nautobot_url
+          - name: OS_CLIENT_CONFIG_FILE
+            value: /etc/openstack/clouds.yaml
+          - name: OS_CLOUD
+            value: understack
+
+    - name: diff-devices
+      container:
+        image: ghcr.io/rackerlabs/understack/diff-nautobot-understack:latest
+        command:
+          - uc-diff
+          - devices
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        env:
+          - name: NAUTOBOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: token
+          - name: NAUTOBOT_URL
+            valueFrom:
+              configMapKeyRef:
+                name: cluster-metadata
+                key: nautobot_url
+          - name: OS_CLIENT_CONFIG_FILE
+            value: /etc/openstack/clouds.yaml
+          - name: OS_CLOUD
+            value: understack
+
+  volumeClaimTemplates: []
+  volumes:
+    - name: nb-token
+      secret:
+        secretName: nautobot-token
+    - name: baremetal-manage
+      secret:
+        secretName: baremetal-manage
+        items:
+          - key: clouds.yaml
+            path: clouds.yaml
