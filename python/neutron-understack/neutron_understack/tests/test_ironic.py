@@ -245,6 +245,15 @@ class TestVifAttach:
         assert client.node_vif_ids(node) == ["p1", "p2"]
 
 
+class TestNodePorts:
+    def test_lists_the_nodes_ports_with_details(self, mocker):
+        client = _client(mocker)
+        client.irclient.ports.return_value = iter(["port-a", "port-b"])
+
+        assert client.node_ports(_node()) == ["port-a", "port-b"]
+        client.irclient.ports.assert_called_once_with(details=True, node_id="n1")
+
+
 class TestReleaseClearsOwnership:
     def test_active_node_is_undeployed_then_ownership_cleared(self, mocker):
         client = _client(mocker)

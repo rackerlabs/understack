@@ -6,6 +6,7 @@ from openstack import connection
 from openstack import exceptions as sdk_exc
 from openstack.baremetal.baremetal_service import BaremetalService
 from openstack.baremetal.v1.node import Node as BaremetalNode
+from openstack.baremetal.v1.port import Port as BaremetalPort
 from oslo_config import cfg
 
 from neutron_understack import config
@@ -177,6 +178,11 @@ class IronicClient:
     def node_vif_ids(self, node: str | BaremetalNode) -> list[str]:
         """Return the Neutron port (VIF) ids currently attached to the node."""
         return self.irclient.list_node_vifs(node)
+
+    def node_ports(self, node: str | BaremetalNode) -> list[BaremetalPort]:
+        """Return the node's baremetal ports, including their network fields."""
+        node_id = node.id if isinstance(node, BaremetalNode) else node
+        return list(self.irclient.ports(details=True, node_id=node_id))
 
     def adopt_node_for_router(
         self,
