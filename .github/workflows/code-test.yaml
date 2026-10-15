@@ -60,7 +60,7 @@ jobs:
           else
             uv run pytest --cov --cov-report xml:coverage.xml --junitxml=junit.xml
           fi
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: coverage-${{ matrix.project }}
           path: python/${{ matrix.project }}/coverage.xml
@@ -80,7 +80,7 @@ jobs:
           fi
       # Keep each project's JUnit for the consolidated publish-test-results job.
       # if-no-files-found=ignore: stestr projects don't emit junit.xml.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ always() }}
         with:
           name: junit-${{ matrix.project }}
@@ -99,7 +99,7 @@ jobs:
           merge-multiple: true
       - run: |
           npx cobertura-merge-globby -o output.xml --files=python/**/coverage.xml
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: coverage.xml
           path: coverage.xml
