@@ -12,9 +12,9 @@ def test_panos_is_a_netdev():
     assert issubclass(PanosHardware, NetdevHardware)
 
 
-def test_panos_matches_netdev_interfaces_today():
-    # Nothing diverges yet. This pins that, so adding a real inspect or deploy
-    # interface later is a deliberate change rather than an accident.
+def test_panos_matches_netdev_except_inspect_and_management():
+    # Only inspect and management diverge. This pins that, so adding another
+    # real interface later is a deliberate change rather than an accident.
     pa = PanosHardware()
     netdev = NetdevHardware()
     for name in (
@@ -23,8 +23,6 @@ def test_panos_matches_netdev_interfaces_today():
         "supported_console_interfaces",
         "supported_deploy_interfaces",
         "supported_firmware_interfaces",
-        "supported_inspect_interfaces",
-        "supported_management_interfaces",
         "supported_network_interfaces",
         "supported_power_interfaces",
         "supported_raid_interfaces",
@@ -33,6 +31,22 @@ def test_panos_matches_netdev_interfaces_today():
         "supported_vendor_interfaces",
     ):
         assert getattr(pa, name) == getattr(netdev, name), name
+
+
+def test_panos_inspect_defaults_to_panos():
+    hw = PanosHardware()
+    assert _interface_names(hw.supported_inspect_interfaces) == [
+        "PanosInspect",
+        "NoInspect",
+    ]
+
+
+def test_panos_management_defaults_to_panos():
+    hw = PanosHardware()
+    assert _interface_names(hw.supported_management_interfaces) == [
+        "PanosManagement",
+        "NoopManagement",
+    ]
 
 
 def test_panos_deploy_is_noop():
