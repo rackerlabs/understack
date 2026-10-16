@@ -11,6 +11,11 @@ on:
     tags:
       - "ironic-ipxe/v*"
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
     paths:
       - "containers/ironic-ipxe/**"
       - ".github/workflows/build-ironic-ipxe.yaml"
@@ -21,6 +26,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
 
     permissions:
@@ -32,7 +38,6 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: login to ghcr.io
-        if: startsWith(github.ref, 'refs/tags/ironic-ipxe/')
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
@@ -53,6 +58,7 @@ jobs:
             type=raw,value=${{ steps.version.outputs.tag }},enable=${{ startsWith(github.ref, 'refs/tags/ironic-ipxe/') }}
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=ref,event=pr
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
@@ -64,7 +70,47 @@ jobs:
           context: containers/ironic-ipxe
           file: containers/ironic-ipxe/Dockerfile
           pull: true
-          push: ${{ startsWith(github.ref, 'refs/tags/ironic-ipxe/') }}
+          push: ${{ startsWith(github.ref, 'refs/tags/ironic-ipxe/') || github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
+
+  clean:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+
+    steps:
+      - name: clean up PR container
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const container_name = `${context.repo.repo}/ironic-ipxe`;
+            const response = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+              package_type: "container",
+              package_name: container_name,
+              org: context.repo.owner,
+            });
+
+            const target_tag = `pr-${context.payload.pull_request.number}`;
+            console.log(`Looking for tag ${target_tag} for container ${container_name}`);
+
+            const versions = response.data || [];
+            const matchingVersion = versions.find(version =>
+              version.metadata.container.tags.includes(target_tag)
+            );
+
+            if (matchingVersion) {
+              console.log(`Found tag to delete "${target_tag}":`, matchingVersion.html_url);
+              await github.rest.packages.deletePackageVersionForOrg({
+                package_type: "container",
+                package_name: container_name,
+                org: context.repo.owner,
+                package_version_id: matchingVersion.id,
+              });
+              console.log("Tag deleted");
+            } else {
+              console.log(`No package version found with the tag "${target_tag}".`);
+            }
