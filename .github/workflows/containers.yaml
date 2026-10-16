@@ -13,6 +13,7 @@ on:
       - "containers/ironic-nautobot-client/**"
       - "containers/ironic-vnc-container/**"
       - "containers/openstack-sync-operator/**"
+      - "go/nautobotop/**"
       - "containers/understack-tests/**"
       - "python/**"
       - ".github/workflows/containers.yaml"
@@ -47,6 +48,10 @@ jobs:
             target: prod
           - name: nautobot
             target: prod
+          - name: nautobotop
+            target: ''
+            dockerfile_path: ./go/nautobotop/Dockerfile
+            context_path: "./go/nautobotop/"
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:

@@ -5,9 +5,12 @@ them. Pushing the tag triggers `containers.yaml` and `containers-openstack.yaml`
 to publish container images, and `release-notes.yaml` to assemble the release
 notes and create the GitHub release.
 
-Per-artifact tags (`understackctl/vX.Y.Z`, `nautobotop-vX.Y.Z`,
-`kubectl-us/vX.Y.Z`, `ironic-hardware-exporter/vX.Y.Z`, `dexop-vX.Y.Z`,
-`ironic-ipxe/vX.Y.Z`) are released independently. See
+`nautobotop` is released with the repository-wide tag: its image is built by
+`containers.yaml` and its Helm chart is deployed straight from
+`charts/nautobotop/` at `understack_ref`, like `openstack-sync-operator`.
+
+Per-artifact tags (`understackctl/vX.Y.Z`, `kubectl-us/vX.Y.Z`,
+`ironic-hardware-exporter/vX.Y.Z`, `dexop-vX.Y.Z`, `ironic-ipxe/vX.Y.Z`) are released independently. See
 [Separately released artifacts](#separately-released-artifacts) below.
 
 ## Writing a release note
