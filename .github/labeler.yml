@@ -16,8 +16,6 @@
       - changed-files:
           - all-globs-to-all-files: ["go/understackctl/**"]
       - changed-files:
-          - all-globs-to-all-files: ["go/nautobotop/**"]
-      - changed-files:
           - all-globs-to-all-files: ["go/dexop/**"]
       - changed-files:
           - all-globs-to-all-files: ["go/ironic-hardware-exporter/**"]
