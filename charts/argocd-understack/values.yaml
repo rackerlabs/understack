@@ -395,7 +395,7 @@ site:
     wave: 2
     # -- Chart version for Ironic
     # renovate: datasource=helm depName=ironic registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.34+dd5656a9c
+    chartVersion: 2026.1.54+484fb97d1
 
   # -- Neutron (Networking Service)
   neutron:
