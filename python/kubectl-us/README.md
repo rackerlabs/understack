@@ -150,6 +150,36 @@ See the
 [operator guide](../../docs/operator-guide/kubectl-us.md#net-router-repair) for
 the complete safety contract.
 
+### `net trunk audit`
+
+```
+kubectl us net trunk audit                      # every baremetal trunk
+kubectl us net trunk audit <trunk-name-or-id>
+```
+
+Reports the trunk state ml2/ovn left on baremetal trunks after
+[LP #2167105](https://bugs.launchpad.net/neutron/+bug/2167105) stopped it
+managing them: `parent_name`/`tag` in a subport's binding profile, the LSP
+`parent_name`/`tag_request` derived from those, an unclaimed subport, and a
+trunk status that disagrees with its parent port's binding. Trunks whose parent
+port is not baremetal are skipped, since ml2/ovn still owns them. Any failed
+check produces a nonzero exit status.
+
+### `net trunk repair`
+
+```
+kubectl us net trunk repair <trunk-name-or-id>          # dry-run plan
+kubectl us net trunk repair <trunk-name-or-id> --apply  # write and verify
+```
+
+Drops those keys from the subport's binding profile, which makes ml2/ovn
+rewrite the LSP without them, and re-claims subports missing
+`device_owner=trunk:subport`. Rows ml2/ovn does not rewrite are cleared
+directly in the NB. Trunk status is audit-only: the Neutron API does not accept
+it. Segments and binding levels are never touched. See the
+[operator guide](../../docs/operator-guide/kubectl-us.md#net-trunk-repair) for
+the complete contract.
+
 ### `backup local`
 
 ```

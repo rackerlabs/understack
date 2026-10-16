@@ -11,6 +11,7 @@ from neutron_lib.plugins.ml2 import api
 
 from neutron_understack import trunk
 from neutron_understack import understack_mech
+from neutron_understack import undersync_mech
 
 
 def _port_update_context(original, current):
@@ -465,3 +466,7 @@ class TestNoUndersyncCoupling:
         source = pathlib.Path(trunk.__file__).read_text().lower()
 
         assert "undersync" not in source
+
+    def test_trunk_status_is_recorded_after_the_fabric_push(self):
+        """ACTIVE must only follow the undersync driver's handler for the event."""
+        assert trunk.STATUS_EVENT_PRIORITY > undersync_mech.TRUNK_EVENT_PRIORITY

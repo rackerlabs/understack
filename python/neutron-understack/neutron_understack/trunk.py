@@ -1,11 +1,14 @@
+from neutron.objects import trunk as trunk_objects
 from neutron.objects.network import NetworkSegment
 from neutron.objects.ports import Port
 from neutron.objects.trunk import SubPort
 from neutron.services.trunk.drivers import base as trunk_base
 from neutron.services.trunk.models import Trunk
+from neutron_lib import constants as p_const
 from neutron_lib import exceptions as exc
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
+from neutron_lib.callbacks import priority_group
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib.services.trunk import constants as trunk_consts
@@ -19,6 +22,12 @@ LOG = log.getLogger(__name__)
 SUPPORTED_INTERFACES = (portbindings.VIF_TYPE_OTHER,)
 
 SUPPORTED_SEGMENTATION_TYPES = (trunk_consts.SEGMENTATION_TYPE_VLAN,)
+
+# Record status after the handlers that push the trunk's config to the fabric
+# (they subscribe at PRIORITY_DEFAULT + 1000), so a trunk is only reported ACTIVE
+# once that has been asked for. Its own priority group, since neutron-lib stores
+# `cancellable` per group.
+STATUS_EVENT_PRIORITY = priority_group.PRIORITY_DEFAULT + 2000
 
 
 class SubportSegmentationIDError(exc.NeutronException):
@@ -66,6 +75,13 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
             cancellable=True,
         )
         registry.subscribe(
+            self.subports_added_post,
+            resources.SUBPORTS,
+            events.AFTER_CREATE,
+            priority=STATUS_EVENT_PRIORITY,
+            cancellable=True,
+        )
+        registry.subscribe(
             self.subports_deleted,
             resources.SUBPORTS,
             events.AFTER_DELETE,
@@ -78,11 +94,93 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
             cancellable=True,
         )
         registry.subscribe(
+            self.trunk_created_post,
+            resources.TRUNK,
+            events.AFTER_CREATE,
+            priority=STATUS_EVENT_PRIORITY,
+            cancellable=True,
+        )
+        registry.subscribe(
             self.trunk_deleted,
             resources.TRUNK,
             events.AFTER_DELETE,
             cancellable=True,
         )
+        registry.subscribe(
+            self.parent_port_updated,
+            resources.PORT,
+            events.AFTER_UPDATE,
+        )
+
+    def _set_trunk_status(self, trunk: Trunk, status: str) -> None:
+        """Record a trunk's status. Postcommit only.
+
+        This driver owns the status of the trunks it serves: the trunk plugin
+        forces DOWN on every create/add/remove, and ml2/ovn deliberately does
+        not manage a trunk whose parent LSP is type=external, which is what a
+        baremetal parent gets (LP #2167105).
+        """
+        LOG.debug("setting trunk %s status to %s", trunk.id, status)
+        trunk.update(status=status)
+
+    @staticmethod
+    def _trunk_status_for_parent(parent_port: Port) -> str:
+        """The status a trunk on this parent port should report."""
+        if utils.parent_port_is_bound(parent_port):
+            return trunk_consts.TRUNK_ACTIVE_STATUS
+        return trunk_consts.TRUNK_DOWN_STATUS
+
+    def _record_trunk_state(self, trunk: Trunk, subports: list[SubPort]) -> None:
+        """Postcommit: record the trunk's status and claim its subports.
+
+        The matching precommit hook has already written the subports' binding
+        levels; pushing them to the fabric is another driver's job,
+        and its handler for the same event runs first (STATUS_EVENT_PRIORITY).
+        """
+        parent_port = utils.fetch_port_object(trunk.port_id)
+        if not utils.is_baremetal_parent_port(parent_port):
+            return
+        status = self._trunk_status_for_parent(parent_port)
+        self._claim_subports(subports, status)
+        self._set_trunk_status(trunk, status)
+
+    def _claim_subports(self, subports: list[SubPort], trunk_status: str) -> None:
+        """Mark these ports as subports of a trunk we serve.
+
+        ml2/ovn used to do this as a side effect of managing our trunks
+        (LP #2167105). device_owner is what stops the rest of Neutron -- ovn's
+        own update_lsp_host_info() included -- from treating a subport as a
+        free port, and a subport is only up if the fabric carries it, which is
+        what the trunk's status says.
+        """
+        self._update_subports(
+            subports,
+            device_owner=trunk_consts.TRUNK_SUBPORT_OWNER,
+            status=(
+                p_const.PORT_STATUS_ACTIVE
+                if trunk_status == trunk_consts.TRUNK_ACTIVE_STATUS
+                else p_const.PORT_STATUS_DOWN
+            ),
+        )
+
+    def _release_subports(self, subports: list[SubPort]) -> None:
+        """Undo _claim_subports() for ports that are leaving the trunk."""
+        self._update_subports(
+            subports, device_owner="", status=p_const.PORT_STATUS_DOWN
+        )
+
+    @staticmethod
+    def _update_subports(
+        subports: list[SubPort], device_owner: str, status: str
+    ) -> None:
+        # Written straight to the port row, as ml2/ovn did: update_port_status()
+        # would re-enter the mechanism drivers, and a revision bump would send
+        # ovn's maintenance worker chasing an LSP that has not changed.
+        for subport in subports:
+            utils.update_port_fields(
+                subport["port_id"],
+                {"device_owner": device_owner, "status": status},
+            )
 
     def _handle_tenant_vlan_id_and_switchport_config(
         self, subports: list[SubPort], trunk: Trunk
@@ -208,10 +306,19 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         subports = payload.metadata["subports"]
         self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
 
+    def subports_added_post(self, resource, event, trunk_plugin, payload):
+        self._record_trunk_state(payload.states[0], payload.metadata["subports"])
+
     def subports_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = payload.metadata["subports"]
         self._clean_parent_port_switchport_config(trunk, subports)
+
+        parent_port = utils.fetch_port_object(trunk.port_id)
+        if not utils.is_baremetal_parent_port(parent_port):
+            return
+        self._release_subports(subports)
+        self._set_trunk_status(trunk, self._trunk_status_for_parent(parent_port))
 
     def trunk_created(self, resource, event, trunk_plugin, payload):
         trunk = payload.latest_state
@@ -219,8 +326,47 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         if subports:
             self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
 
+    def trunk_created_post(self, resource, event, trunk_plugin, payload):
+        """A trunk is born DOWN; record its real state once its rows are committed."""
+        trunk = payload.states[0]
+        self._record_trunk_state(trunk, trunk.sub_ports)
+
+    def parent_port_updated(self, resource, event, trunk_plugin, payload):
+        """Follow a trunked parent port to ACTIVE.
+
+        A trunk is usually created before the node is deployed, so the parent's
+        vif-attach is the point where its fabric config first exists. ml2/ovn
+        does this for its own trunks; ours are not its to manage.
+        """
+        updated_port = payload.latest_state
+        trunk_details = updated_port.get("trunk_details")
+        if not trunk_details:
+            return
+        if updated_port.get("status") != p_const.PORT_STATUS_ACTIVE:
+            return
+        if payload.states[0].get("status") == p_const.PORT_STATUS_ACTIVE:
+            return
+        parent_port = utils.fetch_port_object(updated_port["id"])
+        if not utils.is_baremetal_parent_port(parent_port):
+            return
+        if (
+            self._trunk_status_for_parent(parent_port)
+            != trunk_consts.TRUNK_ACTIVE_STATUS
+        ):
+            return
+
+        trunk = trunk_objects.Trunk.get_object(
+            payload.context, id=trunk_details["trunk_id"]
+        )
+        if not trunk:
+            return
+        self._claim_subports(trunk.sub_ports, trunk_consts.TRUNK_ACTIVE_STATUS)
+        self._set_trunk_status(trunk, trunk_consts.TRUNK_ACTIVE_STATUS)
+
     def trunk_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = trunk.sub_ports
         if subports:
             self._clean_parent_port_switchport_config(trunk, subports)
+            if utils.is_baremetal_parent_port(utils.fetch_port_object(trunk.port_id)):
+                self._release_subports(subports)
