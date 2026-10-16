@@ -10,8 +10,13 @@ image:
   repository: ghcr.io/rackerlabs/understack/nautobotop
   # This sets the pull policy for images.
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
+  # Pins the image tag. When empty, understackRef is used, then "latest".
   tag: ""
+
+# Set by the ArgoCD Application to the understack_ref when it is a release tag
+# (vX.Y.Z), so the image follows the UnderStack release the chart came from.
+# Ignored when image.tag is set.
+understackRef: ""
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []

@@ -365,7 +365,7 @@ catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
 .PHONY: copy-crds-to-helm
-copy-crds-to-helm: ## Copy generated CRDs into Helm chart
+copy-crds-to-helm: ## Copy generated CRDs into the charts/nautobotop Helm chart
 	@echo "Copying CRDs to Helm chart..."
-	mkdir -p helm/crds
-	cat config/crd/bases/sync.rax.io_nautobots.yaml > helm/crds/clients.yaml
+	mkdir -p ../../charts/nautobotop/crds
+	cat config/crd/bases/sync.rax.io_nautobots.yaml > ../../charts/nautobotop/crds/clients.yaml
