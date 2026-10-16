@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# Enable rsyslog and the boot-time configuration unit so remote log forwarding
+# is wired up on every ramdisk boot. The actual destination is resolved at boot
+# from the kernel cmdline by undercloud-rsyslog-configure.
+
+# dib-lint: disable=set setu setpipefail indent
+if [ "${DIB_DEBUG_TRACE:-0}" -gt 0 ]; then
+    set -x
+fi
+set -e
+
+# rsyslog's Debian package usually enables itself via systemd presets, but make
+# it explicit so the ramdisk always starts it.
+systemctl enable rsyslog.service || true
+systemctl enable undercloud-rsyslog-configure.service

@@ -73,12 +73,19 @@ jobs:
           path: ironic-images/artifacts/
 
   build-tenant-images:
-    runs-on: ubuntu-latest
+    # Pinned to 24.04 because newer runner images ship sudo-rs, which ignores
+    # `sudo -E`. diskimage-builder's package-installs element relies on -E to
+    # pass ARCH through, so builds that use arch-specific packages (e.g. grub2
+    # in the ubuntu images) fail with KeyError: 'ARCH'.
+    runs-on: ubuntu-24.04
     needs: [discover, build-esp-image]
     defaults:
       run:
         working-directory: ironic-images
     strategy:
+      # Each image is independent and can fail for its own reasons, so don't
+      # cancel the remaining matrix builds when one fails.
+      fail-fast: false
       matrix:
         yaml-file: ${{ fromJson(needs.discover.outputs.yaml-files) }}
 
@@ -147,6 +154,8 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
 
   cleanup:
+    # run even if some image builds failed so the shared artifact is removed
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     needs: build-tenant-images
 

@@ -16,6 +16,7 @@ RUN git checkout ${IPXE_GIT_REF}
 # Copy config files
 COPY ipxe-general.h /src/ipxe/src/config/local/general.h
 COPY ipxe-branding.h /src/ipxe/src/config/local/branding.h
+COPY ipxe-console.h /src/ipxe/src/config/local/console.h
 
 WORKDIR /src/ipxe/src
 RUN make bin-x86_64-efi/snponly.efi ${IPXE_FLAGS}
