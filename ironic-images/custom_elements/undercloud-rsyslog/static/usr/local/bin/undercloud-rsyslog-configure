@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# Configure rsyslog to forward the IPA ramdisk's logs to a remote syslog
+# collector during cleaning/inspection/deploy.
+#
+# The destination is read from the kernel command line so the image stays
+# site-agnostic (one shared IPA image across all sites). Ironic passes it via
+# [redfish]kernel_append_params / [pxe]pxe_append_params in each deploy site's
+# ironic/values.yaml, e.g.  syslog_server=10.46.100.83  (optionally with
+# syslog_port=514). This mirrors how the stock dynamic-login element reads
+# rootpwd=/sshkey= from /proc/cmdline.
+#
+# rsyslog reads the systemd journal (imjournal), so everything IPA logs to the
+# journal is forwarded. Forwarding is RFC3164 over TCP by default (reliable);
+# the OTEL syslog receiver listens on both UDP and TCP 514.
+
+# dib-lint: disable=set setu setpipefail indent
+if [ "${DIB_DEBUG_TRACE:-0}" -gt 0 ]; then
+    set -x
+fi
+set -e
+
+CMDLINE=$(</proc/cmdline)
+
+SYSLOG_SERVER=""
+if [[ $CMDLINE =~ syslog_server=\"?([^\"[:space:]]+)\"? ]]; then
+    SYSLOG_SERVER="${BASH_REMATCH[1]}"
+fi
+
+# No target configured -> leave rsyslog at its defaults (local only) and exit
+# cleanly so this never blocks boot.
+if [ -z "$SYSLOG_SERVER" ]; then
+    echo "undercloud-rsyslog: no syslog_server= on kernel cmdline, skipping remote forwarding"
+    exit 0
+fi
+
+SYSLOG_PORT="514"
+if [[ $CMDLINE =~ syslog_port=\"?([0-9]+)\"? ]]; then
+    SYSLOG_PORT="${BASH_REMATCH[1]}"
+fi
+
+# Protocol: @@ = TCP (reliable), @ = UDP. Default to TCP; allow syslog_proto=udp.
+PREFIX="@@"
+if [[ $CMDLINE =~ syslog_proto=udp ]]; then
+    PREFIX="@"
+fi
+
+cat > /etc/rsyslog.d/99-undercloud-remote.conf <<EOF
+# Managed by undercloud-rsyslog element (generated at boot from kernel cmdline).
+# Pull from the systemd journal and forward everything to the remote collector.
+module(load="imjournal" StateFile="imjournal.state")
+
+# Queue so transient collector/network blips during cleaning don't wedge boot.
+action(
+    type="omfwd"
+    target="${SYSLOG_SERVER}"
+    port="${SYSLOG_PORT}"
+    protocol="$([ "$PREFIX" = "@@" ] && echo tcp || echo udp)"
+    action.resumeRetryCount="-1"
+    queue.type="linkedList"
+    queue.saveOnShutdown="off"
+    queue.size="10000"
+)
+EOF
+
+echo "undercloud-rsyslog: forwarding journal to ${PREFIX}${SYSLOG_SERVER}:${SYSLOG_PORT}"
+
+# Restart rsyslog if it is already running so the new config takes effect.
+if systemctl is-enabled rsyslog >/dev/null 2>&1; then
+    systemctl restart rsyslog || true
+fi
