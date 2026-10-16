@@ -485,7 +485,7 @@ site:
     enabled: false
     # -- Chart version for OVN
     # renovate: datasource=helm depName=ovn registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: "2026.1.42+696f501eb"
+    chartVersion: "2026.1.43+cb8a7b596"
 
   # -- Chrony NTP service configuration
   chrony:
