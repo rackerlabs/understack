@@ -22,6 +22,7 @@ resources:
   - workflowtemplates/ansible-run.yaml
   - workflowtemplates/inspect-server.yaml
   - workflowtemplates/bmc-password.yaml
+  - workflowtemplates/snmpv3-password.yaml
   - workflowtemplates/server-firmware-update.yaml
   - workflowtemplates/resync-nautobot.yaml
   # CronWorkflows

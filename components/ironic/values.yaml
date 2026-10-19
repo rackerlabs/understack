@@ -290,6 +290,9 @@ pod:
       - secret:
           name: ironic-bmc-sso-oidc-ini
           optional: true
+      - secret:
+          name: ironic-snmpv3-master
+          optional: true
     ironic_novncproxy:
       - secret:
           name: ironic-ks-etc
