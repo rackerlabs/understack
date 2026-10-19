@@ -480,6 +480,17 @@ def active_port_binding(port: port_obj.Port) -> port_obj.PortBinding | None:
     )
 
 
+def is_baremetal_parent_port(port: port_obj.Port) -> bool:
+    """Whether a trunk on this parent port is ours to manage.
+
+    ml2/ovn manages the trunks of every other parent; this is the same
+    distinction its trunk driver draws on the LSP's type (LP #2167105).
+    """
+    return bool(port.bindings) and (
+        port.bindings[0].vnic_type == portbindings.VNIC_BAREMETAL
+    )
+
+
 def parent_port_is_bound(port: port_obj.Port) -> bool:
     port_binding = active_port_binding(port)
     return bool(

@@ -13,6 +13,7 @@ from neutron.plugins.ml2 import db as ml2_db
 from neutron.services.trunk import exceptions as trunk_exc
 from neutron_lib import constants as p_const
 from neutron_lib.callbacks import exceptions as cb_exc
+from neutron_lib.services.trunk import constants as trunk_consts
 
 from neutron_understack.tests.scenarios.base import DEFAULT_PHYSNET
 from neutron_understack.tests.scenarios.base import UnderstackMl2TrunkScenarioBase
@@ -74,6 +75,15 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
                 self.context, trunk_id, {"sub_ports": [{"port_id": subport_id}]}
             )
 
+    def _trunk_status(self, trunk_id):
+        return self.trunk_plugin.get_trunk(self.context, trunk_id)["status"]
+
+    def _assert_subport_claimed(self, subport_id, status):
+        """The trunk owns the subport, and the subport follows the trunk."""
+        port = self._show("ports", subport_id)["port"]
+        assert port["device_owner"] == trunk_consts.TRUNK_SUBPORT_OWNER
+        assert port["status"] == status
+
     def _assert_subport_bound(self, trunk_id, subport_id, host, seg_id=SUBPORT_VLAN):
         assert {
             subport["port_id"]: subport for subport in self._trunk_subports(trunk_id)
@@ -93,11 +103,18 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         assert segment[segments_db.PHYSICAL_NETWORK] == DEFAULT_PHYSNET
         segment_obj = NetworkSegment.get_object(self.context, id=levels[0].segment_id)
         assert segment_obj.is_dynamic
+
+        self._assert_subport_claimed(subport_id, p_const.PORT_STATUS_ACTIVE)
+        assert self._trunk_status(trunk_id) == trunk_consts.TRUNK_ACTIVE_STATUS
         return levels[0].segment_id
 
     def _assert_subport_unbound(self, subport_id, host, segment_id):
         assert not ml2_db.get_binding_level_objs(self.context, subport_id, host)
         assert segments_db.get_segment_by_id(self.context, segment_id) is None
+
+        port = self._show("ports", subport_id)["port"]
+        assert port["device_owner"] == ""
+        assert port["status"] == p_const.PORT_STATUS_DOWN
 
     @pytest.mark.scenario("TRUNK-SUB-ADD")
     def test_subport_add_syncs_parent_physnet(self):
@@ -128,6 +145,7 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
 
         assert updated_trunk["sub_ports"] == []
         self._assert_subport_unbound(subport_id, "host-a", segment_id)
+        assert self._trunk_status(trunk_id) == trunk_consts.TRUNK_ACTIVE_STATUS
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
 
     @pytest.mark.scenario("TRUNK-ORDER-01")
@@ -221,6 +239,8 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         self._add_subport(trunk_id, subport_id)
 
         assert self._trunk_subports(trunk_id)[0]["port_id"] == subport_id
+        assert self._trunk_status(trunk_id) == trunk_consts.TRUNK_DOWN_STATUS
+        assert self._show("ports", subport_id)["port"]["device_owner"] == ""
         assert not ml2_db.get_binding_level_objs(self.context, subport_id, "")
         assert (
             segments_db.get_dynamic_segment(
@@ -274,6 +294,29 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         assert segment_a != segment_b
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
 
+    @pytest.mark.scenario("TRUNK-STATUS-PARENT-BIND-01")
+    def test_trunk_activates_when_the_parent_is_vif_attached(self):
+        parent_net = self._make_network(self.fmt, "parent-net", True)["network"]["id"]
+        parent_id = self._create_baremetal_port(parent_net)
+        subport_net = self._make_network(self.fmt, "subport-net", True)["network"]["id"]
+        subport_id = self._plain_port(subport_net)
+        trunk_id = self._make_trunk(parent_id)
+        self._add_subport(trunk_id, subport_id)
+
+        # Nothing is carried yet: the node has not been deployed.
+        assert self._trunk_status(trunk_id) == trunk_consts.TRUNK_DOWN_STATUS
+        self._assert_subport_claimed(subport_id, p_const.PORT_STATUS_DOWN)
+
+        self.undersync_mock.reset_mock()
+        with mock.patch(
+            "neutron_understack.utils.fetch_network_node_trunk_id",
+            return_value=_FAKE_NN_TRUNK,
+        ):
+            self._vif_attach_port(parent_id, DEFAULT_PHYSNET, "host-a")
+
+        self._assert_subport_bound(trunk_id, subport_id, "host-a")
+        self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
+
     @pytest.mark.scenario("TRUNK-SEGID-RANGE-01")
     def test_subport_segid_out_of_range_rejected(self):
         parent_net = self._make_network(self.fmt, "parent-net", True)["network"]["id"]
@@ -288,6 +331,7 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         with pytest.raises(cb_exc.CallbackFailure) as exc_info:
             self._add_subport(trunk_id, subport_id, seg_id=4000)
         assert "Segmentation ID" in str(exc_info.value)
+        assert self._show("ports", subport_id)["port"]["device_owner"] == ""
         assert not ml2_db.get_binding_level_objs(self.context, subport_id, "host-a")
         assert (
             segments_db.get_dynamic_segment(
