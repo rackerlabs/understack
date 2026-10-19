@@ -364,7 +364,7 @@ pod:
         memory: "1024Mi"
         cpu: "100m"
       limits:
-        memory: "2048Mi"
+        memory: "16384Mi"
   affinity:
     anti:
       type:
