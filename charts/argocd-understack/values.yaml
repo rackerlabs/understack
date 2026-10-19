@@ -368,7 +368,7 @@ site:
     wave: 2
     # -- Chart version for Glance
     # renovate: datasource=helm depName=glance registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.57+fff2b9ab5
+    chartVersion: 2026.1.67+a39ebbeb1
 
   # -- Cinder (Block Storage Service)
   cinder:
