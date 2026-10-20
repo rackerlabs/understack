@@ -452,7 +452,7 @@ site:
     wave: 4
     # -- Chart version for Horizon
     # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.40+cb8a7b596
+    chartVersion: 2026.1.46+0b20d4296
 
   # -- Skyline (Dashboard)
   skyline:
