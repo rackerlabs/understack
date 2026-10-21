@@ -24,6 +24,12 @@ RUN git -C /src/sushy fetch --unshallow --tags && \
 
 COPY python/ironic-understack /src/understack/ironic-understack
 
+# Override the oslo.messaging pin from the 2026.1 upper-constraints (17.3.1) to pull in
+# the QManager reply-queue collision fix (bug/2110957), backported to stable/2026.1 and
+# released as 17.3.2. This stays within the 2026.1 (17.x) release line.
+ARG OSLO_MESSAGING_VERSION=17.3.2
+RUN sed -i '/^oslo.messaging===.*/d' /upper-constraints.txt
+
 ARG OPENSTACK_VERSION="required_argument"
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
@@ -32,7 +38,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         /src/ironic \
         /src/sushy \
         /src/understack/ironic-understack \
-        proliantutils==2.16.3
+        proliantutils==2.16.3 \
+        "oslo.messaging==${OSLO_MESSAGING_VERSION}"
 
 COPY containers/ironic/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
