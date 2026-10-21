@@ -42,12 +42,29 @@ func (s *TenantSync) SyncAll(ctx context.Context, data map[string]string) error 
 		tenants.Tenant = append(tenants.Tenant, yml...)
 	}
 
-	for _, t := range tenants.Tenant {
-		if err := s.syncSingleTenant(ctx, t); err != nil {
-			return err
-		}
+	return s.applyTenants(ctx, tenants, s.syncSingleTenant, s.deleteObsoleteTenants)
+}
+
+func (s *TenantSync) applyTenants(
+	ctx context.Context,
+	tenants models.Tenants,
+	syncOne func(context.Context, models.Tenant) error,
+	prune func(context.Context, models.Tenants),
+) error {
+	result, err := syncItems(ctx, tenants.Tenant, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteTenants(ctx, tenants)
+
+	prune(ctx, tenants)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("tenantDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "tenant", Failures: result.DataFailures}
+	}
+
 	return nil
 }
 

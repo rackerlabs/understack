@@ -62,17 +62,46 @@ func (s *PrefixSync) SyncAll(ctx context.Context, data map[string]string) error 
 		prefixes.Prefix = append(prefixes.Prefix, yml...)
 	}
 
+	return s.applyPrefixes(ctx, prefixes, s.syncSinglePrefix, s.deleteObsoletePrefixes)
+}
+
+// applyPrefixes contains the orchestration for a parsed set of prefixes:
+// apply each one (isolating per-item data errors), prune obsolete prefixes,
+// and report any data failures. syncOne and prune are parameters so the
+// orchestration can be exercised in tests without a live Nautobot.
+//
+// syncOne returns the Nautobot ID of the prefix it touched (or "" on create
+// failure); these IDs are forwarded to prune so it can identify obsolete
+// objects by ID rather than by prefix string.
+func (s *PrefixSync) applyPrefixes(
+	ctx context.Context,
+	prefixes models.Prefixes,
+	syncOne func(context.Context, models.Prefix) (string, error),
+	prune func(context.Context, map[string]struct{}),
+) error {
+	// Wrap syncOne to accumulate synced IDs and satisfy syncItems' signature.
 	syncedIDs := make(map[string]struct{}, len(prefixes.Prefix))
-	for _, prefix := range prefixes.Prefix {
-		id, err := s.syncSinglePrefix(ctx, prefix)
-		if err != nil {
-			return err
-		}
+	wrapper := func(ctx context.Context, p models.Prefix) error {
+		id, err := syncOne(ctx, p)
 		if id != "" {
 			syncedIDs[id] = struct{}{}
 		}
+		return err
 	}
-	s.deleteObsoletePrefixes(ctx, syncedIDs)
+
+	result, err := syncItems(ctx, prefixes.Prefix, wrapper)
+	if err != nil {
+		return err
+	}
+
+	prune(ctx, syncedIDs)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("prefixDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "prefix", Failures: result.DataFailures}
+	}
 
 	return nil
 }
