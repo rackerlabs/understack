@@ -23,6 +23,8 @@ spec:
   arguments:
     parameters:
       - name: ip_address
+      - name: post_inspection_runbooks
+        value: "[]"
       - name: firmware_update
         value: "false"
       - name: raid_configure
@@ -44,6 +46,8 @@ spec:
         args:
           - --ip-address
           - "{{workflow.parameters.ip_address}}"
+          - --post-inspection-runbooks
+          - "{{workflow.parameters.post_inspection_runbooks}}"
           - --firmware-update
           - "{{workflow.parameters.firmware_update}}"
           - --raid-configure

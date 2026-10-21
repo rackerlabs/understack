@@ -339,6 +339,35 @@ def inspect(node: Node, inspect_interface: str = "agent"):
     transition(node, target_state="inspect", expected_state="manageable")
 
 
+def run_post_inspection_runbook(node: Node, name_or_id: str) -> None:
+    """Run a selected runbook while the inspected node is manageable.
+
+    Require at least one matching runbook trait before starting cleaning.
+    Let the runbook determine whether cleaning needs an agent ramdisk.
+    """
+    client = IronicClient()
+    runbook = client.get_runbook(name_or_id)
+    traits = client.get_node_traits(node.uuid)
+    runbook_traits = getattr(runbook, "traits", None)
+    if runbook_traits is None:
+        raise ValueError(
+            f"[node:{node.uuid}] Runbook {name_or_id!r} has no traits metadata; "
+            "Ironic API 1.112 or newer is required"
+        )
+    if not set(traits).intersection(runbook_traits):
+        raise ValueError(
+            f"[node:{node.uuid}] Runbook {name_or_id!r} requires at least one "
+            f"matching node trait from {sorted(runbook_traits)}"
+        )
+    logger.info("[node:%s] Running post-inspection runbook %s", node.uuid, name_or_id)
+    transition(
+        node,
+        target_state="clean",
+        expected_state="manageable",
+        runbook=runbook.uuid,
+    )
+
+
 def apply_firmware_updates(node: Node) -> None:
     client = IronicClient()
     traits = client.get_node_traits(node.uuid)
