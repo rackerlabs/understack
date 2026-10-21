@@ -15,14 +15,20 @@ from openstack_sync.hooks.framework import hook_inputs
 from openstack_sync.hooks.framework import run_hook
 from openstack_sync.hooks.framework import run_sync
 from openstack_sync.plugins.common import wait_for_openstack_network
-from openstack_sync.plugins.neutron.segment_ranges import prune as prune_module
 from openstack_sync.plugins.neutron.segment_ranges import reconcile as reconcile_module
 from openstack_sync.plugins.neutron.segment_ranges.config import BINDING_NAME
 from openstack_sync.plugins.neutron.segment_ranges.config import ENV_PREFIX
 
 
 class SegmentRangePlugin(SyncPlugin):
-    """Sync NeutronSegmentRange CRs into Neutron network segment ranges."""
+    """Sync NeutronSegmentRange CRs into Neutron network segment ranges.
+
+    A segment range is shared infrastructure that outlives any single CR: the
+    plugin only ever finds, adopts, or creates one and never deletes it. It
+    therefore defines no prune step, so the framework runs no cleanup and
+    attaches no finalizer -- deleting a CR leaves its Neutron range in place for
+    an operator to drain and remove.
+    """
 
     noun = "segment range"
 
@@ -34,11 +40,9 @@ class SegmentRangePlugin(SyncPlugin):
         )
 
     def new_cache(self) -> reconcile_module.RangeCache:
-        # Keyed by managed range name and shared across every CR in one
-        # credential group, so the managed-range listing is fetched once and
-        # reused by each reconcile in the group. Prune does not receive this
-        # cache (SyncPlugin.prune / PruneRequest carry no cache) and re-lists
-        # from Neutron itself.
+        # Keyed by range name and shared across every CR in one credential
+        # group, so Neutron is listed once and reused by each reconcile in the
+        # group.
         return {}
 
     def reconcile(
@@ -46,21 +50,6 @@ class SegmentRangePlugin(SyncPlugin):
     ) -> ReconcileResult:
         notes = reconcile_module.sync_segment_range(conn, spec, cache)
         return ReconcileResult(notes=notes)
-
-    def prune(
-        self,
-        conn: Any,
-        desired_specs: list[dict[str, Any]],
-        *,
-        authoritative_empty: bool,
-    ) -> None:
-        # The framework only calls prune under a cleanup policy that runs it,
-        # which for this plugin means the chart's PRUNE flag is enabled (see
-        # SyncPlugin.cleanup_policy: config.prune + a real prune step ->
-        # FINALIZED_PRUNE). No manual gate on config.prune is needed here.
-        prune_module.prune_removed_ranges(
-            conn, desired_specs, authoritative_empty=authoritative_empty
-        )
 
 
 def main() -> int:
