@@ -1,0 +1,15 @@
+[Unit]
+Description=Configure rsyslog remote forwarding from kernel cmdline (undercloud)
+# Needs the network up so the first forwarded messages can reach the collector.
+After=network-online.target systemd-journald.service
+Wants=network-online.target
+# Configure before rsyslog starts so the generated drop-in is present on first start.
+Before=rsyslog.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/undercloud-rsyslog-configure
+
+[Install]
+WantedBy=multi-user.target

@@ -51,7 +51,8 @@ RUN \
 COPY containers/ironic/ironic-console-pod.yaml.template /var/lib/openstack/lib/python3.12/site-packages/ironic/console/container/
 
 # renovate: datasource=docker depName=ghcr.io/rackerlabs/understack/ironic-ipxe versioning=semver
-FROM ghcr.io/rackerlabs/understack/ironic-ipxe:1.0.0 AS ipxe
+# FROM ghcr.io/rackerlabs/understack/ironic-ipxe:1.0.0 AS ipxe
+FROM ghcr.io/rackerlabs/understack/ironic-ipxe:pr-2527 AS ipxe
 
 FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_noble AS final
 
