@@ -47,12 +47,38 @@ func (s *ClusterSync) SyncAll(ctx context.Context, data map[string]string) error
 		clusters.Cluster = append(clusters.Cluster, yml...)
 	}
 
-	for _, cluster := range clusters.Cluster {
-		if err := s.syncSingleCluster(ctx, cluster); err != nil {
-			return err
-		}
+	return s.applyClusters(ctx, clusters, s.syncSingleCluster, s.deleteObsoleteClusters)
+}
+
+// applyClusters contains the orchestration for a parsed set of clusters:
+// apply each one (isolating per-item data errors), prune obsolete clusters,
+// and report any data failures. syncOne and prune are parameters so the
+// orchestration can be exercised in tests without a live Nautobot.
+func (s *ClusterSync) applyClusters(
+	ctx context.Context,
+	clusters models.Clusters,
+	syncOne func(context.Context, models.Cluster) error,
+	prune func(context.Context, models.Clusters),
+) error {
+	// Apply every cluster, isolating per-item data errors (e.g. a 400 from
+	// Nautobot rejecting a bad reference) so one bad cluster does not block
+	// the rest. Infrastructure errors (auth, 5xx, transport) still abort.
+	result, err := syncItems(ctx, clusters.Cluster, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteClusters(ctx, clusters)
+
+	// Only prune obsolete clusters once the desired set was applied without an
+	// infrastructure failure. Per-item data failures are tolerated here: the
+	// clusters that did apply are still authoritative for the prune.
+	prune(ctx, clusters)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("clusterDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "cluster", Failures: result.DataFailures}
+	}
 
 	return nil
 }
