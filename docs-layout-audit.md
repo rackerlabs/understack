@@ -320,7 +320,7 @@ Consequences:
   Renaming them to `deploy/` and `operations/` would break seven files outside
   `docs/` for zero content benefit — `charts/argocd-understack/values.yaml` (four
   places) and `README.md` for `deploy-guide/`; `scripts/README.md`,
-  `go/understackctl/README.md`, `operators/monitoring/README.md`,
+  `go/understackctl/README.md`, `components/monitoring/README.md`,
   `examples/openstack-notifications/README.md` and
   `ansible/roles/nova_flavors/README.md` for `operator-guide/`.
 
@@ -497,7 +497,7 @@ therefore cannot be required.
 5. `scripts/check-published-links.py` — assert every
    `rackerlabs.github.io/understack/<path>` reference in non-`docs/` files
    resolves inside the built `site/`. This is the check that would have caught
-   the `operators/monitoring/README.md` 404, and it is what makes future moves
+   the `components/monitoring/README.md` 404, and it is what makes future moves
    safe. It now matters more: `.github/workflows/release-notes.yaml` constructs
    such a URL and writes it into GitHub release bodies, where a 404 is permanent
    because the body is already published. That workflow's URL template belongs in

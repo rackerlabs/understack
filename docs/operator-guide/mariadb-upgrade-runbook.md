@@ -61,7 +61,7 @@ kubectl get storageclass
 ### 6. Update Mariadb Operator version
 
 - Edit operator reference in:
-   [kustomization.yaml](https://github.com/rackerlabs/understack/blob/main/operators/mariadb-operator/kustomization.yaml)
+   [kustomization.yaml](https://github.com/rackerlabs/understack/blob/main/components/mariadb-operator/kustomization.yaml)
 
 ### 7. Perform the release
 
