@@ -4,11 +4,14 @@ IronicClient.__init__ needs Ironic config, so these bypass it with __new__ and
 inject a mock ``irclient`` (the openstacksdk baremetal proxy).
 """
 
+from types import SimpleNamespace
+
 import pytest
 from openstack.baremetal.v1.node import Node
 
 from neutron_understack.ironic import IronicClient
 from neutron_understack.ironic import NodeReleaseResult
+from neutron_understack.ironic import uses_port_roles
 
 _DEFAULT_EXTRA = object()
 
@@ -51,12 +54,16 @@ class _FakeBaremetal:
         fail_manage_once=False,
     ):
         self.node = node
+        self.nics = []
         self.fail_undeploy_once = fail_undeploy_once
         self.fail_cleanup_once = fail_cleanup_once
         self.fail_manage_once = fail_manage_once
 
     def _copy(self):
         return Node(**self.node.to_dict())
+
+    def ports(self, **filters):
+        return list(self.nics)
 
     def get_node(self, node):
         node_id = node.id if isinstance(node, Node) else node
@@ -165,6 +172,7 @@ class TestAdoptRollback:
         # re-raise so the create aborts. The recovery leaves a manageable node
         # parked after clearing ownership.
         client = _client(mocker)
+        client.irclient.ports.return_value = []  # read before manage
         node = _node(state="available", router_id=None)
         owner = {"understack_router_id": "r"}
         marker = {
@@ -715,3 +723,96 @@ class TestReconcilerTimeout:
         client.release_node_for_router("router-1")
 
         assert self._timeout_used(client) == 300
+
+
+class TestUsesPortRoles:
+    @pytest.mark.parametrize(
+        ("instance_info", "expected"),
+        [
+            ({"traits": ["CUSTOM_NETDEV_ROLE_ATTACH"]}, True),
+            ({"traits": ["CUSTOM_OTHER"]}, False),
+            ({}, False),
+            ("not-a-dict", False),
+        ],
+    )
+    def test_reads_instance_info_traits(self, instance_info, expected):
+        node = SimpleNamespace(instance_info=instance_info)
+
+        assert uses_port_roles(node) is expected
+
+
+class TestRoleTraitOnAdoption:
+    """Adoption sets instance_info.traits to match the node's port roles."""
+
+    def _adopt(self, *, categories, instance_info=None, traits=()):
+        node = _node(state="available", router_id=None, lessee=None, instance_name=None)
+        node.traits = list(traits)
+        node.instance_info = instance_info or {}
+        client = IronicClient.__new__(IronicClient)
+        client.irclient = _FakeBaremetal(node)
+        client.irclient.nics = [SimpleNamespace(category=c) for c in categories]
+        client.adopt_node_for_router(
+            client.irclient.node, project_id="p", router_id="r-1", router_name="rtr"
+        )
+        return client.irclient.node
+
+    def test_node_without_port_roles_keeps_the_default_attach(self):
+        node = self._adopt(categories=["network"])
+
+        assert node.provision_state == "active"
+        assert node.instance_info == {}
+
+    def test_node_with_port_roles_gets_only_the_role_trait(self):
+        node = self._adopt(
+            categories=["outside", "inside", "network"],
+            instance_info={"traits": ["CUSTOM_NETWORK_PORTGROUP"], "note": "kept"},
+        )
+
+        # Only the role rule may run, or another rule could take a spare NIC.
+        assert node.provision_state == "active"
+        assert node.instance_info == {
+            "traits": ["CUSTOM_NETDEV_ROLE_ATTACH"],
+            "note": "kept",
+        }
+
+    def test_a_failed_port_lookup_leaves_the_node_available(self):
+        node = _node(state="available", router_id=None, lessee=None, instance_name=None)
+        client = IronicClient.__new__(IronicClient)
+        client.irclient = _FakeBaremetal(node)
+
+        def lookup_fails(**_):
+            raise RuntimeError("port lookup failed")
+
+        client.irclient.ports = lookup_fails
+
+        with pytest.raises(RuntimeError, match="port lookup failed"):
+            client.adopt_node_for_router(
+                client.irclient.node, project_id="p", router_id="r-1", router_name="rtr"
+            )
+
+        # Untouched: still available and unowned.
+        assert client.irclient.node.provision_state == "available"
+        assert client.irclient.node.instance_id is None
+
+    def test_node_without_port_roles_loses_a_stale_role_trait(self):
+        # A leftover node trait is ignored.
+        node = self._adopt(
+            categories=["network"],
+            traits=["CUSTOM_NETDEV_ROLE_ATTACH"],
+            instance_info={"traits": ["CUSTOM_NETDEV_ROLE_ATTACH"]},
+        )
+
+        assert node.instance_info == {"traits": []}
+
+
+class TestPortForVif:
+    def test_finds_the_port_holding_the_vif(self, mocker):
+        client = _client(mocker)
+        holder = SimpleNamespace(internal_info={"tenant_vif_port_id": "port-1"})
+        client.irclient.ports.return_value = [
+            SimpleNamespace(internal_info=None),
+            holder,
+        ]
+
+        assert client.port_for_vif(_node("n1"), "port-1") is holder
+        assert client.port_for_vif(_node("n1"), "port-2") is None

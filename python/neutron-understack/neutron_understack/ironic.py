@@ -35,6 +35,24 @@ _PROVISION_TIMEOUT = 300
 _RECONCILE_PROVISION_TIMEOUT = 60
 _PANOS_DRIVER = "panos"
 _ROUTER_RELEASE_MARKER = "understack_router_release"  # release is in progress
+# Adoption sets it in instance_info.traits when a port has a role.
+ROLE_ATTACH_TRAIT = "CUSTOM_NETDEV_ROLE_ATTACH"
+_TENANT_VIF_KEY = "tenant_vif_port_id"
+# Port categories that give a NIC a router role.
+_ROLE_CATEGORIES = frozenset({"outside", "inside"})
+
+
+def uses_port_roles(node) -> bool:
+    """Return True if Ironic will attach this node's VIFs by port role.
+
+    Reads instance_info, not node traits: Ironic applies a TBN trait only once
+    it is in instance_info.traits, which adoption sets.
+    """
+    instance_info = getattr(node, "instance_info", None)
+    if not isinstance(instance_info, dict):
+        return False
+    traits = instance_info.get("traits")
+    return isinstance(traits, list) and ROLE_ATTACH_TRAIT in traits
 
 
 @dataclass(frozen=True)
@@ -160,7 +178,7 @@ class IronicClient:
         return identities[0]
 
     def attach_vif_to_node(self, node: str | BaremetalNode, vif_id: str) -> None:
-        """Attach a Neutron port (VIF) to the node."""
+        """Attach a VIF, forwarding optional role tags to Ironic's TBN rules."""
         node_id = node.id if isinstance(node, BaremetalNode) else node
         LOG.info("Attaching VIF %s to Ironic node %s", vif_id, node_id)
         self.irclient.attach_vif_to_node(node, vif_id)
@@ -183,6 +201,15 @@ class IronicClient:
         """Return the node's baremetal ports, including their network fields."""
         node_id = node.id if isinstance(node, BaremetalNode) else node
         return list(self.irclient.ports(details=True, node_id=node_id))
+
+    def port_for_vif(
+        self, node: str | BaremetalNode, vif_id: str
+    ) -> BaremetalPort | None:
+        """Return the node's baremetal port that the VIF is attached to, or None."""
+        for port in self.node_ports(node):
+            if (port.internal_info or {}).get(_TENANT_VIF_KEY) == vif_id:
+                return port
+        return None
 
     def adopt_node_for_router(
         self,
@@ -211,6 +238,8 @@ class IronicClient:
             router_name,
             project_id,
         )
+        # Read before manage, so a failed lookup leaves the node untouched.
+        role_instance_info = self._role_attach_instance_info(node)
         try:
             # available -> manageable, required before the adopt verb is valid.
             # Attempt identity-checked rollback if manage or a later step fails.
@@ -232,13 +261,19 @@ class IronicClient:
                 router_id,
                 router_name,
             )
-            self.irclient.update_node(
-                node,
-                retry_on_conflict=False,
-                lessee=project_id,
-                instance_id=router_id,
-                instance_name=router_name,
-            )
+            stamp = {
+                "lessee": project_id,
+                "instance_id": router_id,
+                "instance_name": router_name,
+            }
+            if role_instance_info is not None:
+                LOG.info(
+                    "Setting node %s instance_info.traits to %s",
+                    node_id,
+                    role_instance_info["traits"],
+                )
+                stamp["instance_info"] = role_instance_info
+            self.irclient.update_node(node, retry_on_conflict=False, **stamp)
             LOG.info("Node %s: adopt (manageable -> active)", node_id)
             # Use wait=False: the SDK waits for available after adopt, not active.
             # https://review.opendev.org/c/openstack/openstacksdk/+/999686
@@ -264,6 +299,31 @@ class IronicClient:
             adopted.instance_id,
             adopted.instance_name,
         )
+
+    def _role_attach_instance_info(self, node: str | BaremetalNode) -> dict | None:
+        """Return instance_info whose traits match the node's port roles, or None.
+
+        A node with an outside or inside port gets exactly the role trait, so
+        no other attach rule can run first; a node without loses a stale one.
+        None means no change.
+        Undeploy clears instance_info, so release needs no matching step.
+        """
+        current = (
+            node if isinstance(node, BaremetalNode) else self.irclient.get_node(node)
+        )
+        if current is None:
+            return None
+        instance_info = dict(current.instance_info or {})
+        traits = list(instance_info.get("traits") or [])
+        ports = self.node_ports(current)
+        if any(port.category in _ROLE_CATEGORIES for port in ports):
+            wanted = [ROLE_ATTACH_TRAIT]
+        else:
+            wanted = [trait for trait in traits if trait != ROLE_ATTACH_TRAIT]
+        if wanted == traits:
+            return None
+        instance_info["traits"] = wanted
+        return instance_info
 
     def _return_node_to_available(
         self,

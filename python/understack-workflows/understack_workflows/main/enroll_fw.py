@@ -144,6 +144,7 @@ def enroll_fw(
         driver_info=driver_info,
         extra=extra,
         properties=properties,
+        assign_roles=True,
     )
 
 
@@ -237,6 +238,9 @@ def _reject_structural_drift(
             port=port,
             existing=ports_by_name.get(f"{name}:{port.label}"),
             ports_by_mac=ports_by_mac,
+            # This path assigns no roles, so a live firewall's outside/inside
+            # labels must not count as drift.
+            manage_category=False,
         )
         if plan is not None:
             raise RuntimeError(
@@ -267,7 +271,9 @@ def argument_parser():
         help="JSON array of ports (same format as enroll-netdev). 'switch' must "
         "be the switch FQDN (e.g. n11-22-1.dfw3.rackspace.net) so the Nautobot "
         "sync can resolve the cable. Optional per-port 'bios_name' (the device "
-        "interface name); defaults to the label.",
+        "interface name); defaults to the label. At least two ports: the "
+        "lowest-numbered interface becomes the router's outside NIC (gateway) "
+        "and the next one its inside NIC (subnets).",
     )
     parser.add_argument(
         "--resource-class",
