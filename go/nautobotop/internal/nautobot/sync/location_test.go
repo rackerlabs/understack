@@ -10,6 +10,12 @@ import (
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/syncerr"
 )
 
+const (
+	locBadChild  = "bad-child"
+	locGoodChild = "good-child"
+	locRoot      = "root"
+)
+
 // newTestLocationSync returns a LocationSync with just enough of a client to
 // collect report lines. Service dependencies are left nil because these tests
 // inject syncOne and prune directly.
@@ -32,17 +38,17 @@ func TestApplyLocations_OneBadItemDoesNotBlockTheRest(t *testing.T) {
 	s := newTestLocationSync()
 
 	root := models.Location{
-		Name: "root",
+		Name: locRoot,
 		Children: []models.Location{
-			{Name: "good-child"},
-			{Name: "bad-child"},
+			{Name: locGoodChild},
+			{Name: locBadChild},
 		},
 	}
 	desired := models.Locations{Location: []models.Location{root}}
 
 	var applied []string
 	syncOne := func(_ context.Context, loc models.Location, _ *string) (*string, error) {
-		if loc.Name == "bad-child" {
+		if loc.Name == locBadChild {
 			dataErr := syncerr.NewDataError(loc.Name, errors.New("400 Bad Request: location cannot be applied"))
 			return nil, errors.Join(errors.New("failed to sync location "+loc.Name), dataErr)
 		}
@@ -57,7 +63,7 @@ func TestApplyLocations_OneBadItemDoesNotBlockTheRest(t *testing.T) {
 	err := s.applyLocations(context.Background(), desired, syncOne, prune)
 
 	// root and good-child succeed; bad-child is skipped.
-	if len(applied) != 2 || applied[0] != "root" || applied[1] != "good-child" {
+	if len(applied) != 2 || applied[0] != locRoot || applied[1] != locGoodChild {
 		t.Errorf("expected root and good-child to be applied, got %v", applied)
 	}
 	// Prune still runs when there are only data failures.
@@ -69,7 +75,7 @@ func TestApplyLocations_OneBadItemDoesNotBlockTheRest(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a PartialSyncError, got %v", err)
 	}
-	if pe.Resource != "location" || len(pe.Failures) != 1 || pe.Failures[0].Item != "bad-child" {
+	if pe.Resource != "location" || len(pe.Failures) != 1 || pe.Failures[0].Item != locBadChild {
 		t.Errorf("unexpected partial error contents: %+v", pe)
 	}
 	// The failure is recorded in the client report.

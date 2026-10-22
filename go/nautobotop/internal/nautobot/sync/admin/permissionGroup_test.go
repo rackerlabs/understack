@@ -18,7 +18,7 @@ func newTestPermissionGroupSync() *PermissionGroupSync {
 }
 
 func permissionList(names ...string) []adminmodels.Permission {
-	var perms []adminmodels.Permission
+	perms := make([]adminmodels.Permission, 0, len(names))
 	for _, n := range names {
 		perms = append(perms, adminmodels.Permission{Name: n})
 	}

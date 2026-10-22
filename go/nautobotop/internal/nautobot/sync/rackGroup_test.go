@@ -32,17 +32,17 @@ func TestApplyRackGroups_OneBadItemDoesNotBlockTheRest(t *testing.T) {
 	s := newTestRackGroupSync()
 
 	root := models.RackGroup{
-		Name: "root",
+		Name: locRoot,
 		Children: []models.RackGroup{
-			{Name: "good-child"},
-			{Name: "bad-child"},
+			{Name: locGoodChild},
+			{Name: locBadChild},
 		},
 	}
 	desired := models.RackGroups{RackGroup: []models.RackGroup{root}}
 
 	var applied []string
 	syncOne := func(_ context.Context, rg models.RackGroup, _ *string) (*string, error) {
-		if rg.Name == "bad-child" {
+		if rg.Name == locBadChild {
 			dataErr := syncerr.NewDataError(rg.Name, errors.New("400 Bad Request: rack group cannot be applied"))
 			return nil, errors.Join(errors.New("failed to sync rack group "+rg.Name), dataErr)
 		}
@@ -57,7 +57,7 @@ func TestApplyRackGroups_OneBadItemDoesNotBlockTheRest(t *testing.T) {
 	err := s.applyRackGroups(context.Background(), desired, syncOne, prune)
 
 	// root and good-child succeed; bad-child is skipped.
-	if len(applied) != 2 || applied[0] != "root" || applied[1] != "good-child" {
+	if len(applied) != 2 || applied[0] != locRoot || applied[1] != locGoodChild {
 		t.Errorf("expected root and good-child to be applied, got %v", applied)
 	}
 	// Prune still runs when there are only data failures.
@@ -69,7 +69,7 @@ func TestApplyRackGroups_OneBadItemDoesNotBlockTheRest(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a PartialSyncError, got %v", err)
 	}
-	if pe.Resource != "rackGroup" || len(pe.Failures) != 1 || pe.Failures[0].Item != "bad-child" {
+	if pe.Resource != "rackGroup" || len(pe.Failures) != 1 || pe.Failures[0].Item != locBadChild {
 		t.Errorf("unexpected partial error contents: %+v", pe)
 	}
 	// The failure is recorded in the client report.
