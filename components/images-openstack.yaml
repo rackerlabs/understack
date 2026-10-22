@@ -20,6 +20,8 @@ images:
     keystone_domain_manage: "ghcr.io/rackerlabs/understack/keystone:2026.1"
     keystone_fernet_rotate: "ghcr.io/rackerlabs/understack/keystone:2026.1"
     keystone_fernet_setup: "ghcr.io/rackerlabs/understack/keystone:2026.1"
+    keystone_credential_cleanup: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
+    identity_controller: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
 
     # ironic
     ironic_api: "ghcr.io/rackerlabs/understack/ironic:2026.1"
@@ -27,11 +29,10 @@ images:
     ironic_novncproxy: "ghcr.io/rackerlabs/understack/ironic:2026.1"
     ironic_pxe: "ghcr.io/rackerlabs/understack/ironic:2026.1"
     ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:2026.1"
-    ironic_pxe_http: "docker.io/nginx:1.29.8"
     ironic_db_sync: "ghcr.io/rackerlabs/understack/ironic:2026.1"
+    ironic_pxe_http: "docker.io/nginx:1.29.8"
     # these want curl which apparently is in the openstack-client image
     ironic_manage_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
-    ironic_retrive_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
     ironic_retrive_swift_config: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
 
     # neutron
@@ -39,7 +40,6 @@ images:
     neutron_dhcp: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_l3: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_l2gw: "ghcr.io/rackerlabs/understack/neutron:2026.1"
-    neutron_linuxbridge_agent: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_metadata: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_ovn_metadata: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_openvswitch_agent: "ghcr.io/rackerlabs/understack/neutron:2026.1"
@@ -50,12 +50,17 @@ images:
     neutron_ironic_agent_init: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_periodic_worker: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_bagpipe_bgp: "ghcr.io/rackerlabs/understack/neutron:2026.1"
+    neutron_bgp_dragent: "ghcr.io/rackerlabs/understack/neutron:2026.1"
+    neutron_ovn_agent: "ghcr.io/rackerlabs/understack/neutron:2026.1"
+    neutron_ovn_db_sync: "ghcr.io/rackerlabs/understack/neutron:2026.1"
+    neutron_ovn_vpn: "ghcr.io/rackerlabs/understack/neutron:2026.1"
+    neutron_sriov_agent: "ghcr.io/rackerlabs/understack/neutron:2026.1"
+    neutron_sriov_agent_init: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_netns_cleanup_cron: "ghcr.io/rackerlabs/understack/neutron:2026.1"
 
     # nova
     nova_api: "ghcr.io/rackerlabs/understack/nova:2026.1"
     nova_cell_setup: "ghcr.io/rackerlabs/understack/nova:2026.1"
-    nova_cell_setup_init: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
     nova_compute: "ghcr.io/rackerlabs/understack/nova:2026.1"
     nova_compute_ironic: "ghcr.io/rackerlabs/understack/nova:2026.1"
     nova_compute_ssh: "ghcr.io/rackerlabs/understack/nova:2026.1"
@@ -66,6 +71,9 @@ images:
     nova_scheduler: "ghcr.io/rackerlabs/understack/nova:2026.1"
     nova_spiceproxy: "ghcr.io/rackerlabs/understack/nova:2026.1"
     nova_spiceproxy_assets: "ghcr.io/rackerlabs/understack/nova:2026.1"
+    nova_serialproxy: "ghcr.io/rackerlabs/understack/nova:2026.1"
+    nova_archive_deleted_rows: "ghcr.io/rackerlabs/understack/nova:2026.1"
+    nova_cell_setup_init: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
     nova_service_cleaner: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
     # placement
@@ -114,5 +122,7 @@ images:
     octavia_worker: "ghcr.io/rackerlabs/understack/octavia:2026.1"
     octavia_housekeeping: "ghcr.io/rackerlabs/understack/octavia:2026.1"
     octavia_health_manager: "ghcr.io/rackerlabs/understack/octavia:2026.1"
+    octavia_driver_agent: "ghcr.io/rackerlabs/understack/octavia:2026.1"
     octavia_health_manager_init: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
+    octavia_worker_init: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
 ...
