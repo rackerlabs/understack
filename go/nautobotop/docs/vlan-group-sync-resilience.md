@@ -293,87 +293,87 @@ reference implementation.
 
 #### 8a. `cluster` — `internal/nautobot/sync/cluster.go`
 
-- [ ] Wrap loop in `applyClusters(ctx, clusters, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyClusters(ctx, clusters, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8b. `clusterGroup` — `internal/nautobot/sync/clusterGroup.go`
 
-- [ ] Wrap loop in `applyClusterGroups(ctx, clusterGroups, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyClusterGroups(ctx, clusterGroups, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8c. `clusterType` — `internal/nautobot/sync/clusterType.go`
 
-- [ ] Wrap loop in `applyClusterTypes(ctx, clusterTypes, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyClusterTypes(ctx, clusterTypes, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8d. `device` — `internal/nautobot/sync/device.go`
 
-- [ ] Wrap loop in `applyDevices(ctx, devices, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyDevices(ctx, devices, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8e. `devicetype` — `internal/nautobot/sync/devicetype.go`
 
-- [ ] Wrap loop in `applyDeviceTypes(ctx, deviceTypes, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyDeviceTypes(ctx, deviceTypes, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8f. `namespace` — `internal/nautobot/sync/namespace.go`
 
-- [ ] Wrap loop in `applyNamespaces(ctx, namespaces, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyNamespaces(ctx, namespaces, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8g. `prefix` — `internal/nautobot/sync/prefix.go`
 
-- [ ] Wrap loop in `applyPrefixes(ctx, prefixes, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyPrefixes(ctx, prefixes, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8h. `rack` — `internal/nautobot/sync/rack.go`
 
-- [ ] Wrap loop in `applyRacks(ctx, racks, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyRacks(ctx, racks, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8i. `rir` — `internal/nautobot/sync/rir.go`
 
-- [ ] Wrap loop in `applyRirs(ctx, rirs, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyRirs(ctx, rirs, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8j. `role` — `internal/nautobot/sync/role.go`
 
-- [ ] Wrap loop in `applyRoles(ctx, roles, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyRoles(ctx, roles, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8k. `tenant` — `internal/nautobot/sync/tenant.go`
 
-- [ ] Wrap loop in `applyTenants(ctx, tenants, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyTenants(ctx, tenants, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8l. `tenantGroup` — `internal/nautobot/sync/tenantGroup.go`
 
-- [ ] Wrap loop in `applyTenantGroups(ctx, tenantGroups, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyTenantGroups(ctx, tenantGroups, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8m. `vlan` — `internal/nautobot/sync/vlan.go`
 
-- [ ] Wrap loop in `applyVlans(ctx, vlans, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyVlans(ctx, vlans, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 #### 8n. `admin/permissionGroup` — `internal/nautobot/sync/admin/permissionGroup.go`
 
-- [ ] Wrap loop in `applyPermissionGroups(ctx, perms, syncOne, prune)`.
-- [ ] Replace manual for-loop with `syncItems`.
-- [ ] Add unit test.
+- [x] Wrap loop in `applyPermissionGroups(ctx, perms, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
 
 ---
 
@@ -392,18 +392,18 @@ failures across recursive calls without breaking the parent-before-child orderin
 
 #### 9a. `location` — `internal/nautobot/sync/location.go`
 
-- [ ] Collect errors from `syncLocationRecursive` calls instead of returning on first.
-- [ ] Propagate `PartialSyncError` up through `SyncAll`.
-- [ ] Add unit test covering a failing child location with a succeeding sibling.
+- [x] Collect errors from `syncLocationRecursive` calls instead of returning on first.
+- [x] Propagate `PartialSyncError` up through `SyncAll`.
+- [x] Add unit test covering a failing child location with a succeeding sibling.
 
 #### 9b. `locationtype` — `internal/nautobot/sync/locationtype.go`
 
-- [ ] Collect errors from `syncLocationTypeRecursive` calls instead of returning on first.
-- [ ] Propagate `PartialSyncError` up through `SyncAll`.
-- [ ] Add unit test.
+- [x] Collect errors from `syncLocationTypeRecursive` calls instead of returning on first.
+- [x] Propagate `PartialSyncError` up through `SyncAll`.
+- [x] Add unit test.
 
 #### 9c. `rackGroup` — `internal/nautobot/sync/rackGroup.go`
 
-- [ ] Collect errors from `syncRackGroupRecursive` calls instead of returning on first.
-- [ ] Propagate `PartialSyncError` up through `SyncAll`.
-- [ ] Add unit test.
+- [x] Collect errors from `syncRackGroupRecursive` calls instead of returning on first.
+- [x] Propagate `PartialSyncError` up through `SyncAll`.
+- [x] Add unit test.

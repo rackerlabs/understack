@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/charmbracelet/log"
@@ -9,6 +10,7 @@ import (
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/dcim"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/helpers"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/models"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/syncerr"
 	"github.com/samber/lo"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -42,30 +44,76 @@ func (s *LocationSync) SyncAll(ctx context.Context, data map[string]string) erro
 		location.Location = append(location.Location, yml...)
 	}
 
-	for _, l := range location.Location {
-		if err := s.syncLocationRecursive(ctx, l, nil); err != nil {
+	return s.applyLocations(ctx, location, s.syncSingleLocation, s.deleteObsoleteLocations)
+}
+
+// applyLocations contains the orchestration for a parsed location tree: apply
+// each root and its children (isolating per-item data errors), prune obsolete
+// locations, and report any data failures. syncOne and prune are parameters so
+// the orchestration can be exercised in tests without a live Nautobot.
+func (s *LocationSync) applyLocations(
+	ctx context.Context,
+	locations models.Locations,
+	syncOne func(context.Context, models.Location, *string) (*string, error),
+	prune func(context.Context, models.Locations),
+) error {
+	var failures []ItemFailure
+	for _, loc := range locations.Location {
+		nodeFailures, err := s.syncLocationTreeNode(ctx, loc, nil, syncOne)
+		if err != nil {
+			// Infrastructure error: stop immediately; prune does not run so
+			// controller-runtime backs off and retries.
 			return err
 		}
+		failures = append(failures, nodeFailures...)
 	}
-	s.deleteObsoleteLocations(ctx, location)
+
+	// Prune obsolete locations after the apply loop. Per-item data failures are
+	// tolerated: the locations that did apply are still authoritative.
+	prune(ctx, locations)
+
+	if len(failures) > 0 {
+		for _, f := range failures {
+			s.client.AddReport("locationDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "location", Failures: failures}
+	}
 
 	return nil
 }
 
-// syncLocationRecursive processes a location  and all its children recursively
-func (s *LocationSync) syncLocationRecursive(ctx context.Context, location models.Location, parentID *string) error {
-	currentID, err := s.syncSingleLocation(ctx, location, parentID)
+// syncLocationTreeNode syncs one location node and then recurses into its
+// children. If the node itself fails with a data error its entire subtree is
+// skipped (child IDs depend on the parent being present) and the failure is
+// collected. An infrastructure error propagates immediately and stops the tree
+// walk.
+func (s *LocationSync) syncLocationTreeNode(
+	ctx context.Context,
+	location models.Location,
+	parentID *string,
+	syncOne func(context.Context, models.Location, *string) (*string, error),
+) ([]ItemFailure, error) {
+	currentID, err := syncOne(ctx, location, parentID)
 	if err != nil {
-		return err
-	}
-
-	for _, child := range location.Children {
-		if err := s.syncLocationRecursive(ctx, child, currentID); err != nil {
-			return err
+		var de *syncerr.DataError
+		if errors.As(err, &de) {
+			// Data error: collect it and skip this node's children (they cannot
+			// be applied without the parent's ID).
+			return []ItemFailure{{Item: de.Item, Err: err}}, nil
 		}
+		// Infrastructure error: propagate.
+		return nil, err
 	}
 
-	return nil
+	var failures []ItemFailure
+	for _, child := range location.Children {
+		childFailures, err := s.syncLocationTreeNode(ctx, child, currentID, syncOne)
+		if err != nil {
+			return failures, err
+		}
+		failures = append(failures, childFailures...)
+	}
+	return failures, nil
 }
 
 // syncSingleLocation handles the create/update logic for a single location

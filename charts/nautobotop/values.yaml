@@ -173,3 +173,19 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# -- Prometheus integration.
+# When prometheus.enabled is true a PrometheusRule is created that fires an
+# alert when one or more Nautobot sync items have been failing for longer than
+# one sync interval. The alert resolves automatically when the data is fixed
+# and the next reconcile clears the failure count to zero.
+prometheus:
+  # -- Create a PrometheusRule. Requires prometheus-operator (or compatible
+  # CRD) to be installed in the cluster; if it is not present, set to false.
+  enabled: false
+  # -- Additional labels to add to the PrometheusRule (e.g. to match a
+  # Prometheus CR's ruleSelector).
+  additionalLabels: {}
+  # -- For how long the failure count must be non-zero before the alert fires.
+  # Default is one sync interval (600 s = 10 m).
+  alertForDuration: 10m

@@ -237,6 +237,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if partial, isPartial := sync.IsPartial(err); isPartial {
 			log.Error(err, "resource synced with item failures", "resource", res.name, "failures", len(partial.Failures))
 			nautobotCR.SetSyncItemFailures(res.name, len(partial.Failures))
+			setSyncItemFailuresGauge(nautobotCR.Name, res.name, len(partial.Failures))
 			totalItemFailures += len(partial.Failures)
 			// Do not advance SyncHash: retry this resource next reconcile.
 			continue
@@ -257,6 +258,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		// Clean sync for this resource type.
 		nautobotCR.SetSyncHash(res.name, computeHash(dataMap))
 		nautobotCR.SetSyncItemFailures(res.name, 0)
+		setSyncItemFailuresGauge(nautobotCR.Name, res.name, 0)
 	}
 
 	// Update status. This runs on both a fully clean reconcile and a partial
