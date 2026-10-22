@@ -4,11 +4,16 @@ IronicClient.__init__ needs Ironic config, so these bypass it with __new__ and
 inject a mock ``irclient`` (the openstacksdk baremetal proxy).
 """
 
+from types import SimpleNamespace
+
 import pytest
+import requests
+from openstack import exceptions as sdk_exc
 from openstack.baremetal.v1.node import Node
 
 from neutron_understack.ironic import IronicClient
 from neutron_understack.ironic import NodeReleaseResult
+from neutron_understack.ironic import uses_port_roles
 
 _DEFAULT_EXTRA = object()
 
@@ -715,3 +720,115 @@ class TestReconcilerTimeout:
         client.release_node_for_router("router-1")
 
         assert self._timeout_used(client) == 300
+
+
+class TestUsesPortRoles:
+    @pytest.mark.parametrize(
+        ("instance_info", "expected"),
+        [
+            ({"traits": ["CUSTOM_NETDEV_ROLE_ATTACH"]}, True),
+            ({"traits": ["CUSTOM_OTHER"]}, False),
+            ({}, False),
+            ("not-a-dict", False),
+        ],
+    )
+    def test_reads_instance_info_traits(self, instance_info, expected):
+        node = SimpleNamespace(instance_info=instance_info)
+
+        assert uses_port_roles(node) is expected
+
+
+class TestRoleTraitOnAdoption:
+    """Adoption copies the port-role TBN trait into instance_info.traits."""
+
+    def _adopt(self, *, traits, instance_info=None):
+        node = _node(state="available", router_id=None, lessee=None, instance_name=None)
+        node.traits = traits
+        node.instance_info = instance_info or {}
+        client = IronicClient.__new__(IronicClient)
+        client.irclient = _FakeBaremetal(node)
+        client.adopt_node_for_router(
+            client.irclient.node, project_id="p", router_id="r-1", router_name="rtr"
+        )
+        return client.irclient.node
+
+    def test_node_with_port_roles_gets_the_trait(self):
+        node = self._adopt(traits=["CUSTOM_NETDEV_ROLE_ATTACH"])
+
+        assert node.provision_state == "active"
+        assert node.instance_id == "r-1"
+        assert node.instance_info == {"traits": ["CUSTOM_NETDEV_ROLE_ATTACH"]}
+
+    def test_node_without_port_roles_keeps_the_default_attach(self):
+        node = self._adopt(traits=[])
+
+        assert node.provision_state == "active"
+        assert node.instance_info == {}
+
+    def test_existing_instance_info_and_traits_are_kept(self):
+        node = self._adopt(
+            traits=["CUSTOM_NETDEV_ROLE_ATTACH", "CUSTOM_OTHER"],
+            instance_info={"traits": ["CUSTOM_OTHER"], "note": "kept"},
+        )
+
+        assert node.instance_info == {
+            "traits": ["CUSTOM_OTHER", "CUSTOM_NETDEV_ROLE_ATTACH"],
+            "note": "kept",
+        }
+
+
+class TestTaggedVifAttach:
+    def test_without_tags_uses_the_sdk(self, mocker):
+        client = _client(mocker)
+        node = _node(state="active")
+
+        client.attach_vif_to_node(node, "port-1")
+
+        client.irclient.attach_vif_to_node.assert_called_once_with(node, "port-1")
+        client.irclient.post.assert_not_called()
+
+    def test_with_tags_posts_them_in_vif_info(self, mocker):
+        client = _client(mocker)
+        client.irclient.post.return_value = mocker.Mock(status_code=204)
+        node = _node("n1", state="active")
+
+        client.attach_vif_to_node(node, "port-1", tags=["CUSTOM_NETDEV_OUTSIDE"])
+
+        client.irclient.post.assert_called_once_with(
+            "/nodes/n1/vifs",
+            json={"id": "port-1", "tags": ["CUSTOM_NETDEV_OUTSIDE"]},
+            microversion="1.28",
+            retriable_status_codes=mocker.ANY,
+        )
+        assert 409 in client.irclient.post.call_args.kwargs["retriable_status_codes"]
+        client.irclient.attach_vif_to_node.assert_not_called()
+
+    def test_with_tags_raises_on_an_error_response(self, mocker):
+        client = _client(mocker)
+        response = requests.Response()
+        response.status_code = 400
+        response._content = b'{"error_message": "bad vif"}'
+        response.headers["content-type"] = "application/json"
+        client.irclient.post.return_value = response
+
+        with pytest.raises(sdk_exc.HttpException, match="Failed to attach VIF port-1"):
+            client.attach_vif_to_node(
+                _node("n1", state="active"), "port-1", tags=["CUSTOM_NETDEV_INSIDE"]
+            )
+
+
+class TestPortForVif:
+    def test_returns_the_port_holding_the_vif(self, mocker):
+        client = _client(mocker)
+        idle = SimpleNamespace(internal_info={})
+        holder = SimpleNamespace(internal_info={"tenant_vif_port_id": "port-1"})
+        client.irclient.ports.return_value = [idle, holder]
+
+        assert client.port_for_vif(_node("n1"), "port-1") is holder
+        client.irclient.ports.assert_called_once_with(details=True, node_id="n1")
+
+    def test_returns_none_when_no_port_holds_it(self, mocker):
+        client = _client(mocker)
+        client.irclient.ports.return_value = [SimpleNamespace(internal_info=None)]
+
+        assert client.port_for_vif(_node("n1"), "port-1") is None

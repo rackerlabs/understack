@@ -1169,3 +1169,190 @@ def test_enroll_does_not_touch_port_with_real_switch_id_and_matching_metadata(
     # update and no state churn on the available node.
     fake_ironic.port.update.assert_not_called()
     fake_ironic.node.set_provision_state.assert_not_called()
+
+
+# --- port roles (outside / inside), assigned by enroll-fw -------------------
+
+ROLE_TRAIT = "CUSTOM_NETDEV_ROLE_ATTACH"
+
+
+def _port(label, bios_name=None):
+    return netdev_reconciler.NetdevPort(
+        label=label,
+        mac=f"00:00:00:00:00:{len(label):02x}",
+        switch="leaf-1",
+        interface="Ethernet1/1",
+        bios_name=bios_name or label,
+    )
+
+
+def _roles(ports):
+    return {
+        port.label: port.role for port in netdev_reconciler.assign_port_roles(ports)
+    }
+
+
+def test_lowest_interface_is_outside_whatever_the_input_order():
+    ports = [_port("ethernet1/20"), _port("ethernet1/19")]
+
+    assert _roles(ports) == {"ethernet1/19": "outside", "ethernet1/20": "inside"}
+
+
+def test_interface_numbers_compare_as_numbers():
+    # As plain text "ethernet1/10" would sort before "ethernet1/9".
+    ports = [_port("ethernet1/10"), _port("ethernet1/9")]
+
+    assert _roles(ports) == {"ethernet1/9": "outside", "ethernet1/10": "inside"}
+
+
+def test_more_than_two_ports_label_only_the_two_lowest():
+    ports = [_port("ethernet1/3"), _port("ethernet1/1"), _port("ethernet1/2")]
+
+    assert _roles(ports) == {
+        "ethernet1/1": "outside",
+        "ethernet1/2": "inside",
+        "ethernet1/3": None,
+    }
+
+
+def test_a_single_port_gets_no_role():
+    assert _roles([_port("ethernet1/1")]) == {"ethernet1/1": None}
+
+
+def test_the_device_interface_name_wins_over_the_label():
+    ports = [
+        _port("port-a", bios_name="ethernet1/20"),
+        _port("port-b", bios_name="ethernet1/19"),
+    ]
+
+    assert _roles(ports) == {"port-b": "outside", "port-a": "inside"}
+
+
+def test_firewall_enroll_sets_categories_and_the_trait(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get_traits.return_value = []
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, assign_roles=True)
+
+    categories = [c.kwargs["category"] for c in fake_ironic.port.create.call_args_list]
+    assert categories == ["outside", "inside"]
+    fake_ironic.node.add_trait.assert_called_once_with("node-123", ROLE_TRAIT)
+
+
+def test_other_netdev_enroll_keeps_network_ports_and_skips_traits(mocker):
+    fake_ironic, _ = make_ironic_client()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS)
+
+    categories = [c.kwargs["category"] for c in fake_ironic.port.create.call_args_list]
+    assert categories == ["network", "network"]
+    fake_ironic.node.get_traits.assert_not_called()
+    fake_ironic.node.add_trait.assert_not_called()
+    fake_ironic.node.remove_trait.assert_not_called()
+
+
+def _available_node():
+    return SimpleNamespace(
+        uuid="node-123",
+        driver="netdev",
+        provision_state="available",
+        resource_class="generic",
+        extra={},
+    )
+
+
+def test_firewall_enroll_is_noop_when_roles_already_match(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = _available_node()
+    ports = matching_ports()
+    ports[0].category = "outside"
+    ports[1].category = "inside"
+    fake_ironic.port.list.return_value = ports
+    fake_ironic.node.get_traits.return_value = [ROLE_TRAIT]
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, assign_roles=True)
+
+    fake_ironic.port.update.assert_not_called()
+    fake_ironic.node.add_trait.assert_not_called()
+    fake_ironic.node.set_provision_state.assert_not_called()
+
+
+def test_firewall_enroll_labels_an_already_enrolled_available_node(mocker):
+    # Ports enrolled before roles existed are "network": relabelling them is a
+    # port change, so the node leaves the pool and comes back.
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = _available_node()
+    fake_ironic.port.list.return_value = matching_ports()
+    fake_ironic.node.get_traits.return_value = []
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, assign_roles=True)
+
+    fake_ironic.port.update.assert_has_calls(
+        [
+            call(
+                "uuid-port1",
+                [{"op": "add", "path": "/category", "value": "outside"}],
+            ),
+            call(
+                "uuid-port2",
+                [{"op": "add", "path": "/category", "value": "inside"}],
+            ),
+        ]
+    )
+    fake_ironic.node.add_trait.assert_called_once_with("node-123", ROLE_TRAIT)
+    fake_ironic.node.set_provision_state.assert_has_calls(
+        [
+            call(
+                "node-123",
+                "manage",
+                cleansteps=None,
+                runbook=None,
+                disable_ramdisk=None,
+            ),
+            call(
+                "node-123",
+                "provide",
+                cleansteps=None,
+                runbook=None,
+                disable_ramdisk=None,
+            ),
+        ]
+    )
+
+
+def test_firewall_enroll_with_one_port_removes_a_stale_trait(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = _available_node()
+    fake_ironic.port.list.return_value = matching_ports()[:1]
+    fake_ironic.node.get_traits.return_value = [ROLE_TRAIT]
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(
+        **{**ENROLL_ARGS, "ports": ENROLL_ARGS["ports"][:1]}, assign_roles=True
+    )
+
+    fake_ironic.node.remove_trait.assert_called_once_with("node-123", ROLE_TRAIT)
+    fake_ironic.port.update.assert_not_called()
+    fake_ironic.node.set_provision_state.assert_not_called()

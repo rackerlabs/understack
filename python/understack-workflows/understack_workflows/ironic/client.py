@@ -59,6 +59,12 @@ class IronicClient:
     def get_node_traits(self, node_id: str) -> list[str]:
         return cast(list[str], self.client.node.get_traits(node_id))
 
+    def add_node_trait(self, node_id: str, trait: str) -> None:
+        self.client.node.add_trait(node_id, trait)
+
+    def remove_node_trait(self, node_id: str, trait: str) -> None:
+        self.client.node.remove_trait(node_id, trait)
+
     def get_runbook(self, runbook_name_or_id: str) -> Runbook:
         """Get runbook by name or by UUID.
 

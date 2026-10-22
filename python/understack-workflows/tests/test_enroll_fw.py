@@ -112,6 +112,7 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
         },
         extra={"mate_serial": "026701010045"},
         properties={},
+        assign_roles=True,
     )
 
 
@@ -396,3 +397,31 @@ def test_argument_parser_requires_management_switch_and_port():
                 "pa1410",
             ]
         )
+
+
+def test_active_node_leaves_port_categories_alone(mocker):
+    # An in-service firewall enrolled before roles keeps its "network" ports,
+    # so its router keeps attaching; the metadata update still goes ahead.
+    two_ports = [
+        BASE_ARGS["ports"][0],
+        {
+            "label": "ethernet1/20",
+            "mac": "60:15:2b:33:31:23",
+            "switch": "n11-22-1.dfw3",
+            "intf": "Ethernet1/44",
+        },
+    ]
+    node_ports = [
+        _actual_port(),
+        _actual_port(
+            label="ethernet1/20", mac="60:15:2b:33:31:23", intf="Ethernet1/44"
+        ),
+    ]
+    client = _mock_client(mocker, node=_node(), node_ports=node_ports)
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": two_ports}, **FW_FIELDS)
+
+    engine.assert_not_called()
+    client.update_port.assert_not_called()
+    client.update_node.assert_called_once()  # metadata only

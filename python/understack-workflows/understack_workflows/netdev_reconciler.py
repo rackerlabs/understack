@@ -1,6 +1,8 @@
 import json
 import logging
+import re
 from dataclasses import dataclass
+from dataclasses import replace
 
 from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from ironicclient.common.utils import args_array_to_patch
@@ -32,6 +34,15 @@ REQUIRED_PORT_FIELDS = ("label", "mac", "switch", "intf")
 OPTIONAL_PORT_FIELDS = ("switch_id", "bios_name")
 ALLOWED_PORT_FIELDS = frozenset(REQUIRED_PORT_FIELDS + OPTIONAL_PORT_FIELDS)
 
+# A port's role says which side of a router its NIC carries
+# stored as the ironic port's category (other ports keep "network")
+# enroll-fw assigns roles from the interface names: see assign_port_roles.
+PORT_ROLES = ("outside", "inside")
+DEFAULT_PORT_CATEGORY = "network"
+# Node trait that turns that rule on; the PaloAlto router flavor copies it
+# into instance_info.traits on adoption. defined in cm-trait-based-networking.yaml
+ROLE_ATTACH_TRAIT = "CUSTOM_NETDEV_ROLE_ATTACH"
+
 
 @dataclass(frozen=True)
 class NetdevPort:
@@ -44,6 +55,12 @@ class NetdevPort:
     # Ironic port's extra.bios_name. The Nautobot device sync uses it to name
     # the interface. Defaults to the label when not supplied.
     bios_name: str | None = None
+    role: str | None = None
+
+    @property
+    def category(self) -> str:
+        """The Ironic port category: the role, or the ordinary default."""
+        return self.role or DEFAULT_PORT_CATEGORY
 
 
 def _has_cmdb_id(external_cmdb_id: int | str | None) -> bool:
@@ -135,6 +152,31 @@ def build_netdev_ports(ports: list[dict]) -> list[NetdevPort]:
     return result
 
 
+def _interface_sort_key(port: NetdevPort) -> tuple:
+    """Order ports by the device's interface name, number by number."""
+    name = port.bios_name or port.label
+    pieces = re.split(r"(\d+)", name)
+    return (
+        tuple((0, int(piece)) if piece.isdigit() else (1, piece) for piece in pieces),
+        port.label,
+    )
+
+
+def assign_port_roles(ports: list[NetdevPort]) -> list[NetdevPort]:
+    """Give a firewall's ports their router roles from the interface names.
+
+    The lowest-numbered interface carries the router's outside (gateway), the
+    next one its inside (subnets), and any others stay ordinary ports. With
+    fewer than two ports there are no roles, and the router uses one NIC.
+    Note: Inspection, once it discovers firewall ports, must apply the same rule.
+    """
+    if len(ports) < len(PORT_ROLES):
+        return list(ports)
+    ordered = sorted(ports, key=_interface_sort_key)
+    roles = dict(zip((port.label for port in ordered), PORT_ROLES, strict=False))
+    return [replace(port, role=roles.get(port.label)) for port in ports]
+
+
 def enroll(
     *,
     name: str,
@@ -146,10 +188,18 @@ def enroll(
     driver_info: dict | None = None,
     extra: dict | None = None,
     properties: dict | None = None,
+    assign_roles: bool = False,
 ) -> None:
+    """Enroll a netdev node and its ports, then make it available.
+
+    ``assign_roles`` (enroll-fw only) labels ports outside/inside and syncs the
+    node's role trait; other netdev devices are left as they were.
+    """
     effective_resource_class = resource_class or DEFAULT_RESOURCE_CLASS
     effective_driver = driver or DEFAULT_DRIVER
     netdev_ports = build_netdev_ports(ports)
+    if assign_roles:
+        netdev_ports = assign_port_roles(netdev_ports)
 
     # driver_info/extra/properties are generic Ironic node metadata a caller may
     # want set (e.g. the firewall workflow records management access in
@@ -244,9 +294,18 @@ def enroll(
             extra=node_extra,
             properties=node_properties,
         )
+    # Traits can change in any provision state, and only matter at the next
+    # adoption, so a trait-only change never takes the node out of the pool.
+    trait_changed = False
+    if assign_roles:
+        trait_changed = sync_role_trait(
+            client=client,
+            node=node,
+            wanted=any(port.role for port in netdev_ports),
+        )
 
     if not pending and state == "available":
-        if metadata_changed:
+        if metadata_changed or trait_changed:
             logger.info(
                 "[node:%s] Node metadata updated; already available with no "
                 "port changes",
@@ -393,6 +452,23 @@ def update_node_metadata(
     return True
 
 
+def sync_role_trait(*, client: IronicClient, node: Node, wanted: bool) -> bool:
+    """Add or remove the port-role trait so the node matches the request.
+
+    Returns True if a change was sent.
+    """
+    has_trait = ROLE_ATTACH_TRAIT in client.get_node_traits(node.uuid)
+    if wanted == has_trait:
+        return False
+    if wanted:
+        logger.info("[node:%s] Adding trait %s", node.uuid, ROLE_ATTACH_TRAIT)
+        client.add_node_trait(node.uuid, ROLE_ATTACH_TRAIT)
+    else:
+        logger.info("[node:%s] Removing trait %s", node.uuid, ROLE_ATTACH_TRAIT)
+        client.remove_node_trait(node.uuid, ROLE_ATTACH_TRAIT)
+    return True
+
+
 def create_netdev_node(
     *,
     client: IronicClient,
@@ -437,12 +513,14 @@ def plan_netdev_port(
     port: NetdevPort,
     existing=None,
     ports_by_mac: dict | None = None,
+    manage_category: bool = True,
 ) -> dict | None:
     """Decide what a single port needs, without mutating anything.
 
     Returns a plan dict describing the action, or None if the port already
     matches the request. Raises on a MAC conflict that would imply an
-    automatic label move/rename.
+    automatic label move/rename. With ``manage_category`` False the port's
+    category is left as it is.
 
     Plan shapes:
       {"kind": "create", "port": NetdevPort}
@@ -496,8 +574,8 @@ def plan_netdev_port(
         patch.append(
             {"op": "add", "path": "/physical_network", "value": physical_network}
         )
-    if getattr(existing, "category", None) != "network":
-        patch.append({"op": "add", "path": "/category", "value": "network"})
+    if manage_category and getattr(existing, "category", None) != port.category:
+        patch.append({"op": "add", "path": "/category", "value": port.category})
     # Converge extra.bios_name (the device's interface name) so re-runs update
     # it. Replace the whole extra object is unsafe (would drop other keys), so
     # patch the single nested key.
@@ -573,7 +651,7 @@ def create_netdev_port(
     bios_name = port.bios_name or port.label
     port_data = {
         "address": port.mac,
-        "category": "network",
+        "category": port.category,
         "extra": {"bios_name": bios_name},
         "local_link_connection": {
             "switch_id": switch_id,
@@ -588,7 +666,7 @@ def create_netdev_port(
     logger.info(
         "[node:%s] Creating baremetal port name=%s mac=%s "
         "physical_network=%s switch_id=%s switch_info=%s port_id=%s "
-        "category=network",
+        "category=%s",
         node.uuid,
         port_name,
         port.mac,
@@ -596,6 +674,7 @@ def create_netdev_port(
         switch_id,
         port.switch,
         port.interface,
+        port.category,
     )
     created_port = client.create_port(port_data)
     logger.info(

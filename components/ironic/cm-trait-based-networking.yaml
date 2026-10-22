@@ -31,6 +31,21 @@ data:
           filter: port.category == 'network'
           max_count: 1
 
+    # Attaches each side of a netdev (paloalto) router to its own NIC.
+    # Each parent port's VIF attach sends its side in vif_info['tags'],
+    # so a VIF lands only on the NIC of its own side.
+    # wip:after dougs's changes pr-1011790 ironic gains vif.* filter variables
+    # match vif.tags here instead the parent ports already carry these tags.
+    CUSTOM_NETDEV_ROLE_ATTACH:
+      order: 1
+      actions:
+        - action: attach_port
+          filter: port.category == 'outside' && network.tags == 'CUSTOM_NETDEV_OUTSIDE'
+          max_count: 1
+        - action: attach_port
+          filter: port.category == 'inside' && network.tags == 'CUSTOM_NETDEV_INSIDE'
+          max_count: 1
+
     # Attaches a single category=storage port for a storage VIF. Single-port
     # only for now (A/B grouping is deferred). Require it on a flavor with:
     #   openstack flavor set --property trait:CUSTOM_STORAGE_ATTACH=required <flavor>

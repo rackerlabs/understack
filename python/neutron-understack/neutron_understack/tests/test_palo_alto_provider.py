@@ -594,6 +594,8 @@ class TestGatewayCreateHandler:
             provider._wiring, "_parent_port_for_router", return_value=None
         )
         mocker.patch.object(provider._wiring, "_trunk_for_router", return_value=None)
+        # A node without port roles: one stack, no side.
+        mocker.patch.object(provider._wiring, "_attach_side", return_value=None)
         stack = palo_alto_wiring.AttachmentStack(
             parent={"id": "parent-1"}, trunk={"id": "trunk-1"}
         )
@@ -608,7 +610,7 @@ class TestGatewayCreateHandler:
 
         # The VIF-bound stack exists before the subport is added to its trunk.
         assert calls.mock_calls == [
-            mocker.call.ensure_stack("r1"),
+            mocker.call.ensure_stack("r1", None),
             mocker.call.add_gateway_subport("r1", stack.trunk, {"id": "gw-1"}),
         ]
 
@@ -634,6 +636,8 @@ class TestRouterInterfaceCreateHandler:
             provider._wiring, "_parent_port_for_router", return_value=None
         )
         mocker.patch.object(provider._wiring, "_trunk_for_router", return_value=None)
+        # A node without port roles: one stack, no side.
+        mocker.patch.object(provider._wiring, "_attach_side", return_value=None)
         stack = palo_alto_wiring.AttachmentStack(
             parent={"id": "parent-1"}, trunk={"id": "trunk-1"}
         )
@@ -650,7 +654,7 @@ class TestRouterInterfaceCreateHandler:
 
         # The VIF-bound stack exists before the subport is added to its trunk.
         assert calls.mock_calls == [
-            mocker.call.ensure_stack("r1"),
+            mocker.call.ensure_stack("r1", None),
             mocker.call.add_interface_subport("r1", stack.trunk, dict(_INTERFACE_PORT)),
         ]
 
@@ -686,6 +690,7 @@ class TestRouterInterfaceCreateHandler:
         trunk_lookup = mocker.patch.object(
             provider._wiring, "_trunk_for_router", return_value=None
         )
+        mocker.patch.object(provider._wiring, "_attach_side", return_value=None)
         mocker.patch.object(
             provider._wiring, "_ensure_parent_port", side_effect=RuntimeError("boom")
         )

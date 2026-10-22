@@ -2,8 +2,10 @@
 
 A router's gateway and interfaces reach its adopted Ironic node through one
 stack: a parent port on the shared anchor network, VIF-attached to the node,
-with a trunk whose VLAN subports are the router's own ports. This module holds
-that wiring logic without any Neutron callback subscriptions.
+with a trunk whose VLAN subports are the router's own ports. A node whose ports
+carry roles gets one stack per side instead: the gateway on the outside NIC and
+the subnets on the inside NIC. This module holds that wiring logic without any
+Neutron callback subscriptions.
 """
 
 import logging
@@ -13,6 +15,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Literal
 
+from neutron.extensions import tagging
 from neutron_lib import constants as const
 from neutron_lib import context as n_context
 from neutron_lib import exceptions as n_exc
@@ -23,6 +26,7 @@ from openstack.baremetal.v1.node import Node as BaremetalNode
 
 from neutron_understack import utils
 from neutron_understack.ironic import IronicClient
+from neutron_understack.ironic import uses_port_roles
 
 LOG = logging.getLogger(__name__)
 
@@ -44,6 +48,19 @@ INTERFACE_SUBPORT_VLAN_START = GATEWAY_SUBPORT_VLAN + 1
 # Which kind of router port a trunk subport carries; used in log messages.
 PortLabel = Literal["gateway", "interface"]
 
+# On a node whose ports carry roles, each side of the router has its own NIC,
+# parent port and trunk: the gateway goes outside, the subnets inside.
+Side = Literal["outside", "inside"]
+LABEL_SIDES: dict[PortLabel, Side] = {"gateway": "outside", "interface": "inside"}
+
+# Sent with each side's VIF attach, and set on its parent port, so Ironic's TBN
+# rule CUSTOM_NETDEV_ROLE_ATTACH (cm-trait-based-networking.yaml)
+# attaches the parent to the NIC whose category is that side.
+SIDE_TAGS: dict[Side, str] = {
+    "outside": "CUSTOM_NETDEV_OUTSIDE",
+    "inside": "CUSTOM_NETDEV_INSIDE",
+}
+
 
 @dataclass(frozen=True)
 class AttachmentSnapshot:
@@ -60,6 +77,8 @@ class AttachmentSnapshot:
     trunk_id: str | None
     subport_present: bool
     parent_vif_attached: bool
+    # The stack the attach used; None on a node without port roles.
+    side: Side | None = None
 
 
 @dataclass(frozen=True)
@@ -104,14 +123,34 @@ class PaloAltoNodeHasNoUsablePort(n_exc.BadRequest):
     )
 
 
-def _parent_port_name(router_id: str) -> str:
-    """Deterministic name for the router's anchor-network parent port."""
-    return f"{ANCHOR_PARENT_PORT_NAME_PREFIX}-{router_id}"
+# BadRequest -> HTTP 400: Ironic did not put a side's parent VIF on that side's NIC.
+class PaloAltoParentNotOnSideNic(n_exc.BadRequest):
+    message = (
+        "Palo Alto router %(router_id)s %(side)s parent port %(port_id)s was "
+        "attached to %(nic)s, not to the node's %(side)s NIC; check the node's "
+        "port categories and Ironic's CUSTOM_NETDEV_ROLE_ATTACH rule."
+    )
 
 
-def _trunk_name(router_id: str) -> str:
-    """Deterministic name for the router's trunk."""
-    return f"{TRUNK_NAME_PREFIX}-{router_id}"
+# BadRequest -> HTTP 400: a node with port roles has no usable NIC for this side.
+class PaloAltoNodeHasNoSideNic(n_exc.BadRequest):
+    message = (
+        "Ironic node %(node_id)s for Palo Alto router %(router_id)s has no "
+        "baremetal port with category %(side)s, physical_network and "
+        "local_link_connection; check the node's port enrollment."
+    )
+
+
+def _parent_port_name(router_id: str, side: Side | None = None) -> str:
+    """Deterministic name for the router's (or a side's) anchor parent port."""
+    name = f"{ANCHOR_PARENT_PORT_NAME_PREFIX}-{router_id}"
+    return f"{name}-{side}" if side else name
+
+
+def _trunk_name(router_id: str, side: Side | None = None) -> str:
+    """Deterministic name for the router's (or a side's) trunk."""
+    name = f"{TRUNK_NAME_PREFIX}-{router_id}"
+    return f"{name}-{side}" if side else name
 
 
 def _has_subport(trunk: dict, port_id: str) -> bool:
@@ -201,9 +240,32 @@ class PaloAltoWiring:
     def _admin_context(self):
         return n_context.get_admin_context()
 
+    def _tag_plugin(self):
+        return directory.get_plugin(tagging.TAG_PLUGIN_TYPE)
+
     def _node_for_router(self, router_id: str) -> BaremetalNode | None:
         """Return the Ironic node adopted for the router, or None."""
         return self._ironic().node_by_instance_uuid(router_id)
+
+    def _attach_side(self, router_id: str, label: PortLabel) -> Side | None:
+        """Return the side a new attachment uses, or None without port roles."""
+        node = self._node_for_router(router_id)
+        if node is None or not uses_port_roles(node):
+            return None
+        return LABEL_SIDES[label]
+
+    def _existing_side(self, router_id: str, label: PortLabel) -> Side | None:
+        """Return the side whose stack exists for this label, or None.
+
+        Decided from Neutron alone, so teardown still finds the stack after the
+        node has been released.
+        """
+        side = LABEL_SIDES[label]
+        if self._trunk_for_router(router_id, side) is not None:
+            return side
+        if self._parent_port_for_router(router_id, side) is not None:
+            return side
+        return None
 
     def ensure_anchor_network(self) -> dict:
         """Create the shared sentinel anchor network if it does not exist."""
@@ -265,7 +327,9 @@ class PaloAltoWiring:
             )
         return ports[0]
 
-    def _parent_port_for_router(self, router_id: str) -> dict | None:
+    def _parent_port_for_router(
+        self, router_id: str, side: Side | None = None
+    ) -> dict | None:
         """Return the router's existing anchor-network parent port, or None."""
         core_plugin = self._core_plugin()
         admin_context = self._admin_context()
@@ -273,27 +337,28 @@ class PaloAltoWiring:
         ports = core_plugin.get_ports(
             admin_context,
             filters={
-                "name": [_parent_port_name(router_id)],
+                "name": [_parent_port_name(router_id, side)],
                 "network_id": [anchor_network["id"]],
             },
         )
         return ports[0] if ports else None
 
-    def _create_parent_port(self, router_id: str) -> dict:
+    def _create_parent_port(self, router_id: str, side: Side | None = None) -> dict:
         """Create the router's parent port on the anchor network.
 
         vnic_type=baremetal so Ironic can VIF-attach it to the adopted node.
+        A side's parent is also tagged with that side.
         """
         core_plugin = self._core_plugin()
         admin_context = self._admin_context()
         anchor_network = self.ensure_anchor_network()
-        port_name = _parent_port_name(router_id)
+        port_name = _parent_port_name(router_id, side)
         LOG.info(
             "Creating Palo Alto anchor parent port %s for router %s",
             port_name,
             router_id,
         )
-        return core_plugin.create_port(
+        port = core_plugin.create_port(
             admin_context,
             {
                 "port": {
@@ -309,10 +374,17 @@ class PaloAltoWiring:
                 }
             },
         )
+        if side is not None:
+            # The VIF attach carries the side too; the tag records it in
+            # Neutron, for operators and for an Ironic that reads port tags.
+            self._tag_plugin().update_tags(
+                admin_context, "ports", port["id"], {"tags": [SIDE_TAGS[side]]}
+            )
+        return port
 
-    def _ensure_parent_port(self, router_id: str) -> dict:
+    def _ensure_parent_port(self, router_id: str, side: Side | None = None) -> dict:
         """Find-or-create the router's anchor-network parent port (idempotent)."""
-        existing = self._parent_port_for_router(router_id)
+        existing = self._parent_port_for_router(router_id, side)
         if existing is not None:
             LOG.debug(
                 "Reusing Palo Alto anchor parent port %s for router %s",
@@ -320,7 +392,7 @@ class PaloAltoWiring:
                 router_id,
             )
             return existing
-        return self._create_parent_port(router_id)
+        return self._create_parent_port(router_id, side)
 
     def _fresh_port(self, port_id: str) -> dict:
         """Re-read a port so callers see its current binding profile."""
@@ -348,12 +420,41 @@ class PaloAltoWiring:
             return False
         return parent_port_id in vif_ids
 
-    def _ensure_parent_vif_attached(self, router_id: str, parent_port: dict) -> dict:
+    def _attach_parent_vif(self, node, parent_port_id: str, side: Side | None) -> None:
+        """Ask Ironic to attach the parent VIF, telling it the side if any."""
+        if side is None:
+            self._ironic().attach_vif_to_node(node, parent_port_id)
+        else:
+            self._ironic().attach_vif_to_node(
+                node, parent_port_id, tags=[SIDE_TAGS[side]]
+            )
+
+    def _verify_parent_on_side_nic(
+        self, router_id: str, node, parent_port_id: str, side: Side
+    ) -> None:
+        """Fail if Ironic did not put the side's parent VIF on that side's NIC.
+
+        When no NIC matches, Ironic's TBN attaches nothing and the attach call
+        still succeeds, so the landing NIC is checked.
+        """
+        nic = self._ironic().port_for_vif(node, parent_port_id)
+        if nic is None or nic.category != side:
+            raise PaloAltoParentNotOnSideNic(
+                router_id=router_id,
+                side=side,
+                port_id=parent_port_id,
+                nic=f"NIC {nic.name}" if nic is not None else "no NIC",
+            )
+
+    def _ensure_parent_vif_attached(
+        self, router_id: str, parent_port: dict, side: Side | None = None
+    ) -> dict:
         """VIF-attach the parent port to the router's node (idempotent).
 
         Attaching a single VIF; Ironic binds it to a free baremetal port on the
         node and annotates the Neutron port with local_link_information +
-        physical_network and host_id .
+        physical_network and host_id . With a side, Ironic must pick that
+        side's NIC.
 
         Returns a fresh copy of the parent port reflecting the new binding.
         """
@@ -370,7 +471,7 @@ class PaloAltoWiring:
             )
         else:
             try:
-                self._ironic().attach_vif_to_node(node, parent_port_id)
+                self._attach_parent_vif(node, parent_port_id, side)
             except Exception:
                 if not self._vif_landed_after_error(router_id, node, parent_port_id):
                     raise
@@ -383,6 +484,8 @@ class PaloAltoWiring:
                     exc_info=True,
                 )
 
+        if side is not None:
+            self._verify_parent_on_side_nic(router_id, node, parent_port_id, side)
         fresh = self._fresh_port(parent_port_id)
         self._verify_parent_annotated(router_id, fresh)
         return fresh
@@ -403,18 +506,22 @@ class PaloAltoWiring:
                 missing=", ".join(missing),
             )
 
-    def _trunk_for_router(self, router_id: str) -> dict | None:
+    def _trunk_for_router(
+        self, router_id: str, side: Side | None = None
+    ) -> dict | None:
         """Return the router's existing trunk (by deterministic name), or None."""
         admin_context = self._admin_context()
         trunks = self._trunk_plugin().get_trunks(
-            admin_context, filters={"name": [_trunk_name(router_id)]}
+            admin_context, filters={"name": [_trunk_name(router_id, side)]}
         )
         return trunks[0] if trunks else None
 
-    def _create_trunk(self, router_id: str, parent_port: dict) -> dict:
+    def _create_trunk(
+        self, router_id: str, parent_port: dict, side: Side | None = None
+    ) -> dict:
         """Create the router's trunk with the parent port as its trunk parent."""
         admin_context = self._admin_context()
-        trunk_name = _trunk_name(router_id)
+        trunk_name = _trunk_name(router_id, side)
         LOG.info(
             "Creating Palo Alto trunk %s on parent port %s for router %s",
             trunk_name,
@@ -434,9 +541,11 @@ class PaloAltoWiring:
             },
         )
 
-    def _ensure_trunk(self, router_id: str, parent_port: dict) -> dict:
+    def _ensure_trunk(
+        self, router_id: str, parent_port: dict, side: Side | None = None
+    ) -> dict:
         """Find-or-create the router's trunk (idempotent)."""
-        existing = self._trunk_for_router(router_id)
+        existing = self._trunk_for_router(router_id, side)
         if existing is not None:
             LOG.debug(
                 "Reusing Palo Alto trunk %s for router %s",
@@ -444,26 +553,37 @@ class PaloAltoWiring:
                 router_id,
             )
             return existing
-        return self._create_trunk(router_id, parent_port)
+        return self._create_trunk(router_id, parent_port, side)
 
-    def check_can_attach(self, router_id: str) -> None:
-        """Raise if the router's node cannot be wired. Read-only."""
+    def check_can_attach(self, router_id: str, label: PortLabel = "gateway") -> None:
+        """Raise if the router's node cannot be wired for this label. Read-only.
+
+        On a node with port roles, the NIC must also carry the label's side.
+        """
         node = self._node_for_router(router_id)
         if node is None:
             raise PaloAltoNodeNotAdopted(router_id=router_id)
-        if not any(_is_bindable_port(port) for port in self._ironic().node_ports(node)):
-            raise PaloAltoNodeHasNoUsablePort(router_id=router_id, node_id=node.id)
+        ports = self._ironic().node_ports(node)
+        if not uses_port_roles(node):
+            if not any(_is_bindable_port(port) for port in ports):
+                raise PaloAltoNodeHasNoUsablePort(router_id=router_id, node_id=node.id)
+            return
+        side = LABEL_SIDES[label]
+        if not any(_is_bindable_port(port) and port.category == side for port in ports):
+            raise PaloAltoNodeHasNoSideNic(
+                router_id=router_id, node_id=node.id, side=side
+            )
 
-    def ensure_stack(self, router_id: str) -> AttachmentStack:
+    def ensure_stack(self, router_id: str, side: Side | None = None) -> AttachmentStack:
         """Find or create the router's parent port, VIF attachment and trunk.
 
         Builds them in this order so the parent is VIF-bound before any subport
         is added: the trunk driver only programs the switchport once the parent
-        is bound.
+        is bound. With a side, builds that side's stack.
         """
-        parent = self._ensure_parent_port(router_id)
-        parent = self._ensure_parent_vif_attached(router_id, parent)
-        trunk = self._ensure_trunk(router_id, parent)
+        parent = self._ensure_parent_port(router_id, side)
+        parent = self._ensure_parent_vif_attached(router_id, parent, side)
+        trunk = self._ensure_trunk(router_id, parent, side)
         return AttachmentStack(parent=parent, trunk=trunk)
 
     def _next_available_subport_vlan(
@@ -557,8 +677,8 @@ class PaloAltoWiring:
     def attach_port(
         self, router_id: str, port: dict, label: PortLabel
     ) -> AttachmentStack:
-        """Build the router's stack, then add the port as a subport."""
-        stack = self.ensure_stack(router_id)
+        """Build the router's stack (the label's side's, if any), add the subport."""
+        stack = self.ensure_stack(router_id, self._attach_side(router_id, label))
         if label == "gateway":
             self.add_gateway_subport(router_id, stack.trunk, port)
         else:
@@ -654,10 +774,12 @@ class PaloAltoWiring:
         Handles a partially-built attach too: if a prior add failed after the
         parent port was created/VIF-attached but before the trunk existed, there
         is no trunk to key off, so find and tear down the orphan parent directly.
+        On a node with port roles, only the label's side's stack is touched.
         """
-        trunk = self._trunk_for_router(router_id)
+        side = self._existing_side(router_id, label)
+        trunk = self._trunk_for_router(router_id, side)
         if trunk is None:
-            parent = self._parent_port_for_router(router_id)
+            parent = self._parent_port_for_router(router_id, side)
             if parent is not None:
                 LOG.info(
                     "No trunk for Palo Alto router %s; deleting orphan parent %s",
@@ -678,8 +800,9 @@ class PaloAltoWiring:
         self, router_id: str, port_id: str, label: PortLabel
     ) -> AttachmentSnapshot:
         """Record which wiring already exists before attaching a router port."""
-        parent = self._parent_port_for_router(router_id)
-        trunk = self._trunk_for_router(router_id)
+        side = self._attach_side(router_id, label)
+        parent = self._parent_port_for_router(router_id, side)
+        trunk = self._trunk_for_router(router_id, side)
         parent_vif_attached = False
         if parent is not None:
             node = self._node_for_router(router_id)
@@ -693,6 +816,7 @@ class PaloAltoWiring:
             trunk_id=trunk["id"] if trunk else None,
             subport_present=trunk is not None and _has_subport(trunk, port_id),
             parent_vif_attached=parent_vif_attached,
+            side=side,
         )
 
     def undo_attachment(self, snapshot: AttachmentSnapshot) -> None:
@@ -701,7 +825,7 @@ class PaloAltoWiring:
         Re-reads current state rather than replaying the calls that succeeded,
         because a remote call can apply its change and still raise.
         """
-        trunk = self._trunk_for_router(snapshot.router_id)
+        trunk = self._trunk_for_router(snapshot.router_id, snapshot.side)
         if trunk is not None:
             if not snapshot.subport_present:
                 self._remove_router_port_subport(
@@ -715,7 +839,7 @@ class PaloAltoWiring:
             if trunk["id"] != snapshot.trunk_id:
                 self._trunk_plugin().delete_trunk(admin_context, trunk["id"])
 
-        parent = self._parent_port_for_router(snapshot.router_id)
+        parent = self._parent_port_for_router(snapshot.router_id, snapshot.side)
         if parent is not None:
             if parent["id"] != snapshot.parent_id:
                 self._detach_and_delete_parent(snapshot.router_id, parent["id"])
