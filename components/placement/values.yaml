@@ -2,6 +2,12 @@
 release_group: null
 
 conf:
+  placement:
+    database:
+      # The MariaDB operator writes the connection string into the
+      # placement-db-conn secret, which is projected into the config directory
+      # below, so the chart must not generate one from the DB password.
+      connection: null
   placement_api_uwsgi:
     uwsgi:
       start-time: "%t"
@@ -42,9 +48,13 @@ pod:
     placement_db_sync:
       - secret:
           name: placement-ks-etc
+      - secret:
+          name: placement-db-conn
     placement:
       - secret:
           name: placement-ks-etc
+      - secret:
+          name: placement-db-conn
   lifecycle:
     disruption_budget:
       api:
@@ -72,8 +82,20 @@ endpoints:
             name: understack-cluster-issuer
             kind: ClusterIssuer
 
+# The chart declares the Database, User, Grant and Connection resources instead
+# of the db-init job. The password is read from the placement-db-password secret
+# in the deploy repo rather than rendered from Helm values.
+mariadb_db:
+  api_group: k8s.mariadb.com
+  # the MariaDB resource is named mariadb, while clients connect through the
+  # mariadb-primary service set in endpoints.oslo_db.hosts
+  mariadb_ref: mariadb
+  password_secret:
+    create: false
+
 manifests:
   job_db_init: false
+  mariadb_db: true
   secret_db: false
   service_ingress: false
   # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
