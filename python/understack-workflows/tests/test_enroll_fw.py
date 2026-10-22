@@ -112,6 +112,7 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
         },
         extra={"mate_serial": "026701010045"},
         properties={},
+        assign_roles=True,
     )
 
 
@@ -396,3 +397,17 @@ def test_argument_parser_requires_management_switch_and_port():
                 "pa1410",
             ]
         )
+
+
+def test_active_node_with_port_roles_still_gets_metadata_updates(mocker):
+    # The request carries no roles here, so an "outside" port is not drift.
+    labelled = _actual_port()
+    labelled.category = "outside"
+    client = _mock_client(mocker, node=_node(), node_ports=[labelled])
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
+
+    engine.assert_not_called()
+    client.update_port.assert_not_called()
+    client.update_node.assert_called_once()  # metadata only
