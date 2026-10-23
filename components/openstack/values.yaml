@@ -27,8 +27,9 @@ mariadb:
       resources:
         requests:
           storage: 10Gi
-  # optional, defaults to operator's image
-  # image: docker-registry1.mariadb.com/library/mariadb:11.4.4
+  # -- MariaDB server image. Pinned so the version never depends on the
+  # operator's own default; sites may override it.
+  image: docker-registry1.mariadb.com/library/mariadb:11.4.10@sha256:3b4dfcc32247eb07adbebec0793afae2a8eafa6860ec523ee56af4d3dec42f7f
 
   # -- galera settings
   galera:

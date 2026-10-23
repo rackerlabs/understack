@@ -62,6 +62,16 @@ kubectl get storageclass
 
 - Edit operator reference in:
    [kustomization.yaml](https://github.com/rackerlabs/understack/blob/main/components/mariadb-operator/kustomization.yaml)
+- Also bump `targetRevision` in the CRDs Application,
+   `charts/argocd-understack/templates/application-mariadb-operator-crds.yaml`,
+   to the same version.
+- Do not skip intermediate versions. Upgrade one hop at a time
+   (25.8.x -> 25.10.4 -> 26.3.0 -> 26.6.0) and wait for the Galera cluster to
+   be `Synced` and the `MariaDB` resource `Ready` before the next hop.
+   Avoid 25.10.0 and 25.10.1, which have a regression.
+- Our `MariaDB` resource sets `updateStrategy.autoUpdateDataPlane: true`, so
+   every operator upgrade rolls the Galera pods to update the data plane
+   (init and agent containers). Schedule a maintenance window.
 
 ### 7. Perform the release
 
