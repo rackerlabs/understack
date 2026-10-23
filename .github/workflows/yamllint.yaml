@@ -29,7 +29,6 @@ jobs:
           set -o errexit
           set -o pipefail
           items=$(find bootstrap -maxdepth 2 -name kustomization.yaml -exec dirname {} \;)
-          items+=($(find operators -maxdepth 2 -name kustomization.yaml -exec dirname {} \;))
           items+=($(find components -maxdepth 2 -name kustomization.yaml -exec dirname {} \;))
           items+=($(find apps -maxdepth 2 -name kustomization.yaml -exec dirname {} \;))
 

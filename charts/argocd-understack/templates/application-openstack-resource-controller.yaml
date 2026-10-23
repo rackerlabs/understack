@@ -15,7 +15,7 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack-operators
   sources:
-  - path: operators/openstack-resource-controller
+  - path: components/openstack-resource-controller
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
   syncPolicy:

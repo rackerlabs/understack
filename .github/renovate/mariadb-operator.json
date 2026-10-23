@@ -6,7 +6,7 @@
   "enabledManagers": ["regex"],
   "regexManagers": [
     {
-      "fileMatch": ["^understack/operators/mariadb-operator/kustomization\\.yaml$"],
+      "fileMatch": ["^understack/components/mariadb-operator/kustomization\\.yaml$"],
       "matchStrings": [
         "(?m)^[ \\t]*- name:\\s*(?<depName>[^\\s]+)[\\s\\S]*?repo:\\s*(?<registryUrl>[^\\s]+)[\\s\\S]*?version:\\s*(?<currentValue>[^\\s]+)"
       ],

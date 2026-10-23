@@ -1,6 +1,6 @@
 ---
 kustomize_paths:
-- operators/openstack-resource-controller
+- components/openstack-resource-controller
 deploy_overrides:
   helm:
     mode: none
