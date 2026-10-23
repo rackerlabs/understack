@@ -44,7 +44,6 @@ class PanosInspect(base.InspectInterface):
         client = panos_api.PanosClient(address)
         try:
             client.login()
-            LOG.debug("[node:%s] Logged in to %s", node.uuid, address)
             system = client.system_info()
         except (panos_api.PanosApiError, requests.RequestException) as e:
             raise exception.HardwareInspectionFailure(
@@ -115,17 +114,10 @@ def _discover_and_update_ports(task, client: panos_api.PanosClient) -> None:
     model = node.properties.get("model", "PA-1410")
     all_interfaces = _get_all_physical_interfaces(model)
 
-    LOG.debug(
-        "[node:%s] Configuring LLDP on all %d interfaces",
-        node.uuid,
-        len(all_interfaces),
-    )
-
     # Enable LLDP on all interfaces
     _enable_lldp_discovery(client, all_interfaces)
 
     # Wait for LLDP neighbors
-    LOG.debug("[node:%s] Waiting 30s for LLDP neighbor discovery", node.uuid)
     time.sleep(30)
 
     # Collect interface MACs and LLDP neighbors
@@ -167,9 +159,8 @@ def _enable_lldp_discovery(
         )
         client.config("delete", xpath, None)
         rules_deleted = True
-        LOG.debug("Deleted security rules")
-    except Exception as e:
-        LOG.debug("No security rules to remove: %s", e)
+    except Exception:
+        pass
 
     try:
         xpath = (
@@ -178,8 +169,8 @@ def _enable_lldp_discovery(
         )
         client.config("delete", xpath, None)
         zones_deleted = True
-    except Exception as e:
-        LOG.debug("No zone config to remove: %s", e)
+    except Exception:
+        pass
 
     try:
         xpath = (
@@ -188,8 +179,8 @@ def _enable_lldp_discovery(
         )
         client.config("delete", xpath, None)
         vwires_deleted = True
-    except Exception as e:
-        LOG.debug("No virtual-wire config to remove: %s", e)
+    except Exception:
+        pass
 
     # Remove virtual-wire config from all specified interfaces
     for iface in interfaces:
@@ -199,8 +190,8 @@ def _enable_lldp_discovery(
                 f"/network/interface/ethernet/entry[@name='{iface}']/virtual-wire"
             )
             client.config("delete", xpath, None)
-        except Exception as e:
-            LOG.debug("No virtual-wire config on %s: %s", iface, e)
+        except Exception:
+            pass
 
     # Only commit if we actually deleted something
     if rules_deleted or zones_deleted or vwires_deleted:

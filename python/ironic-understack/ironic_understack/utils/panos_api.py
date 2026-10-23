@@ -146,14 +146,6 @@ class PanosClient:
         if element and action in ("set", "edit"):
             params["element"] = element
 
-        LOG.debug(
-            "PAN-OS %s config %s: xpath=%s element=%s",
-            self.address,
-            action,
-            xpath,
-            element[:100] if element else None,
-        )
-
         resp = self.session.get(
             self.url,
             params=params,
@@ -161,14 +153,6 @@ class PanosClient:
         )
         root = _parse(resp)
         result = root.find("result")
-
-        LOG.debug(
-            "PAN-OS %s config %s: status=%s, full response=%s",
-            self.address,
-            action,
-            root.get("status"),
-            ET.tostring(root, encoding="unicode")[:500],
-        )
 
         if result is None:
             # For delete/set operations, success response may not have a result
@@ -189,25 +173,12 @@ class PanosClient:
         if description:
             cmd = f"<commit><description>{description}</description></commit>"
 
-        LOG.debug(
-            "PAN-OS %s committing: %s", self.address, description or "no description"
-        )
-
         resp = self.session.get(
             self.url,
             params={"type": "commit", "key": self.api_key, "cmd": cmd},
             timeout=120,
         )
         root = _parse(resp)
-
-        LOG.debug(
-            "PAN-OS %s commit response: status=%s, code=%s, msg=%s, full_xml=%s",
-            self.address,
-            root.get("status"),
-            root.get("code"),
-            root.findtext("msg"),
-            ET.tostring(root, encoding="unicode")[:800],
-        )
 
         # Find job ID first
         job = root.findtext(".//job") or root.findtext("result/job")
@@ -216,19 +187,7 @@ class PanosClient:
         if root.get("code") == "19":
             msg = root.findtext("msg") or ""
             if "no changes" in msg.lower():
-                LOG.debug(
-                    "PAN-OS %s commit returned code 19 (no changes): %s",
-                    self.address,
-                    msg,
-                )
                 return None
-            else:
-                LOG.debug(
-                    "PAN-OS %s commit returned code 19 but message doesn't "
-                    "indicate 'no changes': %s",
-                    self.address,
-                    msg,
-                )
         if not job:
             LOG.error(
                 "PAN-OS %s commit response missing job ID. Root: %s",
@@ -237,7 +196,6 @@ class PanosClient:
             )
             raise PanosApiError("Could not find job ID in commit response")
 
-        LOG.debug("PAN-OS %s commit started, job ID: %s", self.address, job)
         return job
 
     def check_job(self, job_id: str) -> dict[str, str]:
@@ -278,7 +236,6 @@ class PanosClient:
 
             if status["status"] == "FIN":
                 if status["result"] == "OK":
-                    LOG.debug("PAN-OS %s commit job %s succeeded", self.address, job_id)
                     return True
                 else:
                     LOG.error(
@@ -365,11 +322,6 @@ class PanosClient:
 
             neighbor_entry = neighbor_info.get("entry", {})
             if not neighbor_entry or not isinstance(neighbor_entry, dict):
-                LOG.debug(
-                    "PAN-OS %s LLDP skipping entry - neighbor_entry invalid: %s",
-                    self.address,
-                    neighbor_entry,
-                )
                 continue
 
             neighbors.append(
