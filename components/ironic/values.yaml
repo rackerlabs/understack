@@ -1,11 +1,4 @@
 ---
-# Override image tag for PR testing
-images:
-  tags:
-    ironic_conductor: ghcr.io/rackerlabs/understack/ironic:pr-2564
-    ironic_api: ghcr.io/rackerlabs/understack/ironic:pr-2564
-    ironic_pxe: ghcr.io/rackerlabs/understack/ironic:pr-2564
-
 bootstrap:
   image:
     enabled: false
