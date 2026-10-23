@@ -1,10 +1,26 @@
 # Defaults: https://github.com/mariadb-operator/mariadb-operator/blob/main/deploy/charts/mariadb-operator/values.yaml
 
+# The docker-registry*.mariadb.com registries are deprecated upstream. The
+# 26.3.0 chart still defaults to them, so point at the supported ones here.
+# https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/docker.md
+image:
+  repository: ghcr.io/mariadb-operator/mariadb-operator
+
+webhook:
+  image:
+    repository: ghcr.io/mariadb-operator/mariadb-operator
+
+certController:
+  image:
+    repository: ghcr.io/mariadb-operator/mariadb-operator
+
 metrics:
   enabled: true
 
 config:
   # stick with OpenStack's officially supported version
   mariadbDefaultVersion: "11.4"
-  # operator < 26.3 takes the image as a single string
-  mariadbImage: docker-registry1.mariadb.com/library/mariadb:11.4.10
+  mariadbImageName: mariadb
+  mariadbImage:
+    repository: mariadb
+    tag: 11.4.10
