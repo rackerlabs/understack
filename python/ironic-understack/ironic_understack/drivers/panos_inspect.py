@@ -1,6 +1,7 @@
 """Inspect interface for PAN-OS (Palo Alto) appliances."""
 
 import time
+from contextlib import suppress
 from typing import ClassVar
 
 import requests
@@ -159,8 +160,8 @@ def _enable_lldp_discovery(
         )
         client.config("delete", xpath, None)
         rules_deleted = True
-    except Exception:
-        pass
+    except panos_api.PanosApiError:
+        pass  # No security rules to delete
 
     try:
         xpath = (
@@ -169,8 +170,8 @@ def _enable_lldp_discovery(
         )
         client.config("delete", xpath, None)
         zones_deleted = True
-    except Exception:
-        pass
+    except panos_api.PanosApiError:
+        pass  # No zone config to delete
 
     try:
         xpath = (
@@ -179,19 +180,25 @@ def _enable_lldp_discovery(
         )
         client.config("delete", xpath, None)
         vwires_deleted = True
-    except Exception:
-        pass
+    except panos_api.PanosApiError:
+        pass  # No virtual-wire config to delete
 
-    # Remove virtual-wire config from all specified interfaces
+    if rules_deleted or zones_deleted or vwires_deleted:
+        LOG.debug(
+            "Deleted factory config: rules=%s zones=%s vwires=%s",
+            rules_deleted,
+            zones_deleted,
+            vwires_deleted,
+        )
+
+    # Remove virtual-wire config from all interfaces (no per-interface logs)
     for iface in interfaces:
-        try:
+        with suppress(panos_api.PanosApiError):
             xpath = (
                 f"/config/devices/entry[@name='localhost.localdomain']"
                 f"/network/interface/ethernet/entry[@name='{iface}']/virtual-wire"
             )
             client.config("delete", xpath, None)
-        except Exception:
-            pass
 
     # Only commit if we actually deleted something
     if rules_deleted or zones_deleted or vwires_deleted:
