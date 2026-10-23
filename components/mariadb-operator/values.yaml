@@ -1,19 +1,5 @@
 # Defaults: https://github.com/mariadb-operator/mariadb-operator/blob/main/deploy/charts/mariadb-operator/values.yaml
 
-# The docker-registry*.mariadb.com registries are deprecated upstream. The
-# 26.3.0 chart still defaults to them, so point at the supported ones here.
-# https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/docker.md
-image:
-  repository: ghcr.io/mariadb-operator/mariadb-operator
-
-webhook:
-  image:
-    repository: ghcr.io/mariadb-operator/mariadb-operator
-
-certController:
-  image:
-    repository: ghcr.io/mariadb-operator/mariadb-operator
-
 metrics:
   enabled: true
 

@@ -19,7 +19,7 @@ spec:
   source:
     repoURL: https://mariadb-operator.github.io/mariadb-operator
     chart: mariadb-operator-crds
-    targetRevision: 26.3.0
+    targetRevision: 26.6.0
     helm:
       ignoreMissingValueFiles: true
   syncPolicy:
