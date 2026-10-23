@@ -106,108 +106,38 @@ def _apply_system_info(node, system: dict[str, str]) -> None:
 def _discover_and_update_ports(task, client: panos_api.PanosClient) -> None:
     """Discover interfaces and LLDP neighbors, then update/create Ironic ports.
 
-    This temporarily enables LLDP on unconfigured interfaces, collects neighbors,
+    This temporarily enables LLDP on all interfaces, collects neighbors,
     then restores the original configuration.
     """
     node = task.node
 
-    # Step 1: Get current interface configuration to determine what needs LLDP
-    configured_interfaces = _get_configured_interfaces(client)
-    LOG.debug(
-        "[node:%s] Found %d configured interfaces",
-        node.uuid,
-        len(configured_interfaces),
-    )
-
-    # Step 2: Get all physical interfaces based on model
+    # Get all physical interfaces based on model
     model = node.properties.get("model", "PA-1410")
     all_interfaces = _get_all_physical_interfaces(model)
-    interfaces_to_configure = [
-        iface for iface in all_interfaces if iface not in configured_interfaces
-    ]
-
-    if not interfaces_to_configure:
-        LOG.info(
-            "[node:%s] All interfaces configured, skipping temporary LLDP setup",
-            node.uuid,
-        )
-        # Still collect whatever LLDP is already there
-        interface_macs = client.get_interface_macs()
-        lldp_neighbors = client.get_lldp_neighbors()
-        _update_ports_from_neighbors(task, lldp_neighbors, interface_macs)
-        return
 
     LOG.debug(
-        "[node:%s] Will configure LLDP on %d unconfigured interfaces",
+        "[node:%s] Configuring LLDP on all %d interfaces",
         node.uuid,
-        len(interfaces_to_configure),
+        len(all_interfaces),
     )
 
-    # Step 3: Enable LLDP and configure unconfigured interfaces
-    _enable_lldp_discovery(client, interfaces_to_configure)
+    # Enable LLDP on all interfaces
+    _enable_lldp_discovery(client, all_interfaces)
 
-    # Step 4: Wait for LLDP neighbors
+    # Wait for LLDP neighbors
     LOG.debug("[node:%s] Waiting 30s for LLDP neighbor discovery", node.uuid)
     time.sleep(30)
 
-    # Step 5: Collect interface MACs and LLDP neighbors
+    # Collect interface MACs and LLDP neighbors
     interface_macs = client.get_interface_macs()
     lldp_neighbors = client.get_lldp_neighbors()
     LOG.info("[node:%s] Discovered %d LLDP neighbors", node.uuid, len(lldp_neighbors))
 
-    # Step 6: Restore original configuration
-    _restore_interface_config(client, interfaces_to_configure)
+    # Restore original configuration (delete all interface config we added)
+    _restore_interface_config(client, all_interfaces)
 
-    # Step 7: Update Ironic ports
+    # Update Ironic ports
     _update_ports_from_neighbors(task, lldp_neighbors, interface_macs)
-
-
-def _get_configured_interfaces(client: panos_api.PanosClient) -> set[str]:
-    """Get set of interfaces that have any configuration."""
-    configured = set()
-
-    # Check ethernet interface config
-    try:
-        xpath = (
-            "/config/devices/entry[@name='localhost.localdomain']"
-            "/network/interface/ethernet"
-        )
-        result = client.config("get", xpath)
-
-        # Parse XML result
-        for entry in result.findall(".//entry"):
-            name = entry.get("name")
-            if name and any(
-                entry.find(tag) is not None
-                for tag in [
-                    "layer3",
-                    "layer2",
-                    "tap",
-                    "ha",
-                    "aggregate-ethernet",
-                    "virtual-wire",
-                ]
-            ):
-                configured.add(name)
-    except panos_api.PanosApiError as e:
-        LOG.warning("Could not check interface configuration: %s", e)
-
-    # Check virtual-wire configurations
-    try:
-        xpath = (
-            "/config/devices/entry[@name='localhost.localdomain']/network/virtual-wire"
-        )
-        result = client.config("get", xpath)
-
-        for entry in result.findall(".//entry"):
-            for tag in ["interface1", "interface2"]:
-                iface = entry.findtext(tag)
-                if iface:
-                    configured.add(iface)
-    except panos_api.PanosApiError as e:
-        LOG.debug("Could not check virtual-wire configuration: %s", e)
-
-    return configured
 
 
 def _get_all_physical_interfaces(model: str) -> list[str]:
@@ -221,10 +151,11 @@ def _get_all_physical_interfaces(model: str) -> list[str]:
 def _enable_lldp_discovery(
     client: panos_api.PanosClient, interfaces: list[str]
 ) -> None:
-    """Enable LLDP globally and configure it on specified interfaces."""
-    # Remove factory default config that blocks interface configuration
-    # Must delete security rules first (they reference zones),
-    # then zones (they reference virtual-wires)
+    """Enable LLDP globally and configure it on specified interfaces.
+
+    Destructively removes any existing config that would block LLDP setup.
+    """
+    # Remove all blocking config: security rules -> zones -> virtual-wires
     rules_deleted = False
     zones_deleted = False
     vwires_deleted = False
@@ -260,7 +191,7 @@ def _enable_lldp_discovery(
     except Exception as e:
         LOG.debug("No virtual-wire config to remove: %s", e)
 
-    # Remove virtual-wire config from interfaces we want to configure
+    # Remove virtual-wire config from all specified interfaces
     for iface in interfaces:
         try:
             xpath = (
