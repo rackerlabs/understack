@@ -92,10 +92,16 @@ pod:
     glance_api:
       - secret:
           name: glance-ks-etc
+      - secret:
+          name: glance-db-conn
     glance_db_sync:
       - secret:
           name: glance-ks-etc
-    glance_metadefs_load: []
+      - secret:
+          name: glance-db-conn
+    glance_metadefs_load:
+      - secret:
+          name: glance-db-conn
   replicas:
     api: 2
   lifecycle:
@@ -128,6 +134,11 @@ pod:
 
 conf:
   glance:
+    database:
+      # The MariaDB operator writes the connection string into the
+      # glance-db-conn secret, which is projected into the config directory
+      # above, so the chart must not generate one from the DB password.
+      connection: null
     oslo_messaging_notifications:
       driver: messagingv2
     oslo_messaging_rabbit:
@@ -140,7 +151,19 @@ conf:
       # Kubernetes environment.
       processes: 2
 
+# The chart declares the Database, User, Grant and Connection resources instead
+# of the db-init job. The password is read from the glance-db-password secret
+# in the deploy repo rather than rendered from Helm values.
+mariadb_db:
+  api_group: k8s.mariadb.com
+  # the MariaDB resource is named mariadb, while clients connect through the
+  # mariadb-primary service set in endpoints.oslo_db.hosts
+  mariadb_ref: mariadb
+  password_secret:
+    create: false
+
 manifests:
+  mariadb_db: true
   # its pre-delete hook makes ArgoCD add pre-delete finalizers to the
   # Application, which the app-of-apps then fights. no-op for us anyway.
   job_clean: false

@@ -356,7 +356,7 @@ site:
     wave: 1
     # -- Chart version for Keystone
     # renovate: datasource=helm depName=keystone registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.61+a39ebbeb1
+    chartVersion: 2026.2.3+b5078da51
 
   # -- Glance (Image Service)
   glance:
@@ -368,7 +368,7 @@ site:
     wave: 2
     # -- Chart version for Glance
     # renovate: datasource=helm depName=glance registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.67+a39ebbeb1
+    chartVersion: 2026.2.3+b5078da51
 
   # -- Cinder (Block Storage Service)
   cinder:
@@ -404,7 +404,7 @@ site:
     wave: 2
     # -- Chart version for Neutron
     # renovate: datasource=helm depName=neutron registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.107+a39ebbeb1
+    chartVersion: 2026.2.1+b90c3a6ab
 
   # -- Placement (Placement Service)
   placement:
@@ -416,7 +416,7 @@ site:
     wave: 2
     # -- Chart version for Placement
     # renovate: datasource=helm depName=placement registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.58+a39ebbeb1
+    chartVersion: 2026.2.3+b5078da51
 
   # -- Nova (Compute Service)
   nova:
