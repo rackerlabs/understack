@@ -8,14 +8,15 @@
     {
       "fileMatch": ["^understack/components/mariadb-operator/kustomization\\.yaml$"],
       "matchStrings": [
-        "(?m)^[ \\t]*- name:\\s*(?<depName>[^\\s]+)[\\s\\S]*?repo:\\s*(?<registryUrl>[^\\s]+)[\\s\\S]*?version:\\s*(?<currentValue>[^\\s]+)"
+        "(?m)^[ \\t]*- name:\\s*(?<depName>[^\\s]+)[\\s\\S]*?repo:\\s*oci://(?<registry>[^\\s]+)[\\s\\S]*?version:\\s*(?<currentValue>[^\\s]+)"
       ],
-      "datasourceTemplate": "helm"
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "{{{registry}}}/{{{depName}}}"
     }
   ],
   "packageRules": [
     {
-      "matchDatasources": ["helm"],
+      "matchDatasources": ["docker"],
       "groupName": "mariadb-operator Helm charts"
     }
   ]
