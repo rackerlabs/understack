@@ -224,12 +224,16 @@ def _enable_lldp_discovery(
     """Enable LLDP globally and configure it on specified interfaces."""
     # Remove factory default config that blocks interface configuration
     # Must delete zones first (they reference virtual-wires)
+    zones_deleted = False
+    vwires_deleted = False
+
     try:
         xpath = (
             "/config/devices/entry[@name='localhost.localdomain']"
             "/vsys/entry[@name='vsys1']/zone"
         )
         client.config("delete", xpath, None)
+        zones_deleted = True
     except Exception as e:
         LOG.debug("No zone config to remove: %s", e)
 
@@ -239,13 +243,28 @@ def _enable_lldp_discovery(
             "/network/virtual-wire"
         )
         client.config("delete", xpath, None)
+        vwires_deleted = True
     except Exception as e:
         LOG.debug("No virtual-wire config to remove: %s", e)
 
-    # Commit factory default cleanup
-    job_id = client.commit("Inspect: Remove factory default config")
-    if job_id:
-        client.wait_for_commit(job_id)
+    # Remove virtual-wire config from interfaces we want to configure
+    for iface in interfaces:
+        try:
+            xpath = (
+                f"/config/devices/entry[@name='localhost.localdomain']"
+                f"/network/interface/ethernet/entry[@name='{iface}']/virtual-wire"
+            )
+            client.config("delete", xpath, None)
+        except Exception as e:
+            LOG.debug("No virtual-wire config on %s: %s", iface, e)
+
+    # Only commit if we actually deleted something
+    if zones_deleted or vwires_deleted:
+        job_id = client.commit("Inspect: Remove factory default config")
+        if job_id and not client.wait_for_commit(job_id):
+            raise panos_api.PanosApiError(
+                "Failed to commit factory default cleanup configuration"
+            )
 
     # Enable LLDP globally
     xpath = "/config/devices/entry[@name='localhost.localdomain']/network/lldp"
@@ -262,8 +281,8 @@ def _enable_lldp_discovery(
 
     # Commit LLDP profile
     job_id = client.commit("Inspect: Enable LLDP profile")
-    if job_id:
-        client.wait_for_commit(job_id)
+    if job_id and not client.wait_for_commit(job_id):
+        raise panos_api.PanosApiError("Failed to commit LLDP profile configuration")
 
     # Configure interfaces with LLDP
     for iface in interfaces:
@@ -282,8 +301,10 @@ def _enable_lldp_discovery(
 
     # Commit interface changes
     job_id = client.commit("Inspect: Enable interfaces for LLDP discovery")
-    if job_id:
-        client.wait_for_commit(job_id)
+    if job_id and not client.wait_for_commit(job_id):
+        raise panos_api.PanosApiError(
+            "Failed to commit interface configuration for LLDP"
+        )
 
 
 def _restore_interface_config(
@@ -302,8 +323,10 @@ def _restore_interface_config(
 
     # Commit restore
     job_id = client.commit("Inspect: Restore original interface configuration")
-    if job_id:
-        client.wait_for_commit(job_id)
+    if job_id and not client.wait_for_commit(job_id):
+        raise panos_api.PanosApiError(
+            "Failed to commit interface restoration configuration"
+        )
 
 
 def _update_ports_from_neighbors(
