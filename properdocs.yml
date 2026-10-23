@@ -241,6 +241,7 @@ nav:
       - openstack-helm.md
       - design-guide/ironic.md
       - design-guide/neutron-networking.md
+      - design-guide/ovn-gateway-host-networking.md
       - design-guide/argo-workflows.md
       - design-guide/argo-events.md
   - Reference:
