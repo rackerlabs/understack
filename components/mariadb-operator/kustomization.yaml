@@ -14,7 +14,7 @@ helmCharts:
   valuesFile: values.yaml
   releaseName: mariadb-operator
   version: 26.6.0
-  repo: https://mariadb-operator.github.io/mariadb-operator
+  repo: oci://ghcr.io/mariadb-operator/charts
   valuesInline:
     crds:
       enabled: false
