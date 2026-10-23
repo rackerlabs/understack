@@ -223,9 +223,22 @@ def _enable_lldp_discovery(
 ) -> None:
     """Enable LLDP globally and configure it on specified interfaces."""
     # Remove factory default config that blocks interface configuration
-    # Must delete zones first (they reference virtual-wires)
+    # Must delete security rules first (they reference zones),
+    # then zones (they reference virtual-wires)
+    rules_deleted = False
     zones_deleted = False
     vwires_deleted = False
+
+    try:
+        xpath = (
+            "/config/devices/entry[@name='localhost.localdomain']"
+            "/vsys/entry[@name='vsys1']/rulebase/security/rules"
+        )
+        client.config("delete", xpath, None)
+        rules_deleted = True
+        LOG.debug("Deleted security rules")
+    except Exception as e:
+        LOG.debug("No security rules to remove: %s", e)
 
     try:
         xpath = (
@@ -259,7 +272,7 @@ def _enable_lldp_discovery(
             LOG.debug("No virtual-wire config on %s: %s", iface, e)
 
     # Only commit if we actually deleted something
-    if zones_deleted or vwires_deleted:
+    if rules_deleted or zones_deleted or vwires_deleted:
         job_id = client.commit("Inspect: Remove factory default config")
         if job_id and not client.wait_for_commit(job_id):
             raise panos_api.PanosApiError(
