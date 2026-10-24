@@ -266,3 +266,16 @@ spec:
 ## License
 
 Apache 2.0
+
+### Site workflow patches
+
+`argo_events_workflows_patches` accepts Argo CD Kustomize `patches` entries for
+resources in the public `workflows/argo-events` source. Private site resources
+are rendered as a separate source and cannot patch that source directly.
+Keep site-specific patch values in private deployment inventory. The default
+empty list preserves the unmodified public workflows.
+
+The `enroll-server` template exposes `node_uuid` after successful enrollment.
+Downstream workflow steps can consume this output without parsing logs or
+resolving mutable BMC addresses. The output does not imply downstream work has
+completed or gate the node's transition to `available`.

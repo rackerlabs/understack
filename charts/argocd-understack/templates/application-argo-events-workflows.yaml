@@ -18,6 +18,11 @@ spec:
   - path: workflows/argo-events
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
+    {{- with $.Values.argo_events_workflows_patches }}
+    kustomize:
+      patches:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
   - path: {{ include "understack.deploy_path" $ }}/argo-events-workflows
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
