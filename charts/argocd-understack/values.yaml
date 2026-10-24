@@ -609,3 +609,7 @@ site:
     # -- Enable/disable deploying undersync
     # @default -- false
     enabled: false
+
+# Optional Kustomize patches for the public workflow source. Kept separate from
+# private site resources because Argo CD renders each source independently.
+argo_events_workflows_patches: []
