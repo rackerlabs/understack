@@ -35,6 +35,14 @@ spec:
         value: calvin
       - name: external_cmdb_id
         value: ""
+      # Optional post-enrollment hook. "false" (default) = no hook, behaviour
+      # unchanged. A site opts in by setting "true" AND installing an
+      # `enroll-post-hook` WorkflowTemplate (entrypoint `run`, input param
+      # `node_uuid`) in the workflow namespace. The ref name is intentionally
+      # static: Argo resolves templateRef.name at parse time, so it cannot be a
+      # parameter. Each site decides what enroll-post-hook does.
+      - name: post_enroll_hook
+        value: "false"
   templates:
     - name: main
       outputs:
@@ -45,6 +53,17 @@ spec:
       steps:
         - - name: enroll-server
             template: enroll-server
+        # Runs only when the site enabled the hook. This step is a generic
+        # delegator and does not know about any specific integration.
+        - - name: post-enroll
+            when: "{{workflow.parameters.post_enroll_hook}} == true"
+            templateRef:
+              name: enroll-post-hook
+              template: run
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
     - name: enroll-server
       outputs:
         parameters:
