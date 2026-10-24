@@ -11,6 +11,8 @@ spec:
   serviceAccountName: workflow
   entrypoint: main
   volumes:
+    - name: enrollment-result
+      emptyDir: {}
     - name: bmc-master
       secret:
         secretName: bmc-master
@@ -35,15 +37,27 @@ spec:
         value: ""
   templates:
     - name: main
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              parameter: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
       steps:
         - - name: enroll-server
             template: enroll-server
     - name: enroll-server
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              path: /run/enrollment/node-uuid
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - enroll-server
         args:
+          - --node-uuid-output
+          - /run/enrollment/node-uuid
           - --ip-address
           - "{{workflow.parameters.ip_address}}"
           - --post-inspection-runbooks
@@ -57,6 +71,8 @@ spec:
           - --external-cmdb-id
           - "{{workflow.parameters.external_cmdb_id}}"
         volumeMounts:
+          - mountPath: /run/enrollment
+            name: enrollment-result
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true

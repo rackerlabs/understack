@@ -624,7 +624,7 @@ def test_post_inspection_runbook_order(mocker, runbooks):
     for name in ("run_post_inspection_runbook", "apply_firmware_updates", "transition"):
         events.attach_mock(mocker.patch.object(enroll_server.ironic_node, name), name)
 
-    enroll_server.enroll(
+    result = enroll_server.enroll(
         ip_address=bmc.ip_address,
         firmware_update=True,
         raid_configure=True,
@@ -648,6 +648,7 @@ def test_post_inspection_runbook_order(mocker, runbooks):
         ]
     )
     assert events.mock_calls == expected
+    assert result == node.uuid
 
 
 def test_post_inspection_runbook_uses_uuid_and_waits(mocker):
@@ -769,3 +770,26 @@ def test_post_inspection_runbooks_stop_on_failure(mocker):
     raid.assert_not_called()
     firmware.assert_not_called()
     transition.assert_not_called()
+
+
+def test_main_emits_node_uuid_only_after_success(mocker, tmp_path):
+    output = tmp_path / "node-uuid"
+    mocker.patch(
+        "sys.argv",
+        [
+            "enroll-server",
+            "--ip-address",
+            "192.0.2.1",
+            "--node-uuid-output",
+            str(output),
+        ],
+    )
+    mocker.patch.object(enroll_server.helpers, "setup_logger")
+    enroll = mocker.patch.object(enroll_server, "enroll", return_value="node-123")
+    enroll_server.main()
+    assert output.read_text() == "node-123\n"
+    output.unlink()
+    enroll.side_effect = RuntimeError("enrollment failed")
+    with pytest.raises(RuntimeError, match="enrollment failed"):
+        enroll_server.main()
+    assert not output.exists()
