@@ -26,6 +26,7 @@ update-baremetal-port = "ironic_understack.hooks.inspect_hook_update_baremetal_p
 port-bios-name = "ironic_understack.hooks.port_bios_name_hook:PortBiosNameHook"
 node-name-check = "ironic_understack.hooks.inspect_hook_node_name_check:InspectHookNodeNameCheck"
 chassis_model = "ironic_understack.hooks.inspect_hook_chassis_model:InspectHookChassisModel"
+pci-device-capabilities = "ironic_understack.hooks.inspect_hook_pci_device_capabilities:PciDeviceCapabilitiesHook"
 
 [project.entry-points."ironic.hardware.types"]
 netdev = "ironic_understack.drivers.netdev_hardware:NetdevHardware"
