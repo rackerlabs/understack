@@ -114,7 +114,7 @@ spec:
             valueFrom:
               path: /run/enrollment/node-uuid
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-2611
         command:
           - enroll-server
         args:
