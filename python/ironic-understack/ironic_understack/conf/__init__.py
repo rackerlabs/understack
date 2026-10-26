@@ -26,6 +26,11 @@ def setup_conf():
                 "1d": "bmc",
             },
         ),
+        cfg.DictOpt(
+            "pci_device_capabilities",
+            help="Dictionary of pci device IDs (xxxx:xxxx) to capability name",
+            default={},
+        ),
     ]
     cfg.CONF.register_group(grp)
     cfg.CONF.register_opts(opts, group=grp)
