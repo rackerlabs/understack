@@ -1,8 +1,10 @@
 # pylint: disable=E1131,C0103
 
 import argparse
+import json
 import logging
 import os
+from pathlib import Path
 
 from ironicclient.v1.node import Node
 
@@ -51,6 +53,8 @@ def main() -> None:
       mode for cleaning and provisioning (we prefer PXE-based booting over
       virtual media, for performance reasons).
 
+    - Optionally execute post-inspection runbooks in the supplied order.
+
     - Optionally configure RAID.
 
     - Optionally apply firmware updates.
@@ -60,13 +64,17 @@ def main() -> None:
     helpers.setup_logger()
     args = argument_parser().parse_args()
 
-    enroll(
+    node_uuid = enroll(
         ip_address=args.ip_address,
         old_password=args.old_password,
         firmware_update=args.firmware_update,
         raid_configure=args.raid_configure,
         external_cmdb_id=args.external_cmdb_id,
+        post_inspection_runbooks=args.post_inspection_runbooks,
     )
+
+    if args.node_uuid_output:
+        Path(args.node_uuid_output).write_text(node_uuid + "\n")
 
 
 def enroll(
@@ -75,7 +83,8 @@ def enroll(
     raid_configure: bool,
     old_password: str | None,
     external_cmdb_id: int | str | None = None,
-) -> None:
+    post_inspection_runbooks: list[str] | None = None,
+) -> str:
     logger.info("Starting enroll workflow for bmc_ip_address=%s", ip_address)
 
     if external_cmdb_id:
@@ -126,6 +135,9 @@ def enroll(
 
     update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
 
+    for runbook in post_inspection_runbooks or []:
+        ironic_node.run_post_inspection_runbook(node, runbook)
+
     if raid_configure:
         configure_raid(node, inventory)
         # RAID reconfiguration changes the disk layout; refresh inventory.
@@ -138,6 +150,7 @@ def enroll(
 
     ironic_node.transition(node, target_state="provide", expected_state="available")
     logger.info("Completed enroll workflow for bmc_ip_address=%s", ip_address)
+    return str(node.uuid)
 
 
 def agent_inspection(node: Node, virtual_media=False) -> None:
@@ -196,16 +209,46 @@ def parse_bool(value: str) -> bool:
     return value.lower() == "true"
 
 
+def parse_runbooks(value: str) -> list[str]:
+    """Parse an ordered JSON array of runbook names or UUIDs."""
+    try:
+        runbooks = json.loads(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "Expected a JSON array of runbook names or UUIDs"
+        ) from exc
+    if not isinstance(runbooks, list) or any(
+        not isinstance(runbook, str) or not runbook.strip() for runbook in runbooks
+    ):
+        raise argparse.ArgumentTypeError(
+            "Expected a JSON array of nonempty runbook names or UUIDs"
+        )
+    return runbooks
+
+
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__),
         description="Run the server enroll workflow",
+    )
+    parser.add_argument(
+        "--node-uuid-output",
+        help="Write node UUID to this file after successful enrollment",
     )
     parser.add_argument("--ip-address", required=True, help="IP Address of BMC")
     parser.add_argument(
         "--old-password",
         required=False,
         help="Old (current) BMC password",
+    )
+    parser.add_argument(
+        "--post-inspection-runbooks",
+        type=parse_runbooks,
+        default=[],
+        help=(
+            "JSON array of runbook names or UUIDs to execute in order "
+            "after inspection and BIOS configuration"
+        ),
     )
     parser.add_argument(
         "--firmware-update",

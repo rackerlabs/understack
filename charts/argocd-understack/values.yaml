@@ -583,6 +583,17 @@ site:
     # @default -- false
     enabled: false
 
+  # -- Out-of-band monitoring WorkflowTemplates. Deploys the site's
+  #    `<cluster>/obm-monitoring` Kustomize overlay from the deployment
+  #    repository into the existing `argo-events` namespace. The overlay and its
+  #    application code/images live in the deployment repository; this chart only
+  #    renders the ArgoCD Application pointer. A site opts in by setting this to
+  #    true in its deploy.yaml.
+  obm_monitoring:
+    # -- Enable/disable deploying OBM monitoring WorkflowTemplates
+    # @default -- false
+    enabled: false
+
   # -- Nautobot Celery workers (site-level, connects to global Nautobot)
   nautobot_worker:
     # -- Enable/disable deploying Nautobot workers at the site level

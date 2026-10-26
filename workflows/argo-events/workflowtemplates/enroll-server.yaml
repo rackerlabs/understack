@@ -11,6 +11,8 @@ spec:
   serviceAccountName: workflow
   entrypoint: main
   volumes:
+    - name: enrollment-result
+      emptyDir: {}
     - name: bmc-master
       secret:
         secretName: bmc-master
@@ -23,6 +25,8 @@ spec:
   arguments:
     parameters:
       - name: ip_address
+      - name: post_inspection_runbooks
+        value: "[]"
       - name: firmware_update
         value: "false"
       - name: raid_configure
@@ -31,19 +35,52 @@ spec:
         value: calvin
       - name: external_cmdb_id
         value: ""
+      # Optional post-enrollment hook. "false" (default) = no hook, behaviour
+      # unchanged. A site opts in by setting "true" AND installing an
+      # `enroll-post-hook` WorkflowTemplate (entrypoint `run`, input param
+      # `node_uuid`) in the workflow namespace. The ref name is intentionally
+      # static: Argo resolves templateRef.name at parse time, so it cannot be a
+      # parameter. Each site decides what enroll-post-hook does.
+      - name: post_enroll_hook
+        value: "false"
   templates:
     - name: main
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              parameter: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
       steps:
         - - name: enroll-server
             template: enroll-server
+        # Runs only when the site enabled the hook. This step is a generic
+        # delegator and does not know about any specific integration.
+        - - name: post-enroll
+            when: "{{workflow.parameters.post_enroll_hook}} == true"
+            templateRef:
+              name: enroll-post-hook
+              template: run
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
     - name: enroll-server
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              path: /run/enrollment/node-uuid
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - enroll-server
         args:
+          - --node-uuid-output
+          - /run/enrollment/node-uuid
           - --ip-address
           - "{{workflow.parameters.ip_address}}"
+          - --post-inspection-runbooks
+          - "{{workflow.parameters.post_inspection_runbooks}}"
           - --firmware-update
           - "{{workflow.parameters.firmware_update}}"
           - --raid-configure
@@ -53,6 +90,8 @@ spec:
           - --external-cmdb-id
           - "{{workflow.parameters.external_cmdb_id}}"
         volumeMounts:
+          - mountPath: /run/enrollment
+            name: enrollment-result
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
