@@ -333,6 +333,32 @@ def _update_ports_from_neighbors(
         )
         vlan_group_mapping = {}
 
+    # Determine port categories based on interface numbers
+    # Sort ports by interface number
+    # - If exactly 2 ports: lowest is "outside", highest is "inside"
+    # - If 3+ ports: first two in sorted order get "outside"/"inside", rest get None
+    def _extract_interface_number(iface_name: str) -> int:
+        """Extract numeric part from interface name like 'ethernet1/1' -> 1."""
+        try:
+            return int(iface_name.split("/")[-1])
+        except (ValueError, IndexError):
+            return 999  # Put unparsable interfaces at the end
+
+    sorted_ports = sorted(
+        inspected_ports, key=lambda p: _extract_interface_number(p.name)
+    )
+    port_categories = {}
+
+    if len(sorted_ports) == 2:
+        # Exactly 2 ports: lowest is outside, highest is inside
+        port_categories[sorted_ports[0].mac_address.lower()] = "outside"
+        port_categories[sorted_ports[1].mac_address.lower()] = "inside"
+    elif len(sorted_ports) >= 3:
+        # 3+ ports: only first two consecutive get categories
+        port_categories[sorted_ports[0].mac_address.lower()] = "outside"
+        port_categories[sorted_ports[1].mac_address.lower()] = "inside"
+    # If only 1 port, no category assigned
+
     # Now create or update ports
     for inspected_port in inspected_ports:
         mac_address = inspected_port.mac_address
@@ -341,6 +367,7 @@ def _update_ports_from_neighbors(
 
         physical_network = vlan_group_mapping.get(neighbor["system_name"])
         port_name = f"{node.name}:{local_interface}"
+        category = port_categories.get(mac_address.lower())
 
         # Check if port already exists (by MAC or name)
         existing_port = None
@@ -358,6 +385,7 @@ def _update_ports_from_neighbors(
             existing_port.local_link_connection = inspected_port.local_link_connection
             existing_port.extra = {"bios_name": local_interface}
             existing_port.physical_network = physical_network
+            existing_port.category = category
             existing_port.name = port_name
             existing_port.save()
             LOG.debug("[node:%s] Updated port %s", node.uuid, port_name)
@@ -370,8 +398,13 @@ def _update_ports_from_neighbors(
             port_obj.local_link_connection = inspected_port.local_link_connection
             port_obj.extra = {"bios_name": local_interface}
             port_obj.physical_network = physical_network
+            port_obj.category = category
             port_obj.pxe_enabled = True
             port_obj.create()
             LOG.info(
-                "[node:%s] Created port %s (%s)", node.uuid, port_name, mac_address
+                "[node:%s] Created port %s (%s) category=%s",
+                node.uuid,
+                port_name,
+                mac_address,
+                category or "none",
             )
