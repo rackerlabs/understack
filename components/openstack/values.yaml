@@ -60,7 +60,7 @@ mariadb:
 # -- OpenStack RabbitMQ instance settings
 rabbitmq:
   # -- image to use
-  image: rabbitmq:3.13.7-management@sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69
+  image: rabbitmq:4.2.9-management@sha256:7ce498399b07a9594a3d23e5a7920edf233edb888e82503c35357c23cefc2e61
   # -- storage settings
   persistence: {}
   # -- resource settings
