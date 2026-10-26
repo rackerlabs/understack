@@ -23,7 +23,7 @@ spec:
       - $understack/components/openstack/memcached-values.yaml
       - $deploy/{{ include "understack.deploy_path" $ }}/openstack-memcached/values.yaml
     repoURL: https://charts.bitnami.com/bitnami
-    targetRevision: 7.8.6
+    targetRevision: 7.9.7
   - ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
