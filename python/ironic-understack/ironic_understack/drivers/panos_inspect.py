@@ -5,10 +5,10 @@ from contextlib import suppress
 from typing import ClassVar
 
 import requests
+from ironic import objects
 from ironic.common import exception
 from ironic.common import states
 from ironic.drivers import base
-from ironic.objects import port
 from oslo_log import log
 
 from ironic_understack.utils import panos_api
@@ -391,7 +391,7 @@ def _update_ports_from_neighbors(
             LOG.debug("[node:%s] Updated port %s", node.uuid, port_name)
         else:
             # Create new port
-            port_obj = port.Port(task.context)
+            port_obj = objects.Port(task.context)
             port_obj.node_id = node.id
             port_obj.address = mac_address
             port_obj.name = port_name
@@ -408,3 +408,39 @@ def _update_ports_from_neighbors(
                 mac_address,
                 category or "none",
             )
+
+    # Manage CUSTOM_NETDEV_ROLE_ATTACH trait based on whether roles were assigned
+    # Add trait if we assigned categories (outside/inside), remove if we didn't
+    role_attach_trait = "CUSTOM_NETDEV_ROLE_ATTACH"
+    categories_assigned = bool(port_categories)
+
+    try:
+        current_traits = set(task.node.traits or [])
+        has_trait = role_attach_trait in current_traits
+
+        if categories_assigned and not has_trait:
+            LOG.info(
+                "[node:%s] Adding trait %s (port roles assigned)",
+                node.uuid,
+                role_attach_trait,
+            )
+            new_trait = objects.Trait(
+                task.context, node_id=task.node.id, trait=role_attach_trait
+            )
+            new_trait.create()
+        elif not categories_assigned and has_trait:
+            LOG.info(
+                "[node:%s] Removing trait %s (no port roles assigned)",
+                node.uuid,
+                role_attach_trait,
+            )
+            objects.Trait.destroy(
+                task.context, node_id=task.node.id, trait=role_attach_trait
+            )
+    except Exception as e:
+        LOG.warning(
+            "[node:%s] Could not update trait %s: %s",
+            node.uuid,
+            role_attach_trait,
+            e,
+        )
