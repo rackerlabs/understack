@@ -127,10 +127,6 @@ conf:
       # Agent inspection hooks run after inspecting in-band using the IPA image:
       hooks: "ramdisk-error,validate-interfaces,architecture,pci-devices,parse-lldp,update-baremetal-port,chassis_model"
       keep_ports: "present"
-      pci_device_alias:
-        type: multistring
-        values:
-          - '{"vendor_id": "0x1002", "product_id": "0x75a8", "name": "gpu_amd_mi350p"}'
     redfish:
       # Redfish inspection hooks run after inspecting out-of-band using the BMC:
       inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class,chassis_model,pci-device-capabilities"
