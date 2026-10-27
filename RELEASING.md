@@ -9,7 +9,7 @@ notes and create the GitHub release.
 `containers.yaml` and its Helm chart is deployed straight from
 `charts/nautobotop/` at `understack_ref`, like `openstack-sync-operator`.
 
-Per-artifact tags (`understackctl/vX.Y.Z`, `kubectl-us/vX.Y.Z`,
+Per-artifact tags (`kubectl-us/vX.Y.Z`,
 `ironic-hardware-exporter/vX.Y.Z`, `dexop-vX.Y.Z`, `ironic-ipxe/vX.Y.Z`) are released independently. See
 [Separately released artifacts](#separately-released-artifacts) below.
 
@@ -136,16 +136,16 @@ The CLI utilities, operators and images that carry their own tag namespace do
 written by hand.
 
 This is deliberate rather than an oversight. GitHub's note generator has no path
-awareness in a monorepo: the range `understackctl/v0.0.4..understackctl/v0.0.5`
-spans 205 merge commits, almost none of them touching `understackctl`. Turning
+awareness in a monorepo: the range `dexop-v0.0.4..dexop-v0.0.5`
+spans 205 merge commits, almost none of them touching `dexop`. Turning
 on `generate_release_notes` for those workflows would produce 200 lines of
 unrelated platform churn, which is worse than an empty body.
 
 If a body is worth writing, write it by hand, or scope it by path:
 
 ```bash
-git log understackctl/v0.0.4..understackctl/v0.0.5 \
-  --merges --pretty='- %s' -- go/understackctl/
+git log dexop-v0.0.4..dexop-v0.0.5 \
+  --merges --pretty='- %s' -- go/dexop/
 ```
 
 Changes confined entirely to one of these subtrees are labelled

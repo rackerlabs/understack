@@ -67,7 +67,7 @@ Two things to know before you add a page:
 [py-nova]: https://github.com/rackerlabs/understack/blob/main/python/nova-understack/README.md
 [py-workflows]: https://github.com/rackerlabs/understack/blob/main/python/understack-workflows/README.md
 [py-sync]: https://github.com/rackerlabs/understack/blob/main/python/openstack-sync/README.md
-[go-understackctl]: https://github.com/rackerlabs/understack/blob/main/go/understackctl/README.md
+[go-understackctl]: https://github.com/rackerlabs/understackctl/blob/main/README.md
 [go-dexop]: https://github.com/rackerlabs/understack/blob/main/go/dexop/README.md
 [go-nautobotop]: https://github.com/rackerlabs/understack/blob/main/go/nautobotop/README.md
 [go-ihe]: https://github.com/rackerlabs/understack/blob/main/go/ironic-hardware-exporter/README.md

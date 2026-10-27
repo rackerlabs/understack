@@ -4,57 +4,49 @@
 
 ## Installation
 
-### Using go install
+`understackctl` lives in its own repository,
+[rackerlabs/understackctl](https://github.com/rackerlabs/understackctl). Every
+release publishes binaries for Linux, macOS and Windows on amd64 and arm64.
 
-If you have Go 1.24+ installed, you can install directly:
+### macOS — Homebrew
 
 ```bash
-go install github.com/rackerlabs/understack/go/understackctl@latest
+brew install rackerlabs/tap/understackctl
+```
+
+### Windows — Scoop
+
+```powershell
+scoop bucket add rackerlabs https://github.com/rackerlabs/scoop-bucket
+scoop install understackctl
+```
+
+### Release binaries
+
+Download the archive for your platform from the
+[releases page](https://github.com/rackerlabs/understackctl/releases), extract
+it, and place the binary in your `PATH`.
+
+### Using go install
+
+Requires Go 1.26+.
+
+```bash
+go install github.com/rackerlabs/understackctl@latest
 ```
 
 This places the binary in your `$GOPATH/bin` (or `$HOME/go/bin` by default). Make sure that directory is in your `PATH`.
 
 ### From source
 
-Requires Go 1.24+.
-
 ```bash
-git clone https://github.com/rackerlabs/understack.git
-cd understack/go/understackctl
+git clone https://github.com/rackerlabs/understackctl.git
+cd understackctl
 make build
 ```
 
-The binary will be at `build/understackctl/understackctl`. Add it to your `PATH` or copy it somewhere convenient:
-
-```bash
-cp build/understackctl/understackctl /usr/local/bin/
-```
-
-### Cross-platform builds
-
-Build for Linux, macOS, and Windows (amd64/arm64/386):
-
-```bash
-make build-all
-```
-
-Outputs are placed in `build/` as platform-specific directories. To create distributable archives:
-
-```bash
-make package-all
-```
-
-This produces `.tar.gz` files (Linux/macOS) and `.zip` files (Windows).
-
-To generate SHA-256 checksums for all archives:
-
-```bash
-make checksums
-```
-
-### From release binaries
-
-Download a pre-built binary from the [GitHub Releases](https://github.com/rackerlabs/understack/releases) page, extract it, and place it in your `PATH`.
+See the [README](https://github.com/rackerlabs/understackctl#readme) for
+checksum and provenance verification, shell completion, and build details.
 
 ## Prerequisites
 
