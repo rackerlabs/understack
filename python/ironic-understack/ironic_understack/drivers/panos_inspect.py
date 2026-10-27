@@ -1,5 +1,6 @@
 """Inspect interface for PAN-OS (Palo Alto) appliances."""
 
+import re
 import time
 from contextlib import suppress
 from typing import ClassVar
@@ -334,19 +335,21 @@ def _update_ports_from_neighbors(
         vlan_group_mapping = {}
 
     # Determine port categories based on interface numbers
-    # Sort ports by interface number
+    # Sort ports by interface number (natural sort, e.g., ethernet1/20 < ethernet2/19)
     # - If exactly 2 ports: lowest is "outside", highest is "inside"
     # - If 3+ ports: first two in sorted order get "outside"/"inside", rest get None
-    def _extract_interface_number(iface_name: str) -> int:
-        """Extract numeric part from interface name like 'ethernet1/1' -> 1."""
-        try:
-            return int(iface_name.split("/")[-1])
-        except (ValueError, IndexError):
-            return 999  # Put unparsable interfaces at the end
+    def _interface_sort_key(iface_name: str) -> tuple:
+        """Natural sort key for interface names like 'ethernet1/20'.
 
-    sorted_ports = sorted(
-        inspected_ports, key=lambda p: _extract_interface_number(p.name)
-    )
+        Splits on digits to create tuples for natural sorting:
+        ethernet1/20 -> ('ethernet', 1, '/', 20) < ('ethernet', 2, '/', 19)
+        """
+        pieces = re.split(r"(\d+)", iface_name)
+        return tuple(
+            (0, int(piece)) if piece.isdigit() else (1, piece) for piece in pieces
+        )
+
+    sorted_ports = sorted(inspected_ports, key=lambda p: _interface_sort_key(p.name))
     port_categories = {}
 
     if len(sorted_ports) == 2:
