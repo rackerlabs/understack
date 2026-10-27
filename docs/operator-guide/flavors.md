@@ -6,7 +6,7 @@ For architectural details and integration information, see the [design guide](..
 
 ## Prerequisites
 
-* `understackctl` CLI tool installed
+* [`understackctl`](understackctl.md#installation) CLI tool installed
 * Access to your deployment repository
 * `UC_DEPLOY` environment variable set to your deployment repository path
 * Existing device-type definitions with resource classes

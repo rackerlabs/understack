@@ -2,7 +2,7 @@
 # released on their own tag out of the platform release notes.
 #
 # `all-globs-to-all-files` means EVERY changed file has to match, so a pull
-# request that touches go/understackctl/ *and* charts/ is not labelled and still
+# request that touches go/dexop/ *and* charts/ is not labelled and still
 # appears in the platform notes. That is deliberate: most pull requests in this
 # repository span several top-level directories, and a label here removes a
 # change from the release notes entirely.
@@ -12,9 +12,7 @@
 # which can never be true.
 "skip-changelog":
   - any:
-      # CLI utilities and operators, tagged understackctl/vX.Y.Z and friends
-      - changed-files:
-          - all-globs-to-all-files: ["go/understackctl/**"]
+      # CLI utilities and operators, tagged dexop-vX.Y.Z and friends
       - changed-files:
           - all-globs-to-all-files: ["go/dexop/**"]
       - changed-files:
