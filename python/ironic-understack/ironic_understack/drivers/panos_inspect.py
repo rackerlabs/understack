@@ -55,8 +55,10 @@ class PanosInspect(base.InspectInterface):
         _apply_system_info(node, system)
 
         # Discover data plane connectivity via LLDP
+        ports_discovered = False
         try:
             _discover_and_update_ports(task, client)
+            ports_discovered = True
         except Exception as e:
             LOG.warning(
                 "[node:%s] Could not discover ports via LLDP: %s",
@@ -65,6 +67,11 @@ class PanosInspect(base.InspectInterface):
                 exc_info=True,
             )
             # Don't fail inspect if port discovery fails
+
+        # Validate that the device is usable before marking as manageable
+        # Only validate if port discovery succeeded
+        if ports_discovered:
+            _validate_firewall_readiness(task)
 
         # TODO: show high-availability all, recording the HA peer serial in
         # extra["mate_serial"] (which enroll-fw also sets) when HA is enabled.
@@ -320,6 +327,14 @@ def _update_ports_from_neighbors(
         LOG.info("[node:%s] No ports with MAC addresses to create", node.uuid)
         return
 
+    # Validate minimum 2 interfaces before creating ports
+    # A firewall needs at least outside/inside ports to function properly
+    if len(inspected_ports) < 2:
+        raise exception.HardwareInspectionFailure(
+            error=f"Firewall {node.uuid} requires at least 2 ports (outside/inside), "
+            f"but only discovered {len(inspected_ports)} port(s) via LLDP. "
+        )
+
     # Get VLAN group names for all ports
     try:
         vlan_group_mapping = vlan_group_name_convention.vlan_group_names(
@@ -411,3 +426,68 @@ def _update_ports_from_neighbors(
                 mac_address,
                 category or "none",
             )
+
+
+def _validate_firewall_readiness(task) -> None:
+    """Validate that the firewall has minimum requirements to become manageable.
+
+    Checks:
+    - Port categories assigned (outside/inside)
+    - For PA-1410: warn if using slow 1G ports (eth1/1-18 instead of 10G eth1/19-22)
+
+    Note: The minimum 2 ports check is done earlier in _update_ports_from_neighbors
+    before ports are created.
+
+    :raises HardwareInspectionFailure: if requirements not met
+    """
+    node = task.node
+    ports = list(task.ports())
+
+    # Check port categories (should have been assigned during port creation)
+    categories = {getattr(p, "category", None) for p in ports}
+    if "outside" not in categories or "inside" not in categories:
+        LOG.warning(
+            "[node:%s] Port categories incomplete: found %s, expected outside/inside",
+            node.uuid,
+            categories - {None},
+        )
+
+    # For PA-1410: warn if using slow 1G ports
+    model = node.properties.get("model", "")
+    if "1410" in model:
+        slow_ports = []
+        for port in ports:
+            bios_name = port.extra.get("bios_name", "") if port.extra else ""
+            if _is_slow_port_1410(bios_name):
+                slow_ports.append(bios_name)
+
+        if slow_ports:
+            LOG.warning(
+                "[node:%s] PA-1410 using slow 1G ports %s; "
+                "should use 10G ports ethernet1/19-22 for production traffic",
+                node.uuid,
+                slow_ports,
+            )
+
+    LOG.info(
+        "[node:%s] Firewall validation passed: %d ports discovered, " "categories=%s",
+        node.uuid,
+        len(ports),
+        sorted(categories - {None}),
+    )
+
+
+def _is_slow_port_1410(interface_name: str) -> bool:
+    """Check if interface is a slow 1G port on PA-1410.
+
+    PA-1410 has:
+    - ethernet1/1-18: 1G ports (slow)
+    - ethernet1/19-22: 10G ports (fast)
+    """
+    if not interface_name:
+        return False
+    match = re.match(r"ethernet1/(\d+)", interface_name)
+    if not match:
+        return False
+    port_num = int(match.group(1))
+    return 1 <= port_num <= 18
