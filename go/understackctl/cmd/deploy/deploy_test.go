@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -294,6 +295,74 @@ func TestDeployCheck(t *testing.T) {
 
 	if err := runDeployCheck(clusterName); err != nil {
 		t.Errorf("check should pass: %v", err)
+	}
+
+	// A kustomization referencing a resource that doesn't exist must fail the build.
+	broken := "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n  - does-not-exist.yaml\n"
+	if err := os.WriteFile(kustomPath, []byte(broken), 0644); err != nil {
+		t.Fatalf("failed to write broken kustomization.yaml: %v", err)
+	}
+
+	if err := runDeployCheck(clusterName); err == nil {
+		t.Error("check should fail when kustomize build fails")
+	}
+}
+
+func TestValidateKustomizationOutsideDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	sharedDir := filepath.Join(tmpDir, "shared")
+	compDir := filepath.Join(tmpDir, "comp")
+	for _, d := range []string{sharedDir, compDir} {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			t.Fatalf("failed to create %s: %v", d, err)
+		}
+	}
+
+	cm := "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: shared\n"
+	if err := os.WriteFile(filepath.Join(sharedDir, "cm.yaml"), []byte(cm), 0644); err != nil {
+		t.Fatalf("failed to write cm.yaml: %v", err)
+	}
+
+	kust := "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n  - ../shared/cm.yaml\n"
+	if err := os.WriteFile(filepath.Join(compDir, "kustomization.yaml"), []byte(kust), 0644); err != nil {
+		t.Fatalf("failed to write kustomization.yaml: %v", err)
+	}
+
+	// Referencing files outside the component dir only works with LoadRestrictionsNone.
+	if err := validateKustomization(compDir); err != nil {
+		t.Errorf("build should allow files outside the kustomization root: %v", err)
+	}
+}
+
+func TestValidateKustomizationHelmMissing(t *testing.T) {
+	compDir := t.TempDir()
+	kust := `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+helmCharts:
+  - name: example
+    repo: https://charts.example.invalid
+    version: 1.0.0
+`
+	if err := os.WriteFile(filepath.Join(compDir, "kustomization.yaml"), []byte(kust), 0644); err != nil {
+		t.Fatalf("failed to write kustomization.yaml: %v", err)
+	}
+
+	t.Setenv("PATH", t.TempDir())
+
+	err := validateKustomization(compDir)
+	if err == nil {
+		t.Fatal("build should fail when helm is not installed")
+	}
+	if !strings.Contains(err.Error(), "helm binary was not found in PATH") {
+		t.Errorf("error should explain that helm is missing, got: %v", err)
+	}
+}
+
+func TestFormatKustomizeError(t *testing.T) {
+	got := formatKustomizeError("c/kustomization.yaml", fmt.Errorf("first\n  second\n"))
+	want := "c/kustomization.yaml:\n      first\n      second"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
 
