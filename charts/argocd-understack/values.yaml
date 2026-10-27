@@ -127,12 +127,6 @@ global:
     # @default -- false
     enabled: false
 
-  # -- Alerts management (karma)
-  karma:
-    # -- Enable/disable deploying kube-prometheus-stack
-    # @default -- false
-    enabled: false
-
   # -- Monitoring via kube-prometheus-stack
   monitoring:
     # -- Enable/disable deploying kube-prometheus-stack
@@ -504,12 +498,6 @@ site:
     # -- Enable/disable deploying site-specific ESO configs from the deploy repo
     # @default -- false
     installConfigs: false
-
-  # -- Alerts management (karma)
-  karma:
-    # -- Enable/disable deploying kube-prometheus-stack
-    # @default -- false
-    enabled: false
 
   # -- MariaDB Operator
   mariadb_operator:
