@@ -131,6 +131,8 @@ conf:
       # Redfish inspection hooks run after inspecting out-of-band using the BMC:
       inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class,chassis_model,pci-device-capabilities"
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
+      post_boot_retry_attempts: 6
+      post_boot_retry_delay: 30
     sensor_data:
       send_sensor_data: true
       enable_for_undeployed_nodes: true
