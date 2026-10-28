@@ -382,11 +382,11 @@ class TestEnsureStack:
 
         stack = wiring.ensure_stack("r1")
 
-        m_parent.assert_called_once_with("r1")
+        m_parent.assert_called_once_with("r1", None)
         # VIF-attach runs on the parent BEFORE the trunk/subport
-        m_vif.assert_called_once_with("r1", parent)
+        m_vif.assert_called_once_with("r1", parent, None)
         # trunk + subport use the BOUND parent
-        m_trunk.assert_called_once_with("r1", bound)
+        m_trunk.assert_called_once_with("r1", bound, None)
         assert stack == palo_alto_wiring.AttachmentStack(parent=bound, trunk=trunk)
 
 
@@ -685,3 +685,237 @@ class TestUndoAttachment:
 
         ironic.detach_vif_from_node.assert_not_called()
         core_plugin.delete_port.assert_not_called()
+
+
+_ROLE_INSTANCE_INFO = {"traits": ["CUSTOM_NETDEV_ROLE_ATTACH"]}
+
+
+def _nic(category, name):
+    """A bindable Ironic NIC whose category is its port role."""
+    return SimpleNamespace(
+        name=name,
+        category=category,
+        physical_network="physnet-1",
+        local_link_connection={"switch_id": "aa", "port_id": "Eth1/1"},
+    )
+
+
+_OUTSIDE_NIC = _nic("outside", "fw:ethernet1/19")
+_INSIDE_NIC = _nic("inside", "fw:ethernet1/20")
+
+
+def _named(by_name):
+    """A get_ports/get_trunks fake returning what by_name holds for the name."""
+
+    def lookup(_ctx, filters):
+        return by_name.get(filters["name"][0], [])
+
+    return lookup
+
+
+class TestSingleStackWithoutPortRoles:
+    def test_attach_uses_one_unsuffixed_stack_and_no_tags(
+        self, mocker, wiring, ironic, node, core_plugin, trunk_plugin, device_id
+    ):
+        node.instance_info = {}
+        ironic.node_vif_ids.return_value = []
+        core_plugin.get_ports.return_value = []
+        core_plugin.create_port.return_value = {"id": "parent-1"}
+        core_plugin.get_port.return_value = _ANNOTATED_PARENT
+        trunk_plugin.get_trunks.return_value = []
+        trunk_plugin.create_trunk.return_value = {"id": "trunk-1", "sub_ports": []}
+        tag_plugin = mocker.patch.object(wiring, "_tag_plugin")
+
+        wiring.attach_port("r1", dict(_GATEWAY_PORT), "gateway")
+
+        _ctx, body = core_plugin.create_port.call_args[0]
+        assert body["port"]["name"] == "palo-alto-router-anchor-r1"
+        ironic.attach_vif_to_node.assert_called_once_with(node, "parent-1")
+        ironic.port_for_vif.assert_not_called()
+        tag_plugin.assert_not_called()
+        _ctx, body = trunk_plugin.create_trunk.call_args[0]
+        assert body["trunk"]["name"] == "palo-alto-router-trunk-r1"
+
+
+class TestSidedStacks:
+    """A node with port roles gets one parent port and trunk per side."""
+
+    @pytest.fixture(autouse=True)
+    def _roles_node(self, mocker, wiring, ironic, core_plugin, trunk_plugin, device_id):
+        self.node = mocker.Mock(id="node-1", instance_info=_ROLE_INSTANCE_INFO)
+        ironic.node_by_instance_uuid.return_value = self.node
+        ironic.node_vif_ids.return_value = []
+        ironic.port_for_vif.side_effect = lambda _node, vif: {
+            "parent-outside": _OUTSIDE_NIC,
+            "parent-inside": _INSIDE_NIC,
+        }.get(vif)
+        core_plugin.get_ports.return_value = []
+        core_plugin.create_port.side_effect = lambda _ctx, body: {
+            "id": "parent-" + body["port"]["name"].rsplit("-", 1)[1]
+        }
+        core_plugin.get_port.side_effect = lambda _ctx, port_id: {
+            **_ANNOTATED_PARENT,
+            "id": port_id,
+        }
+        trunk_plugin.get_trunks.return_value = []
+        trunk_plugin.create_trunk.side_effect = lambda _ctx, body: {
+            "id": "trunk-" + body["trunk"]["name"].rsplit("-", 1)[1],
+            "sub_ports": [],
+        }
+        mocker.patch.object(
+            palo_alto_wiring.utils,
+            "allowed_tenant_vlan_id_ranges",
+            return_value=[(1, 1799)],
+        )
+        self.tags = mocker.patch.object(wiring, "_tag_plugin").return_value
+
+    def test_gateway_goes_on_the_outside_stack(
+        self, wiring, ironic, core_plugin, trunk_plugin
+    ):
+        wiring.attach_port("r1", dict(_GATEWAY_PORT), "gateway")
+
+        _ctx, body = core_plugin.create_port.call_args[0]
+        assert body["port"]["name"] == "palo-alto-router-anchor-r1-outside"
+        self.tags.update_tags.assert_called_once_with(
+            ANY, "ports", "parent-outside", {"tags": ["outside"]}
+        )
+        ironic.attach_vif_to_node.assert_called_once_with(self.node, "parent-outside")
+        _ctx, body = trunk_plugin.create_trunk.call_args[0]
+        assert body["trunk"]["name"] == "palo-alto-router-trunk-r1-outside"
+        assert body["trunk"]["port_id"] == "parent-outside"
+        _ctx, trunk_id, body = trunk_plugin.add_subports.call_args[0]
+        assert trunk_id == "trunk-outside"
+        assert (
+            body["sub_ports"][0]["segmentation_id"]
+            == palo_alto_wiring.GATEWAY_SUBPORT_VLAN
+        )
+
+    def test_subnet_goes_on_the_inside_stack(
+        self, wiring, ironic, core_plugin, trunk_plugin
+    ):
+        wiring.attach_port("r1", dict(_INTERFACE_PORT), "interface")
+
+        _ctx, body = core_plugin.create_port.call_args[0]
+        assert body["port"]["name"] == "palo-alto-router-anchor-r1-inside"
+        self.tags.update_tags.assert_called_once_with(
+            ANY, "ports", "parent-inside", {"tags": ["inside"]}
+        )
+        ironic.attach_vif_to_node.assert_called_once_with(self.node, "parent-inside")
+        _ctx, trunk_id, body = trunk_plugin.add_subports.call_args[0]
+        assert trunk_id == "trunk-inside"
+        assert (
+            body["sub_ports"][0]["segmentation_id"]
+            == palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START
+        )
+
+    @pytest.mark.parametrize(("tags", "retagged"), [([], True), (["outside"], False)])
+    def test_reused_parent_keeps_its_side_tag(
+        self, wiring, core_plugin, tags, retagged
+    ):
+        core_plugin.get_ports.return_value = [{"id": "parent-outside", "tags": tags}]
+
+        wiring._ensure_parent_port("r1", "outside")
+
+        core_plugin.create_port.assert_not_called()
+        assert self.tags.update_tags.called is retagged
+
+    @pytest.mark.parametrize(
+        ("landed", "where"),
+        [(_INSIDE_NIC, "NIC fw:ethernet1/20"), (None, "no NIC")],
+        ids=["wrong-nic", "no-nic"],
+    )
+    def test_rejects_a_vif_that_missed_its_sides_nic(
+        self, wiring, ironic, trunk_plugin, landed, where
+    ):
+        ironic.port_for_vif.side_effect = None
+        ironic.port_for_vif.return_value = landed
+
+        with pytest.raises(
+            palo_alto_wiring.PaloAltoParentNotOnSideNic,
+            match=f"outside parent port parent-outside was attached to {where},",
+        ):
+            wiring.attach_port("r1", dict(_GATEWAY_PORT), "gateway")
+        trunk_plugin.create_trunk.assert_not_called()
+
+    def test_check_can_attach_needs_the_sides_nic(self, wiring, ironic):
+        ironic.node_ports.return_value = [_INSIDE_NIC]
+
+        with pytest.raises(
+            palo_alto_wiring.PaloAltoNodeHasNoSideNic,
+            match="no baremetal port with category outside",
+        ):
+            wiring.check_can_attach("r1")
+
+        ironic.node_ports.return_value = [_INSIDE_NIC, _OUTSIDE_NIC]
+        wiring.check_can_attach("r1")
+
+    def test_snapshot_records_the_side(self, wiring, core_plugin, trunk_plugin):
+        snapshot = wiring.snapshot_attachment("r1", "gw-1", "gateway")
+
+        assert snapshot.side == "outside"
+        assert core_plugin.get_ports.call_args.kwargs["filters"]["name"] == [
+            "palo-alto-router-anchor-r1-outside"
+        ]
+        assert trunk_plugin.get_trunks.call_args.kwargs["filters"]["name"] == [
+            "palo-alto-router-trunk-r1-outside"
+        ]
+
+    def test_cleanup_only_touches_the_sides_stack(
+        self, wiring, ironic, core_plugin, trunk_plugin
+    ):
+        outside = {
+            "id": "trunk-outside",
+            "port_id": "parent-outside",
+            "sub_ports": [{"port_id": "gw-1"}],
+        }
+        trunk_plugin.get_trunks.side_effect = _named(
+            {"palo-alto-router-trunk-r1-outside": [outside]}
+        )
+        trunk_plugin.get_trunk.return_value = {**outside, "sub_ports": []}
+
+        wiring.cleanup_attachment("r1", "gw-1", "gateway")
+
+        _ctx, trunk_id, _body = trunk_plugin.remove_subports.call_args[0]
+        assert trunk_id == "trunk-outside"
+        trunk_plugin.delete_trunk.assert_called_once_with(ANY, "trunk-outside")
+        ironic.detach_vif_from_node.assert_called_once_with(self.node, "parent-outside")
+        core_plugin.delete_port.assert_called_once_with(ANY, "parent-outside")
+
+    def test_cleanup_still_finds_a_single_stack_router(self, wiring, trunk_plugin):
+        # A router built before the node had port roles keeps its one stack.
+        single = {
+            "id": "trunk-1",
+            "port_id": "parent-1",
+            "sub_ports": [{"port_id": "gw-1"}],
+        }
+        trunk_plugin.get_trunks.side_effect = _named(
+            {"palo-alto-router-trunk-r1": [single]}
+        )
+        trunk_plugin.get_trunk.return_value = {**single, "sub_ports": []}
+
+        wiring.cleanup_attachment("r1", "gw-1", "gateway")
+
+        _ctx, trunk_id, _body = trunk_plugin.remove_subports.call_args[0]
+        assert trunk_id == "trunk-1"
+
+    def test_undo_removes_only_this_sides_new_stack(
+        self, wiring, core_plugin, trunk_plugin
+    ):
+        # The inside attach failed after building its stack; outside is untouched.
+        inside = {
+            "id": "trunk-inside",
+            "port_id": "parent-inside",
+            "sub_ports": [{"port_id": "intf-1"}],
+        }
+        trunk_plugin.get_trunks.side_effect = _named(
+            {"palo-alto-router-trunk-r1-inside": [inside]}
+        )
+        trunk_plugin.get_trunk.return_value = {**inside, "sub_ports": []}
+        core_plugin.get_ports.side_effect = _named(
+            {"palo-alto-router-anchor-r1-inside": [{"id": "parent-inside"}]}
+        )
+
+        wiring.undo_attachment(_snapshot(side="inside"))
+
+        trunk_plugin.delete_trunk.assert_called_once_with(ANY, "trunk-inside")
+        core_plugin.delete_port.assert_called_once_with(ANY, "parent-inside")
