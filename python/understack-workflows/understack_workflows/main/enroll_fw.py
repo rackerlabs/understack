@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+from pathlib import Path
 
 from ironicclient.common.apiclient import exceptions as ironic_exceptions
 
@@ -24,7 +25,7 @@ def main() -> None:
     helpers.setup_logger()
     args = argument_parser().parse_args()
 
-    enroll_fw(
+    node_uuid = enroll_fw(
         name=args.name,
         physical_network=args.physical_network,
         ports=netdev_reconciler.parse_ports_arg(args.ports),
@@ -39,6 +40,9 @@ def main() -> None:
         vendor=args.vendor,
         model=args.model,
     )
+
+    if args.node_uuid_output:
+        Path(args.node_uuid_output).write_text(node_uuid + "\n")
 
 
 def _require_specific_resource_class(resource_class: str | None) -> str:
@@ -90,7 +94,7 @@ def enroll_fw(
     serial: str = "",
     vendor: str = "",
     model: str = "",
-) -> None:
+) -> str:
     driver = (driver or "").strip()
     if not driver:
         raise ValueError("enroll-fw requires a non-empty --driver")
@@ -129,12 +133,12 @@ def enroll_fw(
             extra=extra,
             properties=properties,
         )
-        return
+        return node.uuid
 
     # New or re-enrollable node: the engine writes the metadata inside the
     # enrollment lifecycle (at create, or patched before the node becomes
     # available), so the node is never allocatable in an under-described state.
-    netdev_reconciler.enroll(
+    return netdev_reconciler.enroll(
         name=name,
         physical_network=physical_network,
         ports=ports,
@@ -254,6 +258,10 @@ def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__),
         description="Enroll a firewall (defaults to the panos hardware type)",
+    )
+    parser.add_argument(
+        "--node-uuid-output",
+        help="Write node UUID to this file after successful enrollment",
     )
     parser.add_argument("--name", required=True, help="Ironic node name")
     parser.add_argument(

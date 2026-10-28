@@ -40,28 +40,6 @@ jobs:
           kubectl create namespace argo-events
           kubectl -n argo-events apply -f workflows/argo-events/workflowtemplates/
 
-      - name: Deploy lint stubs for externally-provided templateRefs
-        run: |
-          # Some templates reference WorkflowTemplates that live outside this
-          # repo (site-specific extensions installed from undercloud-deploy,
-          # opted into per site). `argo lint` resolves templateRef names against
-          # the cluster, so those references fail to resolve here unless a
-          # placeholder is present. Any stub placed in the lint-stubs directory
-          # is deployed so the reference resolves; the stub bodies are
-          # deliberately minimal and are never shipped. Add a new external
-          # reference by dropping a file in that directory -- no change here.
-          stub_dir="workflows/argo-events/_lint-stubs"
-          shopt -s nullglob
-          stubs=("$stub_dir"/*.yaml)
-          if [ ${#stubs[@]} -gt 0 ]; then
-            for stub in "${stubs[@]}"; do
-              echo "Deploying lint stub: $stub"
-              kubectl -n argo-events apply -f "$stub"
-            done
-          else
-            echo "No lint stubs to deploy."
-          fi
-
       - name: Argo Lint Workflow Template
         run: |
           set +e

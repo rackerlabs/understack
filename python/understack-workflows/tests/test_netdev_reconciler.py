@@ -80,8 +80,9 @@ def test_enroll_creates_node_ports_logs_and_makes_available(mocker, caplog):
         return_value=fake_ironic,
     )
 
-    netdev_reconciler.enroll(**ENROLL_ARGS, resource_class=None)
+    node_uuid = netdev_reconciler.enroll(**ENROLL_ARGS, resource_class=None)
 
+    assert node_uuid == node.uuid
     fake_ironic.node.create.assert_called_once_with(
         automated_clean=False,
         driver="netdev",
@@ -260,8 +261,9 @@ def test_enroll_patches_physical_network_drift_on_existing_port(mocker):
         return_value=fake_ironic,
     )
 
-    netdev_reconciler.enroll(**ENROLL_ARGS)
+    node_uuid = netdev_reconciler.enroll(**ENROLL_ARGS)
 
+    assert node_uuid == "node-123"
     fake_ironic.port.update.assert_called_once_with(
         "uuid-port1",
         [{"op": "add", "path": "/physical_network", "value": "f20-1-network"}],
@@ -472,8 +474,9 @@ def test_enroll_is_true_noop_when_available_and_everything_matches(mocker):
         return_value=fake_ironic,
     )
 
-    netdev_reconciler.enroll(**ENROLL_ARGS)
+    node_uuid = netdev_reconciler.enroll(**ENROLL_ARGS)
 
+    assert node_uuid == "node-123"
     # Nothing drifted: no metadata patch, no port work, no state churn.
     fake_ironic.node.update.assert_not_called()
     fake_ironic.port.update.assert_not_called()
