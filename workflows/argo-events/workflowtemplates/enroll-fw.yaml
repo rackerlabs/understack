@@ -9,11 +9,17 @@ metadata:
       Reuses enroll-netdev for the node/port lifecycle and additionally records
       firewall management details in driver_info and the HA mate serial in extra.
       Defaults to the panos hardware type.
+
+      The workflow reads site-specific configuration from the
+      `enroll-fw-config` ConfigMap. After enrollment, it runs the templates
+      listed in `post_enroll_workflows`.
 kind: WorkflowTemplate
 spec:
   serviceAccountName: workflow
   entrypoint: main
   volumes:
+    - name: enrollment-result
+      emptyDir: {}
     - name: baremetal-manage
       secret:
         secretName: baremetal-manage
@@ -50,15 +56,44 @@ spec:
         value: ""
   templates:
     - name: main
+      inputs:
+        parameters:
+          - name: post_enroll_workflows
+            valueFrom:
+              configMapKeyRef:
+                name: enroll-fw-config
+                key: post_enroll_workflows
+              default: "[]"
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              parameter: "{{steps.enroll-fw.outputs.parameters.node_uuid}}"
       steps:
         - - name: enroll-fw
             template: enroll-fw
+        - - name: post-enroll
+            templateRef:
+              name: "{{item}}"
+              template: run
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-fw.outputs.parameters.node_uuid}}"
+            withParam: "{{inputs.parameters.post_enroll_workflows}}"
     - name: enroll-fw
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              path: /run/enrollment/node-uuid
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - enroll-fw
         args:
+          - --node-uuid-output
+          - /run/enrollment/node-uuid
           - --name
           - "{{workflow.parameters.name}}"
           - --physical-network
@@ -86,6 +121,8 @@ spec:
           - --model
           - "{{workflow.parameters.model}}"
         volumeMounts:
+          - mountPath: /run/enrollment
+            name: enrollment-result
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true

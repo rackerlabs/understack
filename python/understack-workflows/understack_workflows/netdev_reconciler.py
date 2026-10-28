@@ -146,7 +146,7 @@ def enroll(
     driver_info: dict | None = None,
     extra: dict | None = None,
     properties: dict | None = None,
-) -> None:
+) -> str:
     effective_resource_class = resource_class or DEFAULT_RESOURCE_CLASS
     effective_driver = driver or DEFAULT_DRIVER
     netdev_ports = build_netdev_ports(ports)
@@ -257,7 +257,7 @@ def enroll(
                 "[node:%s] Node already available and up to date, nothing to do",
                 node.uuid,
             )
-        return
+        return node.uuid
 
     for plan in pending:
         apply_port_plan(
@@ -274,6 +274,7 @@ def enroll(
         name,
         node.uuid,
     )
+    return node.uuid
 
 
 def warn_orphan_ports(

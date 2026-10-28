@@ -94,10 +94,13 @@ def _patch_paths(update_node_call) -> dict[str, Any]:
 
 def test_enroll_fw_hands_metadata_to_the_engine(mocker):
     _mock_client(mocker, node=None)  # not found -> new node -> engine enrolls
-    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+    engine = mocker.patch.object(
+        enroll_fw.netdev_reconciler, "enroll", return_value="node-123"
+    )
 
-    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
+    node_uuid = enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
 
+    assert node_uuid == "node-123"
     engine.assert_called_once_with(
         name="PA1410-026701008071",
         physical_network="f20-1-network",
@@ -219,8 +222,9 @@ def test_active_node_updates_metadata_when_ports_match(mocker):
     client = _mock_client(mocker, node=_node(), node_ports=[_actual_port()])
     engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
 
-    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
+    node_uuid = enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
 
+    assert node_uuid == "node-uuid"
     engine.assert_not_called()
     client.update_node.assert_called_once()
     paths = _patch_paths(client.update_node.call_args)
@@ -363,6 +367,41 @@ def test_main_passes_default_or_explicit_driver(mocker, driver_args, expected):
     enroll_fw.main()
 
     assert engine.call_args.kwargs["driver"] == expected
+
+
+def test_main_emits_node_uuid_only_after_success(mocker, tmp_path):
+    output = tmp_path / "node-uuid"
+    mocker.patch.object(enroll_fw.helpers, "setup_logger")
+    mocker.patch(
+        "sys.argv",
+        [
+            "enroll-fw",
+            "--name",
+            "fw1",
+            "--physical-network",
+            "net",
+            "--ports",
+            "[]",
+            "--resource-class",
+            "pa1410",
+            "--management-switch",
+            "switch1",
+            "--management-switch-port",
+            "eth1",
+            "--node-uuid-output",
+            str(output),
+        ],
+    )
+    engine = mocker.patch.object(enroll_fw, "enroll_fw", return_value="node-123")
+
+    enroll_fw.main()
+
+    assert output.read_text() == "node-123\n"
+    output.unlink()
+    engine.side_effect = RuntimeError("enrollment failed")
+    with pytest.raises(RuntimeError, match="enrollment failed"):
+        enroll_fw.main()
+    assert not output.exists()
 
 
 def test_argument_parser_requires_resource_class():

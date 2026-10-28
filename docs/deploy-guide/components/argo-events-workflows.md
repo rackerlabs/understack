@@ -45,12 +45,20 @@ Optional additions:
 
 - `Additional integration Secrets`: Add more Secrets beside the API token if individual workflows need their own credentials or endpoints.
 
-## Enroll Server Configuration
+## Enrollment Workflow Configuration
 
-Configure site-specific behavior for the `enroll-server` workflow by creating
-an `enroll-server-config` ConfigMap in the `argo-events` namespace. The
-`post_enroll_workflows` value is a JSON array of `WorkflowTemplate` names to run
-after a server is enrolled:
+Each enrollment workflow can run site-specific templates after it enrolls an
+Ironic node. Configure a workflow by creating its ConfigMap in the `argo-events`
+namespace:
+
+| Workflow | ConfigMap |
+| --- | --- |
+| `enroll-server` | `enroll-server-config` |
+| `enroll-fw` | `enroll-fw-config` |
+| `enroll-netdev` | `enroll-netdev-config` |
+
+The `post_enroll_workflows` value is a JSON array of `WorkflowTemplate` names.
+For example, the server configuration is:
 
 ```yaml title="enroll-server-config.yaml"
 apiVersion: v1
@@ -93,13 +101,12 @@ spec:
 
 {% endraw %}
 
-The hooks run in parallel as steps of the existing `enroll-server` workflow;
-they do not create child `Workflow` resources. A failed hook fails the
-post-enrollment step. If the ConfigMap or its key is absent, the hook list
-defaults to empty and enrollment completes without running hooks.
+The hooks run in parallel as steps of the existing enrollment workflow; they do
+not create child `Workflow` resources. A failed hook fails the post-enrollment
+step. If the ConfigMap or its key is absent, the hook list defaults to empty and
+enrollment completes without running hooks.
 
 Only the referenced `run` template is imported by `templateRef`. Put required
-pod configuration on that template, or arrange for it on the `enroll-server`
+pod configuration on that template, or arrange for it on the parent enrollment
 workflow; settings elsewhere in the referenced `WorkflowTemplate` spec are not
-inherited. Hook pods use the service account of the parent `enroll-server`
-workflow.
+inherited. Hook pods use the service account of the parent workflow.
