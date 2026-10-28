@@ -35,6 +35,10 @@ the Neutron team designed this type as an overlay style VXLAN system while we ar
 focused on an underlay or EVPN-VXLAN style system. We are actively working with
 upstream on how to best include this use case.
 
+The proposed host-side attachment for carrying these dynamic VLANs into an OVN
+gateway while separating host-owned and OVN-owned OVS bridges is described in
+[OVN Gateway Host Networking](ovn-gateway-host-networking.md).
+
 ## Mapping Leaf/Spine to Neutron Networks
 
 In a Leaf/Spine fabric, VXLAN VNIs are used to create virtual network segments
