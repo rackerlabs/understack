@@ -1,4 +1,8 @@
 ---
+conf:
+  nginx:
+    worker_processes: 4
+
 endpoints:
   oslo_db:
     hosts:
