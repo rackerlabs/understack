@@ -24,6 +24,9 @@ spec:
       patches:
         - patch: |
             - op: add
+              path: /data/UNDERSTACK_CLUSTER_NAME
+              value: {{ $.Release.Name | quote }}
+            - op: add
               path: /data/UNDERSTACK_PARTITION
               value: "{{ index $.Values.appLabels "understack.rackspace.com/partition" | default "" }}"
             - op: add
