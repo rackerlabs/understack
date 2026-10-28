@@ -6,6 +6,10 @@ metadata:
     workflows.argoproj.io/title: Perform server discovery and update Ironic
     workflows.argoproj.io/description: |
       Defined in `workflows/argo-events/workflowtemplates/enroll-server.yaml`
+
+      The workflow reads site-specific configuration from the
+      `enroll-server-config` ConfigMap. After enrollment, it runs the templates
+      listed in `post_enroll_workflows`.
 kind: WorkflowTemplate
 spec:
   serviceAccountName: workflow
@@ -35,16 +39,20 @@ spec:
         value: calvin
       - name: external_cmdb_id
         value: ""
-      # Optional post-enrollment hook. "false" (default) = no hook, behaviour
-      # unchanged. A site opts in by setting "true" AND installing an
-      # `enroll-post-hook` WorkflowTemplate (entrypoint `run`, input param
-      # `node_uuid`) in the workflow namespace. The ref name is intentionally
-      # static: Argo resolves templateRef.name at parse time, so it cannot be a
-      # parameter. Each site decides what enroll-post-hook does.
-      - name: post_enroll_hook
-        value: "false"
   templates:
     - name: main
+      inputs:
+        parameters:
+          # A site can configure this value with a JSON array of
+          # WorkflowTemplate names. Each WorkflowTemplate must expose a `run`
+          # template that accepts `node_uuid`. If the ConfigMap is absent, no
+          # post-enrollment templates are run.
+          - name: post_enroll_workflows
+            valueFrom:
+              configMapKeyRef:
+                name: enroll-server-config
+                key: post_enroll_workflows
+              default: "[]"
       outputs:
         parameters:
           - name: node_uuid
@@ -53,17 +61,15 @@ spec:
       steps:
         - - name: enroll-server
             template: enroll-server
-        # Runs only when the site enabled the hook. This step is a generic
-        # delegator and does not know about any specific integration.
         - - name: post-enroll
-            when: "{{workflow.parameters.post_enroll_hook}} == true"
             templateRef:
-              name: enroll-post-hook
+              name: "{{item}}"
               template: run
             arguments:
               parameters:
                 - name: node_uuid
                   value: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
+            withParam: "{{inputs.parameters.post_enroll_workflows}}"
     - name: enroll-server
       outputs:
         parameters:
