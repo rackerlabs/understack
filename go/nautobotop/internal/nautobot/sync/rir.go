@@ -37,12 +37,29 @@ func (s *RirSync) SyncAll(ctx context.Context, data map[string]string) error {
 		rirs.Rir = append(rirs.Rir, yml...)
 	}
 
-	for _, rir := range rirs.Rir {
-		if err := s.syncSingleRir(ctx, rir); err != nil {
-			return err
-		}
+	return s.applyRirs(ctx, rirs, s.syncSingleRir, s.deleteObsoleteRirs)
+}
+
+func (s *RirSync) applyRirs(
+	ctx context.Context,
+	rirs models.Rirs,
+	syncOne func(context.Context, models.Rir) error,
+	prune func(context.Context, models.Rirs),
+) error {
+	result, err := syncItems(ctx, rirs.Rir, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteRirs(ctx, rirs)
+
+	prune(ctx, rirs)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("rirDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "rir", Failures: result.DataFailures}
+	}
+
 	return nil
 }
 
