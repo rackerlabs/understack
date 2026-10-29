@@ -103,17 +103,6 @@ def make_bmc(mocker, fake_sushy=None):
     return bmc
 
 
-def make_raid_hardware():
-    controller = SimpleNamespace(
-        identity="RAID.Integrated.1-1",
-        drives=[SimpleNamespace(identity="Disk1"), SimpleNamespace(identity="Disk2")],
-    )
-    system = SimpleNamespace(storage=SimpleNamespace(get_members=lambda: [controller]))
-    return SimpleNamespace(
-        get_system_collection=lambda: SimpleNamespace(get_members=lambda: [system])
-    )
-
-
 def make_ironic_client(
     *,
     node_name: str,
@@ -174,263 +163,6 @@ def make_port(*, address: str, pxe_enabled: bool, bios_name: str | None):
         pxe_enabled=pxe_enabled,
         extra=extra,
         physical_network="abc1234",
-    )
-
-
-def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
-    device_info = make_device_info()
-    fake_bmc = make_bmc(mocker, fake_sushy=make_raid_hardware())
-    inventory = make_node_inventory(
-        connected_interface_names=["NIC.Integrated.1-1", "NIC.Integrated.1-2"],
-        storage_controllers=[
-            {
-                "id": "RAID.Integrated.1-1",
-                "drives": [
-                    {"id": "Disk1", "size": 479559942144},
-                    {"id": "Disk2", "size": 479559942144},
-                ],
-            }
-        ],
-    )
-    # port-enroll-config hook has run during agent inspection and flagged
-    # pxe_enabled on LLDP-connected ports.  port-bios-name (OOB) stamped
-    # extra.bios_name earlier.
-    ports = [
-        make_port(
-            address="aa:aa:aa:aa:aa:01",
-            pxe_enabled=True,
-            bios_name="NIC.Integrated.1-1",
-        ),
-        make_port(
-            address="aa:aa:aa:aa:aa:02",
-            pxe_enabled=True,
-            bios_name="NIC.Integrated.1-2",
-        ),
-        make_port(
-            address="aa:aa:aa:aa:aa:03",
-            pxe_enabled=False,
-            bios_name="NIC.Slot.1-1",
-        ),
-    ]
-    fake_ironic, created_node = make_ironic_client(
-        node_name="Dell-ABC123",
-        # OOB inspect, agent inspect, OOB inspect (post-RAID).
-        inspect_interfaces=["idrac-redfish", "idrac-redfish", "idrac-redfish"],
-        inventory=inventory,
-        ports=ports,
-    )
-
-    mocker.patch.object(enroll_server, "bmc_for_ip_address", return_value=fake_bmc)
-    mocker.patch.object(enroll_server, "chassis_info", return_value=device_info)
-    set_bmc_password = mocker.patch.object(enroll_server, "set_bmc_password")
-    update_dell_drac_settings = mocker.patch.object(
-        enroll_server, "update_dell_drac_settings"
-    )
-    bmc_set_hostname = mocker.patch.object(enroll_server, "bmc_set_hostname")
-    update_dell_bios_settings = mocker.patch.object(
-        enroll_server, "update_dell_bios_settings"
-    )
-    mocker.patch(
-        "understack_workflows.ironic.client.get_ironic_client",
-        return_value=fake_ironic,
-    )
-
-    enroll_server.enroll(
-        ip_address="10.0.0.10",
-        firmware_update=False,
-        raid_configure=True,
-        old_password="old-password",
-        external_cmdb_id="cmdb-1",
-    )
-
-    set_bmc_password.assert_called_once_with(
-        ip_address="10.0.0.10",
-        new_password="calvin",
-        old_password="old-password",
-    )
-    update_dell_drac_settings.assert_called_once_with(fake_bmc)
-    bmc_set_hostname.assert_called_once_with(fake_bmc, "None", "Dell-ABC123")
-
-    # BIOS settings configured exactly once, using pxe_enabled port BIOS names.
-    update_dell_bios_settings.assert_any_call(
-        fake_bmc,
-        pxe_interface="NIC.Integrated.1-1",
-    )
-
-    fake_ironic.node.create.assert_called_once_with(
-        name="Dell-ABC123",
-        driver="idrac",
-        driver_info={
-            "redfish_address": "https://10.0.0.10",
-            "redfish_verify_ca": False,
-            "redfish_username": "root",
-            "redfish_password": "calvin",
-        },
-        boot_interface="http-ipxe",
-        deploy_interface="direct",
-        inspect_interface="idrac-redfish",
-        extra={"external_cmdb_id": "cmdb-1"},
-    )
-
-    fake_ironic.node.set_target_raid_config.assert_called_once_with(
-        created_node.uuid,
-        {
-            "logical_disks": [
-                {
-                    "controller": "RAID.Integrated.1-1",
-                    "is_root_volume": True,
-                    "physical_disks": ["Disk1", "Disk2"],
-                    "raid_level": "1",
-                    "size_gb": "MAX",
-                }
-            ]
-        },
-    )
-
-    fake_ironic.node.set_provision_state.assert_has_calls(
-        [
-            call(
-                created_node.uuid,
-                "manage",
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-            call(
-                created_node.uuid,
-                "inspect",  # OOB redfish inspect for bios_name / basic info
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-            call(
-                created_node.uuid,
-                "inspect",  # agent inspect via virtual media
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-            call(
-                created_node.uuid,
-                "clean",
-                cleansteps=[
-                    {"interface": "raid", "step": "delete_configuration"},
-                    {"interface": "raid", "step": "create_configuration"},
-                ],
-                runbook=None,
-                disable_ramdisk=False,
-            ),
-            call(
-                created_node.uuid,
-                "inspect",  # OOB redfish inspect to refresh disks post-RAID
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-            call(
-                created_node.uuid,
-                "provide",
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-        ]
-    )
-
-    expected_reset = [{"op": "remove", "path": "/inspect_interface"}]
-    expected_ipxe_boot = [
-        {"op": "add", "path": "/boot_interface", "value": "http-ipxe"}
-    ]
-    expected_agent = [{"op": "add", "path": "/inspect_interface", "value": "agent"}]
-    assert fake_ironic.node.update.call_args_list == [
-        call(created_node.uuid, expected_reset),  # OOB inspect prep
-        call(created_node.uuid, expected_ipxe_boot),
-        call(created_node.uuid, expected_agent),
-        call(created_node.uuid, expected_ipxe_boot),
-        call(created_node.uuid, expected_reset),  # Post-RAID OOB inspect prep
-    ]
-
-
-def test_enrol_existing_failed_node_recovers_and_updates(mocker):
-    device_info = make_device_info()
-    existing_node = SimpleNamespace(
-        uuid="node-999",
-        provision_state="inspect failed",
-        driver="idrac",
-        inspect_interface="idrac-redfish",
-    )
-    inventory = make_node_inventory(
-        connected_interface_names=["NIC.Integrated.1-1"],
-    )
-    ports = [
-        make_port(
-            address="aa:aa:aa:aa:aa:01",
-            pxe_enabled=True,
-            bios_name="NIC.Integrated.1-1",
-        ),
-    ]
-    fake_bmc = make_bmc(mocker)
-    fake_ironic, _ = make_ironic_client(
-        node_name="Dell-ABC123",
-        node_uuid="node-999",
-        existing_node=existing_node,
-        inspect_interfaces=["idrac-redfish", "idrac-redfish"],
-        inventory=inventory,
-        ports=ports,
-    )
-
-    mocker.patch.object(enroll_server, "bmc_for_ip_address", return_value=fake_bmc)
-    mocker.patch.object(enroll_server, "chassis_info", return_value=device_info)
-    mocker.patch.object(enroll_server, "set_bmc_password")
-    mocker.patch.object(enroll_server, "update_dell_drac_settings")
-    mocker.patch.object(enroll_server, "bmc_set_hostname")
-    mocker.patch.object(enroll_server, "update_dell_bios_settings")
-    mocker.patch(
-        "understack_workflows.ironic.client.get_ironic_client",
-        return_value=fake_ironic,
-    )
-
-    enroll_server.enroll(
-        ip_address="10.0.0.10",
-        firmware_update=False,
-        raid_configure=False,
-        old_password=None,
-        external_cmdb_id="cmdb-1",
-    )
-
-    fake_ironic.node.create.assert_not_called()
-    fake_ironic.node.set_target_raid_config.assert_not_called()
-    fake_ironic.node.set_provision_state.assert_has_calls(
-        [
-            call(
-                existing_node.uuid,
-                "manage",
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-            call(
-                existing_node.uuid,
-                "inspect",  # OOB inspect
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-            call(
-                existing_node.uuid,
-                "inspect",  # Agent inspect via virtual media
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-            call(
-                existing_node.uuid,
-                "provide",
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-        ]
     )
 
 
@@ -599,49 +331,54 @@ def test_get_lldp_connected_interfaces_absent_from_lldp():
     assert result == []
 
 
-def test_enrollment_order_without_configured_runbooks(mocker):
+@pytest.mark.parametrize("configure_hardware", [False, True])
+def test_minimal_enrollment_only_reads_chassis_and_provides_node(
+    mocker, configure_hardware
+):
     node = SimpleNamespace(uuid="node-123")
     bmc = make_bmc(mocker)
     mocker.patch.object(enroll_server, "bmc_for_ip_address", return_value=bmc)
-    mocker.patch.object(
-        enroll_server, "initialize_bmc", return_value=make_device_info()
-    )
-    mocker.patch.object(
-        enroll_server.ironic_node, "create_or_update", return_value=node
-    )
-    mocker.patch.object(enroll_server.ironic_node, "inspect_out_of_band")
-    mocker.patch.object(
-        enroll_server.ironic_node, "get_node_inventory", return_value={}
-    )
-    mocker.patch.object(
-        enroll_server.ironic_node, "pxe_enabled_bios_name", return_value="NIC.1"
-    )
     events = MagicMock()
-    for name in ("agent_inspection", "update_dell_bios_settings", "configure_raid"):
-        events.attach_mock(mocker.patch.object(enroll_server, name), name)
-    for name in ("apply_firmware_updates", "transition"):
+    events.attach_mock(
+        mocker.patch.object(
+            enroll_server, "chassis_info", return_value=make_device_info()
+        ),
+        "chassis_info",
+    )
+    events.attach_mock(
+        mocker.patch.object(
+            enroll_server.ironic_node, "create_or_update", return_value=node
+        ),
+        "create_or_update",
+    )
+    for name in (
+        "inspect_out_of_band",
+        "get_node_inventory",
+        "pxe_enabled_bios_name",
+        "inspect",
+        "apply_firmware_updates",
+        "transition",
+    ):
         events.attach_mock(mocker.patch.object(enroll_server.ironic_node, name), name)
 
     result = enroll_server.enroll(
         ip_address=bmc.ip_address,
-        firmware_update=True,
-        raid_configure=True,
-        old_password=None,
+        firmware_update=configure_hardware,
+        raid_configure=configure_hardware,
+        old_password="unused",
+        external_cmdb_id="cmdb-1",
     )
 
-    expected = [
-        call.update_dell_bios_settings(bmc, pxe_interface="NIC.1"),
-        call.agent_inspection(node, virtual_media=False),
-        call.update_dell_bios_settings(bmc, pxe_interface="NIC.1"),
+    assert events.mock_calls == [
+        call.chassis_info(bmc),
+        call.create_or_update(
+            bmc=bmc,
+            name="Dell-ABC123",
+            manufacturer="Dell",
+            external_cmdb_id="cmdb-1",
+        ),
+        call.transition(node, target_state="provide", expected_state="available"),
     ]
-    expected.extend(
-        [
-            call.configure_raid(node, {}),
-            call.apply_firmware_updates(node),
-            call.transition(node, target_state="provide", expected_state="available"),
-        ]
-    )
-    assert events.mock_calls == expected
     assert result == node.uuid
 
 
