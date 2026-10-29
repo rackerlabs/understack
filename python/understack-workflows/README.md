@@ -10,20 +10,29 @@ operation happens against the Nautobot Tenants. Operations include
 create, update and delete.
 
 
-## enroll-server post-inspection runbooks
+## Ironic runbooks
 
-Optionally pass an ordered JSON array of runbook names or UUIDs:
+`apply-node-runbook` runs configured Ironic runbooks for a node, handling the
+required state transitions. Runbooks execute in order; a failure stops the list.
 
 ```sh
-enroll-server --ip-address 192.0.2.10 \
-  --post-inspection-runbooks '["first-runbook", "second-runbook"]'
+apply-node-runbook --node NODE_UUID \
+  --runbooks '["bmc-configure-snmpv3-user"]'
 ```
 
-For Argo, use the `enroll-server` WorkflowTemplate parameter
-`post_inspection_runbooks` with the same JSON array. It defaults to `[]`.
+For `active` nodes, the runner uses Ironic servicing and waits for the node to
+return to `active` after each runbook. All requested runbooks must explicitly
+set `disable_ramdisk=True`; Ironic also validates their service steps. This
+prevents booting IPA, but the steps themselves must still be appropriate for a
+running server. The SNMPv3 runbook configures the BMC account out of band.
+Instance and allocation IDs are allowed on active nodes. Maintenance, conductor
+reservations, and pending state transitions are rejected for all nodes.
 
-Runbooks execute sequentially after agent inspection and final BIOS
-configuration, before RAID configuration, firmware updates, and `provide`.
-Each requires at least one matching node/runbook trait (Ironic API 1.112 or
-newer), uses the runbook's ramdisk setting, and waits for `manageable`.
-A failed lookup, trait check, or cleaning operation stops enrollment.
+For `available` nodes, the runner transitions to `manageable`, runs manual
+cleaning, then requests `provide` to return to `available`. Nodes starting in
+`manageable` remain there. Failures stop the sequence without restoring the
+starting state; inspect the Ironic error before retrying.
+
+For automatic execution after enrollment, configure `post_enroll_workflows`
+with WorkflowTemplates that accept `node_uuid`. Enrollment still uses the idle
+node cleaning path; active-node servicing does not change that behavior.
