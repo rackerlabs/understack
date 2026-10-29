@@ -339,12 +339,8 @@ def inspect(node: Node, inspect_interface: str = "agent"):
     transition(node, target_state="inspect", expected_state="manageable")
 
 
-def run_post_inspection_runbook(node: Node, name_or_id: str) -> None:
-    """Run a selected runbook while the inspected node is manageable.
-
-    Require at least one matching runbook trait before starting cleaning.
-    Let the runbook determine whether cleaning needs an agent ramdisk.
-    """
+def validate_node_runbook(node: Node, name_or_id: str):
+    """Resolve a runbook and check its trait requirements without mutation."""
     client = IronicClient()
     runbook = client.get_runbook(name_or_id)
     traits = client.get_node_traits(node.uuid)
@@ -359,13 +355,63 @@ def run_post_inspection_runbook(node: Node, name_or_id: str) -> None:
             f"[node:{node.uuid}] Runbook {name_or_id!r} requires at least one "
             f"matching node trait from {sorted(runbook_traits)}"
         )
-    logger.info("[node:%s] Running post-inspection runbook %s", node.uuid, name_or_id)
-    transition(
-        node,
-        target_state="clean",
-        expected_state="manageable",
-        runbook=runbook.uuid,
-    )
+    return runbook
+
+
+def validate_runbook_node(node: Node) -> None:
+    """Require an idle, healthy node with no instance or allocation."""
+    state = node.provision_state
+    if state not in {"available", "manageable"}:
+        raise ValueError(
+            f"[node:{node.uuid}] State {state!r}: refusing to run runbooks"
+        )
+    for field in (
+        "maintenance",
+        "reservation",
+        "target_provision_state",
+        "allocation_id",
+        "instance_uuid",
+    ):
+        value = getattr(node, field, None)
+        if value:
+            raise ValueError(
+                f"[node:{node.uuid}] State {state!r}, {field}={value!r}: "
+                "refusing to run runbooks"
+            )
+
+
+def run_runbooks_standalone(node: Node, runbooks: list[str]) -> None:
+    """Run idle-node runbooks in order; restore availability only on success."""
+    if not runbooks:
+        return
+    current = refresh(node)
+    validate_runbook_node(current)
+    # Validate the entire sequence before removing the node from availability.
+    resolved = [(name, validate_node_runbook(node, name)) for name in runbooks]
+    restore_available = current.provision_state == "available"
+    if restore_available:
+        transition(node, target_state="manage", expected_state="manageable")
+    for name, runbook in resolved:
+        current = refresh(node)
+        validate_runbook_node(current)
+        if current.provision_state != "manageable":
+            raise ValueError(
+                f"[node:{node.uuid}] Expected manageable before {name!r}, "
+                f"got {current.provision_state!r}"
+            )
+        logger.info("[node:%s] Running runbook %s", node.uuid, name)
+        try:
+            transition(
+                node,
+                target_state="clean",
+                expected_state="manageable",
+                runbook=runbook.uuid,
+            )
+        except Exception:
+            logger.exception("[node:%s] Runbook %s failed", node.uuid, name)
+            raise
+    if restore_available:
+        transition(node, target_state="provide", expected_state="available")
 
 
 def apply_firmware_updates(node: Node) -> None:

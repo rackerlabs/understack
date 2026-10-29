@@ -1,7 +1,6 @@
 # pylint: disable=E1131,C0103
 
 import argparse
-import json
 import logging
 import os
 from pathlib import Path
@@ -53,8 +52,6 @@ def main() -> None:
       mode for cleaning and provisioning (we prefer PXE-based booting over
       virtual media, for performance reasons).
 
-    - Optionally execute post-inspection runbooks in the supplied order.
-
     - Optionally configure RAID.
 
     - Optionally apply firmware updates.
@@ -70,7 +67,6 @@ def main() -> None:
         firmware_update=args.firmware_update,
         raid_configure=args.raid_configure,
         external_cmdb_id=args.external_cmdb_id,
-        post_inspection_runbooks=args.post_inspection_runbooks,
     )
 
     if args.node_uuid_output:
@@ -83,7 +79,6 @@ def enroll(
     raid_configure: bool,
     old_password: str | None,
     external_cmdb_id: int | str | None = None,
-    post_inspection_runbooks: list[str] | None = None,
 ) -> str:
     logger.info("Starting enroll workflow for bmc_ip_address=%s", ip_address)
 
@@ -134,9 +129,6 @@ def enroll(
     logger.info("[node:%s] Selected PXE interface %s", node.uuid, pxe_interface)
 
     update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
-
-    for runbook in post_inspection_runbooks or []:
-        ironic_node.run_post_inspection_runbook(node, runbook)
 
     if raid_configure:
         configure_raid(node, inventory)
@@ -209,23 +201,6 @@ def parse_bool(value: str) -> bool:
     return value.lower() == "true"
 
 
-def parse_runbooks(value: str) -> list[str]:
-    """Parse an ordered JSON array of runbook names or UUIDs."""
-    try:
-        runbooks = json.loads(value)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(
-            "Expected a JSON array of runbook names or UUIDs"
-        ) from exc
-    if not isinstance(runbooks, list) or any(
-        not isinstance(runbook, str) or not runbook.strip() for runbook in runbooks
-    ):
-        raise argparse.ArgumentTypeError(
-            "Expected a JSON array of nonempty runbook names or UUIDs"
-        )
-    return runbooks
-
-
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__),
@@ -240,15 +215,6 @@ def argument_parser():
         "--old-password",
         required=False,
         help="Old (current) BMC password",
-    )
-    parser.add_argument(
-        "--post-inspection-runbooks",
-        type=parse_runbooks,
-        default=[],
-        help=(
-            "JSON array of runbook names or UUIDs to execute in order "
-            "after inspection and BIOS configuration"
-        ),
     )
     parser.add_argument(
         "--firmware-update",
