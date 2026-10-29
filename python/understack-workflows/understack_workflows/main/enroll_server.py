@@ -5,58 +5,21 @@ import logging
 import os
 from pathlib import Path
 
-from ironicclient.v1.node import Node
-
 from understack_workflows import helpers
 from understack_workflows import ironic_node
-from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import bmc_for_ip_address
-from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import chassis_info
-from understack_workflows.bmc_credentials import set_bmc_password
-from understack_workflows.bmc_hostname import bmc_set_hostname
-from understack_workflows.bmc_settings import update_dell_drac_settings
-from understack_workflows.raid import configure_raid
 
 logger = logging.getLogger(__name__)
 
-MAX_PXE_INTERFACES = 8
-
 
 def main() -> None:
-    """On-board a new baremetal node, or refresh an existing one.
+    """Use minimal enrollment to test post-enrollment workflows.
 
-    - Connect to the BMC using standard password, if that fails then use the
-      password supplied in --old-bmc-password option, or factory default.
-
-    - Ensure standard BMC password is set, and other basic BMC settings.
-
-    - From BMC, discover basic chassis info: manufacturer, model, serial.
-
-    - Find or create this baremetal node in Ironic:
-      - Set the name to "{manufacturer}-{servicetag}".
-      - Set the driver as appropriate for the manufacturer/model.
-      - Set the node's external_cmdb_id, if one was provided.
-
-    - Perform agent inspection via virtual-media boot to capture the full
-      hardware inventory and LLDP-confirmed switch topology.
-
-      Using virtual-media avoids having to configure PXE during the initial
-      phase, however the IPA agent still requires DHCP autoconfiguration, so it
-      needs to be connected to the provisioning VLAN, and it needs at least one
-      port in Neutron to be configured for "enroll".
-
-    - Configure the Dell HTTP-boot BIOS entries using the LLDP-confirmed PXE
-      interfaces, then flip the node back to its final production http-ipxe boot
-      mode for cleaning and provisioning (we prefer PXE-based booting over
-      virtual media, for performance reasons).
-
-    - Optionally configure RAID.
-
-    - Optionally apply firmware updates.
-
-    - Transition the node to the 'available' state (implies cleaning).
+    Read chassis info, create or update the Ironic node, then provide it and
+    return its UUID. BMC configuration, inspection, BIOS, RAID, and firmware
+    updates are skipped. The existing CLI arguments remain accepted for Argo.
     """
     helpers.setup_logger()
     args = argument_parser().parse_args()
@@ -80,13 +43,15 @@ def enroll(
     old_password: str | None,
     external_cmdb_id: int | str | None = None,
 ) -> str:
-    logger.info("Starting enroll workflow for bmc_ip_address=%s", ip_address)
+    logger.info(
+        "Starting minimal test enroll workflow for bmc_ip_address=%s", ip_address
+    )
 
     if external_cmdb_id:
         logger.info("  external_cmdb_id=%s", external_cmdb_id)
 
     bmc = bmc_for_ip_address(ip_address)
-    device_info = initialize_bmc(bmc, old_password)
+    device_info = chassis_info(bmc)
 
     node = ironic_node.create_or_update(
         bmc=bmc,
@@ -95,102 +60,11 @@ def enroll(
         external_cmdb_id=external_cmdb_id,
     )
 
-    # Out-of-band redfish inspection populates data including baremetal ports.
-    #
-    # Our hooks augment the ironic baremetal port with the BMC-reported
-    # interface name (e.g. NIC.Integrated.1-1) as well as some placeholder
-    # "enrol" dummy data that is required by Ironic/Neutron to perform agent
-    # inspection.  Neutron needs to assign a port to the provisioning network
-    # and it bails out unless we have ports with pxe_enabled, local_link_info,
-    # etc.
-    ironic_node.inspect_out_of_band(node)
-    inventory = ironic_node.get_node_inventory(node)
-
-    # Agent inspection gathers LLDP and full hardware inventory.
-    #
-    # Virtual media boot makes Neutron behave differently to normal HTTP agent
-    # boot - in our normal configuration it fails to set up ports on the
-    # provisioning network.
-    #
-    # Therefore, we only use virtual media during our "enroll" phase, when the
-    # port data is set up in a manner that suits the Neutron algorithm.  If a
-    # normal PXE/HTTP port is available then we use it instead:
-
-    pxe_interface = ironic_node.pxe_enabled_bios_name(node)
-    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
-    agent_inspection(node, virtual_media=not pxe_interface)
-
-    pxe_interface = ironic_node.pxe_enabled_bios_name(node)
-    if not pxe_interface:
-        raise RuntimeError(
-            f"[node:{node.uuid}] Agent inspection produced no pxe_enabled ports "
-            "cannot configure HTTP boot."
-        )
-    logger.info("[node:%s] Selected PXE interface %s", node.uuid, pxe_interface)
-
-    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
-
-    if raid_configure:
-        configure_raid(node, inventory)
-        # RAID reconfiguration changes the disk layout; refresh inventory.
-        ironic_node.inspect_out_of_band(node)
-    else:
-        logger.info("%s RAID configuration was not requested", node.uuid)
-
-    if firmware_update:
-        ironic_node.apply_firmware_updates(node)
-
     ironic_node.transition(node, target_state="provide", expected_state="available")
-    logger.info("Completed enroll workflow for bmc_ip_address=%s", ip_address)
-    return str(node.uuid)
-
-
-def agent_inspection(node: Node, virtual_media=False) -> None:
-    """Run agent inspection booted, optionally via virtual media.
-
-    If requested,  the node is temporarily flipped to a virtual-media
-    boot_interface so the agent ramdisk boots from a BMC-attached ISO rather
-    than via PXE.  After initial inspection, the boot_interface is set back to
-    the steady-state value used for cleaning and provisioning.
-
-    If cleaning fails we don't reset the boot_interface (as Ironic won't let us
-    change that attribute in the inspect_failed state).
-    """
-    if virtual_media:
-        refreshed = ironic_node.refresh(node, fields=["driver"])
-        boot_interface = ironic_node.virtual_media_boot_interface_for(refreshed.driver)
-    else:
-        boot_interface = ironic_node.STEADY_STATE_BOOT_INTERFACE
-
     logger.info(
-        "[node:%s] Switching boot_interface to %s for agent inspection",
-        node.uuid,
-        boot_interface,
+        "Completed minimal test enroll workflow for bmc_ip_address=%s", ip_address
     )
-    ironic_node.patch(node, [f"boot_interface={boot_interface}"])
-    ironic_node.inspect(node)
-    ironic_node.patch(
-        node, [f"boot_interface={ironic_node.STEADY_STATE_BOOT_INTERFACE}"]
-    )
-
-
-def initialize_bmc(bmc: Bmc, old_password: str | None) -> ChassisInfo:
-    """Discover and configure BMC with Undercloud standard settings."""
-    set_bmc_password(
-        ip_address=bmc.ip_address,
-        new_password=bmc.password,
-        old_password=old_password,
-    )
-
-    device_info = chassis_info(bmc)
-    for line in device_info.dump:
-        logger.info("Discovered %s", line)
-
-    if device_info.manufacturer == "Dell":
-        update_dell_drac_settings(bmc)
-
-    bmc_set_hostname(bmc, device_info.bmc_hostname, device_name(device_info))
-    return device_info
+    return str(node.uuid)
 
 
 def device_name(device_info: ChassisInfo) -> str:

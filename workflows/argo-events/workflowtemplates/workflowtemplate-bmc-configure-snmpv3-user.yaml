@@ -32,7 +32,7 @@ spec:
               - key: clouds.yaml
                 path: clouds.yaml
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-2607
         command:
           - apply-node-runbook
         args:
