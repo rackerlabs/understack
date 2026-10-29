@@ -13,6 +13,12 @@ metadata:
       it runs the templates listed in `post_enroll_workflows`.
 kind: WorkflowTemplate
 spec:
+  # Labels make runs filterable in the Argo UI (`argo list -l`) and give
+  # alerts a stable key. Per-target labels are added at submission time.
+  workflowMetadata:
+    labels:
+      understack.rackspace.com/workflow-kind: enroll
+      understack.rackspace.com/device-type: server
   serviceAccountName: workflow
   entrypoint: main
   volumes:
