@@ -12,6 +12,7 @@ from neutron_lib.plugins.ml2.api import MechanismDriver
 from oslo_config import cfg
 
 from neutron_understack import config
+from neutron_understack import lag_name
 from neutron_understack import utils
 from neutron_understack.undersync_client import Undersync
 
@@ -108,6 +109,34 @@ class UndersyncDriver(MechanismDriver):
                 cancellable=True,
             )
 
+    def update_port_precommit(self, context: PortContext) -> None:
+        """Store the LAG name of a bonded port in its binding profile.
+
+        Only generated when not already present. Runs inside the port update's
+        transaction, so an anchor we cannot name aborts the update.
+        update_port_postcommit and delete_port_postcommit then read
+        ``local_group_information["lag"]`` back from the profile.
+        """
+        if not utils.is_baremetal_port(context):
+            return
+
+        profile = context.current.get(portbindings.PROFILE) or {}
+        group = profile.get("local_group_information")
+        if not group:
+            return
+
+        if group.get("lag"):
+            return
+
+        try:
+            group["lag"] = lag_name.for_profile(profile)
+        except lag_name.InvalidLagAnchor:
+            LOG.exception("Cannot name the LAG for port %s", context.current["id"])
+            raise
+        utils.set_active_binding_profile(
+            context.plugin_context, context.current["id"], profile
+        )
+
     def update_port_postcommit(self, context: PortContext) -> None:
         if not utils.is_baremetal_port(context):
             return
@@ -122,7 +151,18 @@ class UndersyncDriver(MechanismDriver):
 
         physnet = port[portbindings.PROFILE].get("physical_network")
         if physnet:
+            LOG.debug(
+                "syncing vlan group %s, lag %s", physnet, self._postcommit_lag(port)
+            )
             self.undersync.sync(physnet)
+
+    def _postcommit_lag(self, port: dict) -> str | None:
+        """Best-effort LAG name; bind_port already rejected unnameable anchors."""
+        try:
+            return self._lag_for(port)
+        except lag_name.InvalidLagAnchor:
+            LOG.error("Cannot name the LAG for port %s", port["id"])
+            return None
 
     def delete_port_postcommit(self, context: PortContext) -> None:
         # Releasing the segment stays with the understack driver; we only
@@ -130,8 +170,12 @@ class UndersyncDriver(MechanismDriver):
         if not utils.is_baremetal_port(context):
             return
 
-        physnet = context.current[portbindings.PROFILE].get("physical_network")
+        port = context.current
+        physnet = port[portbindings.PROFILE].get("physical_network")
         if physnet:
+            LOG.debug(
+                "syncing vlan group %s, lag %s", physnet, self._postcommit_lag(port)
+            )
             self.undersync.sync(physnet)
 
     def _validate_parent_physnet(self, resource, event, trunk_plugin, payload):
@@ -177,6 +221,14 @@ class UndersyncDriver(MechanismDriver):
 
         LOG.debug("notifying Undersync of vlan group %s", physnet)
         self.undersync.sync(physnet)
+
+    @staticmethod
+    def _lag_for(port: dict) -> str | None:
+        """The port-channel name for a bonded port, or None if not bonded.
+
+        Raises InvalidLagAnchor if the anchor cannot be named.
+        """
+        return lag_name.for_profile(port.get(portbindings.PROFILE) or {})
 
     def bind_port(self, context: PortContext) -> None:
         port = context.current

@@ -13,6 +13,7 @@ from neutron.services.trunk.plugin import TrunkPlugin
 from neutron_lib import constants
 from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
+from neutron_lib import exceptions as exc
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
 from neutron_lib.plugins import utils as plugin_utils
@@ -478,6 +479,24 @@ def active_port_binding(port: port_obj.Port) -> port_obj.PortBinding | None:
     return plugin_utils.get_port_binding_by_status_and_host(
         port.bindings, constants.ACTIVE, port_id=port.id
     )
+
+
+def set_active_binding_profile(plugin_context, port_id: str, profile: dict) -> None:
+    """Persist ``profile`` on the port's ACTIVE binding.
+
+    Use the caller's plugin_context from a precommit hook so the write joins
+    the port update's transaction. PortContext only holds a snapshot of the
+    binding, so changing it there is not saved.
+    """
+    binding = port_obj.PortBinding.get_object(
+        plugin_context, port_id=port_id, status=constants.ACTIVE
+    )
+    if binding is None:
+        raise exc.BadRequest(
+            resource="port", msg=f"port {port_id} has no active binding"
+        )
+    binding.profile = profile
+    binding.update()
 
 
 def parent_port_is_bound(port: port_obj.Port) -> bool:

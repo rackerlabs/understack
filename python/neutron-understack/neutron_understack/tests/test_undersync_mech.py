@@ -499,3 +499,106 @@ class TestValidateParentPhysnet:
         )
 
         fetch.assert_not_called()
+
+
+class TestUndersyncDriverLagName:
+    def _bonded_ctx(self, vlan_segment, port_id="Eth1/17"):
+        ctx = _make_context(segments=[vlan_segment()])
+        ctx.current[portbindings.PROFILE].update(
+            {
+                "local_link_information": [{"port_id": port_id, "switch_id": "aa"}],
+                "local_group_information": {"id": "g1", "name": "bond0"},
+            }
+        )
+        return ctx
+
+    def test_precommit_stores_lag(self, undersync_driver, vlan_segment, mocker):
+        ctx = self._bonded_ctx(vlan_segment)
+        store = mocker.patch.object(undersync_mech.utils, "set_active_binding_profile")
+
+        undersync_driver.update_port_precommit(ctx)
+
+        profile = ctx.current[portbindings.PROFILE]
+        assert profile["local_group_information"]["lag"] == "Po1170"
+        store.assert_called_once_with(ctx.plugin_context, "port-1", profile)
+
+    def test_precommit_keeps_existing_lag(self, undersync_driver, vlan_segment, mocker):
+        ctx = self._bonded_ctx(vlan_segment)
+        ctx.current[portbindings.PROFILE]["local_group_information"]["lag"] = "Po9"
+        store = mocker.patch.object(undersync_mech.utils, "set_active_binding_profile")
+
+        undersync_driver.update_port_precommit(ctx)
+
+        assert (
+            ctx.current[portbindings.PROFILE]["local_group_information"]["lag"] == "Po9"
+        )
+        store.assert_not_called()
+
+    def test_precommit_ignores_unbonded_port(
+        self, undersync_driver, vlan_segment, mocker
+    ):
+        ctx = _make_context(segments=[vlan_segment()])
+        store = mocker.patch.object(undersync_mech.utils, "set_active_binding_profile")
+
+        undersync_driver.update_port_precommit(ctx)
+
+        store.assert_not_called()
+
+    def test_precommit_rejects_unnameable_anchor(
+        self, undersync_driver, vlan_segment, mocker
+    ):
+        ctx = self._bonded_ctx(vlan_segment, port_id="Eth2/1")
+        store = mocker.patch.object(undersync_mech.utils, "set_active_binding_profile")
+
+        with pytest.raises(exc.InvalidInput):
+            undersync_driver.update_port_precommit(ctx)
+
+        store.assert_not_called()
+
+    def test_lag_derived_for_bonded_port(self, undersync_driver, vlan_segment):
+        ctx = self._bonded_ctx(vlan_segment)
+
+        assert undersync_driver._lag_for(ctx.current) == "Po1170"
+
+    def test_no_lag_for_unbonded_port(self, undersync_driver, vlan_segment):
+        ctx = _make_context(segments=[vlan_segment()])
+
+        assert undersync_driver._lag_for(ctx.current) is None
+
+    def test_stored_lag_wins(self, undersync_driver, vlan_segment):
+        ctx = self._bonded_ctx(vlan_segment)
+        ctx.current[portbindings.PROFILE]["local_group_information"]["lag"] = "Po9"
+
+        assert undersync_driver._lag_for(ctx.current) == "Po9"
+
+    def test_update_postcommit_reads_lag(self, undersync_driver, vlan_segment):
+        ctx = self._bonded_ctx(vlan_segment)
+        ctx.vif_type = portbindings.VIF_TYPE_OTHER
+        undersync_driver._postcommit_lag = MagicMock(return_value="Po1170")
+
+        undersync_driver.update_port_postcommit(ctx)
+
+        undersync_driver._postcommit_lag.assert_called_once_with(ctx.current)
+
+    def test_delete_postcommit_reads_lag(self, undersync_driver, vlan_segment):
+        ctx = self._bonded_ctx(vlan_segment)
+        undersync_driver._postcommit_lag = MagicMock(return_value="Po1170")
+
+        undersync_driver.delete_port_postcommit(ctx)
+
+        undersync_driver._postcommit_lag.assert_called_once_with(ctx.current)
+
+    def test_postcommit_lag_swallows_bad_anchor(self, undersync_driver, vlan_segment):
+        ctx = self._bonded_ctx(vlan_segment, port_id="Eth2/1")
+
+        assert undersync_driver._postcommit_lag(ctx.current) is None
+
+    def test_precommit_rejects_bond_without_links(
+        self, undersync_driver, vlan_segment, mocker
+    ):
+        ctx = self._bonded_ctx(vlan_segment)
+        ctx.current[portbindings.PROFILE]["local_link_information"] = []
+        mocker.patch.object(undersync_mech.utils, "set_active_binding_profile")
+
+        with pytest.raises(exc.InvalidInput):
+            undersync_driver.update_port_precommit(ctx)
