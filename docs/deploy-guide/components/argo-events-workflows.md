@@ -47,9 +47,8 @@ Optional additions:
 
 ## Enrollment Workflow Configuration
 
-Each enrollment workflow can run site-specific templates after it enrolls an
-Ironic node. Configure a workflow by creating its ConfigMap in the `argo-events`
-namespace:
+Configure enrollment runbooks and post-enrollment templates through ConfigMaps
+in the `argo-events` namespace:
 
 | Workflow | ConfigMap |
 | --- | --- |
@@ -57,10 +56,17 @@ namespace:
 | `enroll-fw` | `enroll-fw-config` |
 | `enroll-netdev` | `enroll-netdev-config` |
 
-The `post_enroll_workflows` value is a JSON array of `WorkflowTemplate` names.
-For example, the server configuration is:
+Configuration values are JSON arrays:
 
-```yaml title="enroll-server-config.yaml"
+| Key | Values | When it runs |
+| --- | --- | --- |
+| `post_inspection_runbooks` (`enroll-server` only) | Ironic runbook names or UUIDs | In list order after inspection and BIOS configuration, before RAID configuration, firmware updates, and making the node available. A failure stops enrollment. |
+| `post_enroll_workflows` | `WorkflowTemplate` names | In parallel after enrollment. A failure fails the post-enrollment step. |
+
+Create the ConfigMap in your deployment overlay. Replace the example names with
+your runbooks and workflow templates; keep the parameter-source label.
+
+```yaml title="configmap-enroll-server-config.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -69,12 +75,21 @@ metadata:
   labels:
     workflows.argoproj.io/configmap-type: Parameter
 data:
+  post_inspection_runbooks: |
+    [
+      "first-runbook",
+      "second-runbook"
+    ]
   post_enroll_workflows: |
-    ["notify-enrollment", "configure-monitoring"]
+    [
+      "notify-enrollment",
+      "configure-monitoring"
+    ]
 ```
 
-The `workflows.argoproj.io/configmap-type: Parameter` label is required so the
-Argo Workflows controller discovers the ConfigMap as a parameter source.
+Missing ConfigMaps or keys default to `[]`. Set a value to `[]` to disable it.
+For a single server enrollment, override the runbooks with
+`-p post_inspection_runbooks='["runbook"]'`, or pass `[]` to skip them.
 
 Each named `WorkflowTemplate` must be in the same namespace and expose a `run`
 template that accepts the enrolled server's `node_uuid`:
@@ -100,11 +115,6 @@ spec:
 ```
 
 {% endraw %}
-
-The hooks run in parallel as steps of the existing enrollment workflow; they do
-not create child `Workflow` resources. A failed hook fails the post-enrollment
-step. If the ConfigMap or its key is absent, the hook list defaults to empty and
-enrollment completes without running hooks.
 
 Only the referenced `run` template is imported by `templateRef`. Put required
 pod configuration on that template, or arrange for it on the parent enrollment
