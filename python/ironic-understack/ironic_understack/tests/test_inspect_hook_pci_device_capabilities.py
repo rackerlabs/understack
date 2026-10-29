@@ -6,13 +6,23 @@ from ironic_understack.hooks.inspect_hook_pci_device_capabilities import (
 )
 from ironic_understack.hooks.inspect_hook_pci_device_capabilities import pci_device_slug
 
+AMD_GPU = {
+    "vendor_id": "0x1002",
+    "product_id": "0x75a8",
+    "name": "amd_gpu_mi350p",
+}
 
-def test_adds_pci_capability_to_node_without_capabilities(mocker):
+
+def configure_pci_devices(mocker, *devices):
     mocker.patch(
         "ironic_understack.hooks.inspect_hook_pci_device_capabilities."
         "CONF.ironic_understack.pci_device_capabilities",
-        {"1002:75a8": "amd_gpu_mi350p"},
+        list(devices),
     )
+
+
+def test_adds_pci_capability_to_node_without_capabilities(mocker):
+    configure_pci_devices(mocker, AMD_GPU)
     inventory = {
         "pci_devices": [
             {"vendor_id": "0x1002", "product_id": "0x75a8"},
@@ -30,12 +40,33 @@ def test_adds_pci_capability_to_node_without_capabilities(mocker):
     node.save.assert_called_once_with()
 
 
-def test_preserves_non_pci_capabilities(mocker):
-    mocker.patch(
-        "ironic_understack.hooks.inspect_hook_pci_device_capabilities."
-        "CONF.ironic_understack.pci_device_capabilities",
-        {"1002:75a8": "amd_gpu_mi350p"},
+def test_counts_all_matching_devices_from_redfish_inventory(mocker):
+    configure_pci_devices(mocker, AMD_GPU)
+    inventory = {
+        "pci_devices": [
+            {"vendor_id": "0x1002", "product_id": "0x75a8"},
+            {"vendor_id": "0x1002", "product_id": "0x75a8"},
+            {"vendor_id": "0x1002", "product_id": "0x75a8"},
+            {"vendor_id": "0x1002", "product_id": "0x75a8"},
+            {"vendor_id": "0x1002", "product_id": "0x75a8"},
+            {"vendor_id": "0x1002", "product_id": "0x75a8"},
+            {"vendor_id": "0x1002", "product_id": "0x75a8"},
+            {"vendor_id": "0x1002", "product_id": "0x75a8"},
+        ]
+    }
+    node = mocker.Mock(properties={})
+    task = mocker.Mock(node=node)
+
+    PciDeviceCapabilitiesHook()(task, inventory, {})
+
+    node.set_property.assert_called_once_with(
+        "capabilities", "pci_device_amd_gpu_mi350p:8"
     )
+    node.save.assert_called_once_with()
+
+
+def test_preserves_non_pci_capabilities(mocker):
+    configure_pci_devices(mocker, AMD_GPU)
     inventory = {
         "pci_devices": [
             {"vendor_id": "0x1002", "product_id": "0x75a8"},
@@ -55,11 +86,7 @@ def test_preserves_non_pci_capabilities(mocker):
 
 
 def test_replaces_stale_pci_capability(mocker):
-    mocker.patch(
-        "ironic_understack.hooks.inspect_hook_pci_device_capabilities."
-        "CONF.ironic_understack.pci_device_capabilities",
-        {"1002:75a8": "amd_gpu_mi350p"},
-    )
+    configure_pci_devices(mocker, AMD_GPU)
     inventory = {
         "pci_devices": [
             {"vendor_id": "0x1002", "product_id": "0x75a8"},
@@ -80,11 +107,7 @@ def test_replaces_stale_pci_capability(mocker):
 
 
 def test_does_not_duplicate_current_pci_capability(mocker):
-    mocker.patch(
-        "ironic_understack.hooks.inspect_hook_pci_device_capabilities."
-        "CONF.ironic_understack.pci_device_capabilities",
-        {"1002:75a8": "amd_gpu_mi350p"},
-    )
+    configure_pci_devices(mocker, AMD_GPU)
     inventory = {
         "pci_devices": [
             {"vendor_id": "0x1002", "product_id": "0x75a8"},
@@ -103,11 +126,7 @@ def test_does_not_duplicate_current_pci_capability(mocker):
 
 
 def test_removes_pci_capability_when_device_is_no_longer_present(mocker):
-    mocker.patch(
-        "ironic_understack.hooks.inspect_hook_pci_device_capabilities."
-        "CONF.ironic_understack.pci_device_capabilities",
-        {"1002:75a8": "amd_gpu_mi350p"},
-    )
+    configure_pci_devices(mocker, AMD_GPU)
     inventory = {
         "pci_devices": [
             {"vendor_id": "0x1022", "product_id": "0x7901"},
@@ -124,32 +143,24 @@ def test_removes_pci_capability_when_device_is_no_longer_present(mocker):
     node.save.assert_called_once_with()
 
 
-def test_does_nothing_when_pci_capabilities_are_not_configured(mocker):
-    mocker.patch(
-        "ironic_understack.hooks.inspect_hook_pci_device_capabilities."
-        "CONF.ironic_understack.pci_device_capabilities",
-        None,
-    )
+def test_removes_pci_capability_when_device_is_no_longer_configured(mocker):
+    configure_pci_devices(mocker)
     inventory = {
         "pci_devices": [
             {"vendor_id": "0x1002", "product_id": "0x75a8"},
         ]
     }
-    node = mocker.Mock(properties={})
+    node = mocker.Mock(properties={"capabilities": "pci_device_amd_gpu_mi350p:1"})
     task = mocker.Mock(node=node)
 
     PciDeviceCapabilitiesHook()(task, inventory, {})
 
-    node.set_property.assert_not_called()
-    node.save.assert_not_called()
+    node.set_property.assert_called_once_with("capabilities", "")
+    node.save.assert_called_once_with()
 
 
 def test_does_nothing_when_inventory_has_no_pci_devices(mocker):
-    mocker.patch(
-        "ironic_understack.hooks.inspect_hook_pci_device_capabilities."
-        "CONF.ironic_understack.pci_device_capabilities",
-        {"1002:75a8": "amd_gpu_mi350p"},
-    )
+    configure_pci_devices(mocker, AMD_GPU)
     inventory = {}
     node = mocker.Mock(properties={})
     task = mocker.Mock(node=node)
@@ -161,13 +172,25 @@ def test_does_nothing_when_inventory_has_no_pci_devices(mocker):
 
 
 def test_does_nothing_when_pci_device_list_is_empty(mocker):
+    configure_pci_devices(mocker, AMD_GPU)
+    inventory = {"pci_devices": []}
+    node = mocker.Mock(properties={})
+    task = mocker.Mock(node=node)
+
+    PciDeviceCapabilitiesHook()(task, inventory, {})
+
+    node.set_property.assert_not_called()
+    node.save.assert_not_called()
+
+
+def test_does_nothing_when_configuration_is_omitted(mocker):
     mocker.patch(
         "ironic_understack.hooks.inspect_hook_pci_device_capabilities."
         "CONF.ironic_understack.pci_device_capabilities",
-        {"1002:75a8": "amd_gpu_mi350p"},
+        None,
     )
-    inventory = {"pci_devices": []}
-    node = mocker.Mock(properties={})
+    inventory = {"pci_devices": [{"vendor_id": "0x1002", "product_id": "0x75a8"}]}
+    node = mocker.Mock(properties={"capabilities": "pci_device_old:1"})
     task = mocker.Mock(node=node)
 
     PciDeviceCapabilitiesHook()(task, inventory, {})
@@ -214,6 +237,14 @@ def test_pci_device_slug_removes_hexadecimal_prefixes():
 
 def test_pci_device_slug_accepts_ids_without_hexadecimal_prefixes():
     pci_device = {"vendor_id": "1002", "product_id": "75a8"}
+
+    slug = pci_device_slug(pci_device)
+
+    assert slug == "1002:75a8"
+
+
+def test_pci_device_slug_normalizes_uppercase_ids():
+    pci_device = {"vendor_id": "0X1002", "product_id": "0X75A8"}
 
     slug = pci_device_slug(pci_device)
 
