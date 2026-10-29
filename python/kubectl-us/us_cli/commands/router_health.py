@@ -38,6 +38,7 @@ class OvnInventory:
     router_ports: dict[str, dict]
     switch_ports: dict[str, dict]
     switch_port_parents: dict[str, list[str]]
+    nats: list[dict]
 
 
 @dataclass
@@ -66,6 +67,15 @@ class HaChassisGroupRepairOperation:
     group_name: str
     target_chassis: str
     remove_member_uuids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class NatGatewayPortRepairOperation:
+    """Clearing a NAT ``gateway_port`` that is not a distributed gateway port."""
+
+    nat_uuid: str
+    name: str
+    reason: str
 
 
 def _value(resource: Any, key: str, default=None):
@@ -133,11 +143,17 @@ def _load_inventory(
     for switch in ovn.nbctl_list(conn_ctx, "Logical_Switch"):
         for port_uuid in ovn.as_list(switch.get("ports")):
             switch_port_parents.setdefault(port_uuid, []).append(switch.get("name", ""))
+    nat_uuids = {uuid for lr in lr_rows for uuid in ovn.as_list(lr.get("nat"))}
     return OvnInventory(
         routers=routers,
         router_ports=router_ports,
         switch_ports=switch_ports,
         switch_port_parents=switch_port_parents,
+        nats=(
+            ovn.nbctl_list_records(conn_ctx, "NAT", sorted(nat_uuids))
+            if nat_uuids
+            else []
+        ),
     )
 
 
@@ -374,6 +390,72 @@ def _check(
     )
 
 
+def _nat_gateway_port_problems(
+    inventory: OvnInventory,
+) -> list[tuple[dict, dict | None, str]]:
+    """Return ``(nat, lrp, problem)`` for each NAT with a ``gateway_port``.
+
+    ``problem`` is empty when ``gateway_port`` names a distributed gateway
+    port on the router. NATs without a ``gateway_port`` are skipped.
+    """
+    lrps_by_uuid = {row.get("_uuid"): row for row in inventory.router_ports.values()}
+    results: list[tuple[dict, dict | None, str]] = []
+    for nat in inventory.nats:
+        gateway_port = nat.get("gateway_port")
+        if not gateway_port:
+            continue
+        lrp = lrps_by_uuid.get(gateway_port)
+        if lrp is None:
+            problem = f"{gateway_port} is not a port on this router"
+        elif not (
+            ovn.as_list(lrp.get("gateway_chassis"))
+            or ovn.as_list(lrp.get("ha_chassis_group"))
+        ):
+            problem = (
+                f"{lrp['name']} is not a distributed gateway port "
+                "(no gateway_chassis or ha_chassis_group)"
+            )
+        else:
+            problem = ""
+        results.append((nat, lrp, problem))
+    return results
+
+
+def _nat_name(nat: dict) -> str:
+    return f"NAT {nat.get('type')} {nat.get('external_ip')}"
+
+
+def _audit_nat_gateway_ports(inventory: OvnInventory) -> list[Finding]:
+    """Check each NAT's ``gateway_port`` names a distributed gateway port.
+
+    northd ignores a NAT whose ``gateway_port`` is not a DGP on the router
+    (warning "is not a valid distributed gateway port"), which breaks the
+    floating IP. Neutron sets ``gateway_port`` on every NAT, so this fires on
+    centralized routers, whose gateway LRP carries no gateway_chassis/HCG.
+    """
+    findings: list[Finding] = []
+    for nat, lrp, problem in _nat_gateway_port_problems(inventory):
+        _check(
+            findings,
+            not problem,
+            f"{_nat_name(nat)}: gateway_port",
+            lrp.get("name", "") if lrp else "",
+            problem,
+        )
+    return findings
+
+
+def _nat_gateway_port_repair_operations(
+    inventory: OvnInventory,
+) -> list[NatGatewayPortRepairOperation]:
+    """Plan clearing each NAT ``gateway_port`` that is not a DGP."""
+    return [
+        NatGatewayPortRepairOperation(nat["_uuid"], _nat_name(nat), problem)
+        for nat, _lrp, problem in _nat_gateway_port_problems(inventory)
+        if problem
+    ]
+
+
 def _audit_native_router(
     router,
     ports: list[Any],
@@ -516,6 +598,7 @@ def _audit_native_router(
                 )
             )
             audited_networks.add(network_id)
+    findings.extend(_audit_nat_gateway_ports(inventory))
     return findings
 
 
@@ -815,7 +898,7 @@ def repair(
         help="Apply the displayed plan; without this flag no changes are made",
     ),
 ) -> None:
-    """Repair safe native-OVN router LSP and HA chassis group state."""
+    """Repair safe native-OVN router LSP, HA chassis group and NAT state."""
     conn_ctx: ConnectionContext = ctx.obj
     print_connection_banner(conn_ctx, include_openstack=True)
     try:
@@ -844,6 +927,7 @@ def repair(
             inventory,
             ha_inventory,
         )
+        nat_operations = _nat_gateway_port_repair_operations(inventory)
     except typer.Exit:
         raise
     except Exception as exc:
@@ -853,7 +937,8 @@ def repair(
     print(f"\nRouter {_value(router, 'name') or '(unnamed)'} ({_value(router, 'id')})")
     print(
         "Repair scope: attached router peer LSP fields and unambiguous "
-        "per-network HA chassis group repopulation"
+        "per-network HA chassis group repopulation, and clearing NAT "
+        "gateway_port that is not a distributed gateway port"
     )
     for reason in lsp_refused:
         print(f"  REFUSED LSP repair  {reason}")
@@ -874,9 +959,16 @@ def repair(
                 f"{', '.join(operation.remove_member_uuids)}"
             )
         print(f"    repopulate with live chassis: {operation.target_chassis}")
+    for nat_operation in nat_operations:
+        print(f"  {nat_operation.name}")
+        print(f"    gateway_port: {nat_operation.reason}; clear gateway_port")
 
     has_refusals = bool(lsp_refused or ha_refused)
-    if not allowed_operations and not allowed_ha_group_operations:
+    if (
+        not allowed_operations
+        and not allowed_ha_group_operations
+        and not nat_operations
+    ):
         if not has_refusals:
             print("\nNo repairable differences found.")
             return
@@ -933,6 +1025,8 @@ def repair(
                 row_id,
             ]
         )
+    for nat_operation in nat_operations:
+        args.extend(["--", "clear", "NAT", nat_operation.nat_uuid, "gateway_port"])
     ovn.nbctl_raw(conn_ctx, args)
 
     refreshed = _load_inventory(conn_ctx, _value(router, "id"), ports)
@@ -955,7 +1049,10 @@ def repair(
             allowed_ha_group_operations,
             refreshed_ha,
         )
-    if structural or remaining or ha_verification_errors:
+    remaining_nats = (
+        _nat_gateway_port_repair_operations(refreshed) if nat_operations else []
+    )
+    if structural or remaining or ha_verification_errors or remaining_nats:
         typer.echo("ERROR: repair verification failed", err=True)
         for reason in structural:
             typer.echo(f"  {reason}", err=True)
@@ -965,11 +1062,13 @@ def repair(
             )
         for reason in ha_verification_errors:
             typer.echo(f"  {reason}", err=True)
+        for nat_operation in remaining_nats:
+            typer.echo(f"  {nat_operation.name}: {nat_operation.reason}", err=True)
         raise typer.Exit(1)
     print(
-        f"\nApplied {len(allowed_operations)} LSP repair(s) and "
-        f"{len(allowed_ha_group_operations)} HA chassis group repair(s); "
-        "verification passed."
+        f"\nApplied {len(allowed_operations)} LSP repair(s), "
+        f"{len(allowed_ha_group_operations)} HA chassis group repair(s) and "
+        f"{len(nat_operations)} NAT repair(s); verification passed."
     )
     if has_refusals:
         typer.echo(
