@@ -199,6 +199,46 @@ def test_audit_reports_corrupt_native_gateway_lsp(monkeypatch):
     assert "FAIL  gateway gw-1: exclude-lb-vips-from-garp option" in result.output
 
 
+def nat_state(*, dgp):
+    conn, tables = native_state(healthy=True)
+    tables["Logical_Router"][0]["nat"] = ["nat-uuid", "snat-uuid"]
+    if dgp:
+        tables["Logical_Router_Port"][0]["ha_chassis_group"] = "hcg-uuid"
+    tables["Logical_Router_Port"][0]["_uuid"] = "lrp-uuid"
+    tables["NAT"] = [
+        {
+            "_uuid": "nat-uuid",
+            "type": "dnat_and_snat",
+            "external_ip": "203.0.113.10",
+            "gateway_port": "lrp-uuid",
+        },
+        {"_uuid": "snat-uuid", "type": "snat", "external_ip": "203.0.113.1"},
+    ]
+    return conn, tables
+
+
+def test_audit_fails_nat_gateway_port_that_is_not_a_dgp(monkeypatch):
+    conn, tables = nat_state(dgp=False)
+    patch_environment(monkeypatch, conn, tables)
+
+    result = runner.invoke(make_app(), ["router", "audit", "native-router"])
+
+    assert result.exit_code == 1
+    assert "FAIL  NAT dnat_and_snat 203.0.113.10: gateway_port" in result.output
+    assert "lrp-gw-1 is not a distributed gateway port" in result.output
+    assert "ovn-nbctl clear NAT nat-uuid gateway_port" in result.output
+    assert "NAT snat" not in result.output
+
+
+def test_audit_accepts_nat_gateway_port_that_is_a_dgp(monkeypatch):
+    conn, tables = nat_state(dgp=True)
+    patch_environment(monkeypatch, conn, tables)
+
+    result = runner.invoke(make_app(), ["router", "audit", "native-router"])
+
+    assert "PASS  NAT dnat_and_snat 203.0.113.10: gateway_port" in result.output
+
+
 def test_audit_reports_missing_peer_lsp_without_crashing(monkeypatch):
     conn, tables = native_state(healthy=True)
     tables["Logical_Switch_Port"] = []

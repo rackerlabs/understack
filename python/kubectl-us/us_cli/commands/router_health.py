@@ -38,6 +38,7 @@ class OvnInventory:
     router_ports: dict[str, dict]
     switch_ports: dict[str, dict]
     switch_port_parents: dict[str, list[str]]
+    nats: list[dict]
 
 
 @dataclass
@@ -133,11 +134,17 @@ def _load_inventory(
     for switch in ovn.nbctl_list(conn_ctx, "Logical_Switch"):
         for port_uuid in ovn.as_list(switch.get("ports")):
             switch_port_parents.setdefault(port_uuid, []).append(switch.get("name", ""))
+    nat_uuids = {uuid for lr in lr_rows for uuid in ovn.as_list(lr.get("nat"))}
     return OvnInventory(
         routers=routers,
         router_ports=router_ports,
         switch_ports=switch_ports,
         switch_port_parents=switch_port_parents,
+        nats=(
+            ovn.nbctl_list_records(conn_ctx, "NAT", sorted(nat_uuids))
+            if nat_uuids
+            else []
+        ),
     )
 
 
@@ -374,6 +381,42 @@ def _check(
     )
 
 
+def _audit_nat_gateway_ports(inventory: OvnInventory) -> list[Finding]:
+    """Check each NAT's ``gateway_port`` names a distributed gateway port.
+
+    northd ignores a NAT whose ``gateway_port`` is not a DGP on the router
+    (warning "is not a valid distributed gateway port"), which breaks the
+    floating IP. Neutron sets ``gateway_port`` on every NAT, so this fires on
+    centralized routers, whose gateway LRP carries no gateway_chassis/HCG.
+    """
+    lrps_by_uuid = {row.get("_uuid"): row for row in inventory.router_ports.values()}
+    findings: list[Finding] = []
+    for nat in inventory.nats:
+        gateway_port = nat.get("gateway_port")
+        if not gateway_port:
+            continue
+        name = f"NAT {nat.get('type')} {nat.get('external_ip')}"
+        lrp = lrps_by_uuid.get(gateway_port)
+        is_dgp = lrp is not None and bool(
+            ovn.as_list(lrp.get("gateway_chassis"))
+            or ovn.as_list(lrp.get("ha_chassis_group"))
+        )
+        _check(
+            findings,
+            is_dgp,
+            f"{name}: gateway_port",
+            lrp.get("name", "") if lrp else "",
+            (
+                f"{lrp['name']} is not a distributed gateway port "
+                "(no gateway_chassis or ha_chassis_group)"
+                if lrp
+                else f"{gateway_port} is not a port on this router"
+            )
+            + f"; repair: ovn-nbctl clear NAT {nat.get('_uuid')} gateway_port",
+        )
+    return findings
+
+
 def _audit_native_router(
     router,
     ports: list[Any],
@@ -516,6 +559,7 @@ def _audit_native_router(
                 )
             )
             audited_networks.add(network_id)
+    findings.extend(_audit_nat_gateway_ports(inventory))
     return findings
 
 
