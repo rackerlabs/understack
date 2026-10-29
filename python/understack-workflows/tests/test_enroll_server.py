@@ -1,4 +1,3 @@
-import argparse
 import secrets
 from types import SimpleNamespace
 from typing import cast
@@ -600,8 +599,7 @@ def test_get_lldp_connected_interfaces_absent_from_lldp():
     assert result == []
 
 
-@pytest.mark.parametrize("runbooks", [None, [], ["first", "second"]])
-def test_post_inspection_runbook_order(mocker, runbooks):
+def test_enrollment_order_without_configured_runbooks(mocker):
     node = SimpleNamespace(uuid="node-123")
     bmc = make_bmc(mocker)
     mocker.patch.object(enroll_server, "bmc_for_ip_address", return_value=bmc)
@@ -621,7 +619,7 @@ def test_post_inspection_runbook_order(mocker, runbooks):
     events = MagicMock()
     for name in ("agent_inspection", "update_dell_bios_settings", "configure_raid"):
         events.attach_mock(mocker.patch.object(enroll_server, name), name)
-    for name in ("run_post_inspection_runbook", "apply_firmware_updates", "transition"):
+    for name in ("apply_firmware_updates", "transition"):
         events.attach_mock(mocker.patch.object(enroll_server.ironic_node, name), name)
 
     result = enroll_server.enroll(
@@ -629,7 +627,6 @@ def test_post_inspection_runbook_order(mocker, runbooks):
         firmware_update=True,
         raid_configure=True,
         old_password=None,
-        post_inspection_runbooks=runbooks,
     )
 
     expected = [
@@ -637,9 +634,6 @@ def test_post_inspection_runbook_order(mocker, runbooks):
         call.agent_inspection(node, virtual_media=False),
         call.update_dell_bios_settings(bmc, pxe_interface="NIC.1"),
     ]
-    expected.extend(
-        call.run_post_inspection_runbook(node, runbook) for runbook in runbooks or []
-    )
     expected.extend(
         [
             call.configure_raid(node, {}),
@@ -649,127 +643,6 @@ def test_post_inspection_runbook_order(mocker, runbooks):
     )
     assert events.mock_calls == expected
     assert result == node.uuid
-
-
-def test_post_inspection_runbook_uses_uuid_and_waits(mocker):
-    client = mocker.patch.object(enroll_server.ironic_node, "IronicClient").return_value
-    client.get_runbook.return_value = SimpleNamespace(
-        uuid="runbook-123", traits=["CUSTOM_DELL", "CUSTOM_OTHER"], disable_ramdisk=True
-    )
-    client.get_node_traits.return_value = ["CUSTOM_DELL"]
-    node = cast(Node, SimpleNamespace(uuid="node-123"))
-
-    enroll_server.ironic_node.run_post_inspection_runbook(node, "post-inspection")
-
-    client.get_runbook.assert_called_once_with("post-inspection")
-    client.get_node_traits.assert_called_once_with(node.uuid)
-    client.set_node_provision_state.assert_called_once_with(
-        node.uuid,
-        "clean",
-        clean_steps=None,
-        runbook="runbook-123",
-        disable_ramdisk=None,
-    )
-    client.wait_for_node_provision_state.assert_called_once_with(
-        node.uuid,
-        "manageable",
-        timeout=enroll_server.ironic_node.NODE_STATE_TIMEOUT_SECS,
-    )
-
-
-@pytest.mark.parametrize("traits", [[], ["CUSTOM_OTHER"], None])
-def test_post_inspection_runbook_rejects_ineligible_node(mocker, traits):
-    client = mocker.patch.object(enroll_server.ironic_node, "IronicClient").return_value
-    client.get_runbook.return_value = SimpleNamespace(uuid="runbook-123", traits=traits)
-    client.get_node_traits.return_value = ["CUSTOM_DELL"]
-    node = cast(Node, SimpleNamespace(uuid="node-123"))
-
-    with pytest.raises(ValueError, match=r"traits metadata|matching node trait"):
-        enroll_server.ironic_node.run_post_inspection_runbook(node, "post-inspection")
-
-    client.set_node_provision_state.assert_not_called()
-
-
-def test_post_inspection_runbook_failure_propagates(mocker):
-    client = mocker.patch.object(enroll_server.ironic_node, "IronicClient").return_value
-    client.get_runbook.return_value = SimpleNamespace(
-        uuid="runbook-123", traits=["CUSTOM_DELL"]
-    )
-    client.get_node_traits.return_value = ["CUSTOM_DELL"]
-    client.wait_for_node_provision_state.side_effect = RuntimeError("clean failed")
-    node = cast(Node, SimpleNamespace(uuid="node-123"))
-
-    with pytest.raises(RuntimeError, match="clean failed"):
-        enroll_server.ironic_node.run_post_inspection_runbook(node, "post-inspection")
-
-
-def test_post_inspection_runbook_cli(mocker):
-    mocker.patch(
-        "sys.argv",
-        [
-            "enroll-server",
-            "--ip-address",
-            "10.0.0.10",
-            "--post-inspection-runbooks",
-            '["first", "second"]',
-        ],
-    )
-    mocker.patch.object(enroll_server.helpers, "setup_logger")
-    enroll = mocker.patch.object(enroll_server, "enroll")
-
-    enroll_server.main()
-
-    assert enroll.call_args.kwargs["post_inspection_runbooks"] == ["first", "second"]
-
-
-@pytest.mark.parametrize(
-    "value", ["invalid", '"first"', "{}", "null", "[null]", "[1]", '[""]', '[" "]']
-)
-def test_post_inspection_runbooks_reject_invalid_cli(value):
-    with pytest.raises(argparse.ArgumentTypeError, match="JSON array"):
-        enroll_server.parse_runbooks(value)
-
-
-def test_post_inspection_runbooks_stop_on_failure(mocker):
-    node = SimpleNamespace(uuid="node-123")
-    mocker.patch.object(enroll_server, "bmc_for_ip_address")
-    mocker.patch.object(
-        enroll_server, "initialize_bmc", return_value=make_device_info()
-    )
-    mocker.patch.object(
-        enroll_server.ironic_node, "create_or_update", return_value=node
-    )
-    mocker.patch.object(enroll_server.ironic_node, "inspect_out_of_band")
-    mocker.patch.object(
-        enroll_server.ironic_node, "get_node_inventory", return_value={}
-    )
-    mocker.patch.object(
-        enroll_server.ironic_node, "pxe_enabled_bios_name", return_value="NIC.1"
-    )
-    mocker.patch.object(enroll_server, "agent_inspection")
-    mocker.patch.object(enroll_server, "update_dell_bios_settings")
-    runbook = mocker.patch.object(
-        enroll_server.ironic_node,
-        "run_post_inspection_runbook",
-        side_effect=RuntimeError("clean failed"),
-    )
-    raid = mocker.patch.object(enroll_server, "configure_raid")
-    firmware = mocker.patch.object(enroll_server.ironic_node, "apply_firmware_updates")
-    transition = mocker.patch.object(enroll_server.ironic_node, "transition")
-
-    with pytest.raises(RuntimeError, match="clean failed"):
-        enroll_server.enroll(
-            ip_address="10.0.0.10",
-            firmware_update=True,
-            raid_configure=True,
-            old_password=None,
-            post_inspection_runbooks=["first", "second"],
-        )
-
-    runbook.assert_called_once_with(node, "first")
-    raid.assert_not_called()
-    firmware.assert_not_called()
-    transition.assert_not_called()
 
 
 def test_main_emits_node_uuid_only_after_success(mocker, tmp_path):

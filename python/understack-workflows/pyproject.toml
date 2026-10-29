@@ -30,6 +30,7 @@ dependencies = [
 ]
 
 [project.scripts]
+apply-node-runbook = "understack_workflows.main.apply_node_runbook:main"
 bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
 bmc-password = "understack_workflows.main.print_bmc_password:main"
 enroll-fw = "understack_workflows.main.enroll_fw:main"

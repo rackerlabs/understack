@@ -29,8 +29,6 @@ spec:
   arguments:
     parameters:
       - name: ip_address
-      - name: post_inspection_runbooks
-        value: "[]"
       - name: firmware_update
         value: "false"
       - name: raid_configure
@@ -46,7 +44,8 @@ spec:
           # A site can configure this value with a JSON array of
           # WorkflowTemplate names. Each WorkflowTemplate must expose a `run`
           # template that accepts `node_uuid`. If the ConfigMap is absent, no
-          # post-enrollment templates are run.
+          # post-enrollment templates are run. Entries run in list order, and
+          # a failure prevents subsequent entries from running.
           - name: post_enroll_workflows
             valueFrom:
               configMapKeyRef:
@@ -62,14 +61,41 @@ spec:
         - - name: enroll-server
             template: enroll-server
         - - name: post-enroll
+            template: post-enroll-sequence
+            when: "{{=len(fromJSON(inputs.parameters.post_enroll_workflows)) > 0}}"
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
+                - name: workflows
+                  value: "{{inputs.parameters.post_enroll_workflows}}"
+    # Recurse over the remaining names only after the current hook succeeds.
+    # A withParam loop would schedule independent hooks concurrently.
+    - name: post-enroll-sequence
+      inputs:
+        parameters:
+          - name: node_uuid
+          - name: workflows
+      steps:
+        - - name: run-workflow
             templateRef:
               name: "{{item}}"
               template: run
             arguments:
               parameters:
                 - name: node_uuid
-                  value: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
-            withParam: "{{inputs.parameters.post_enroll_workflows}}"
+                  value: "{{inputs.parameters.node_uuid}}"
+            # Expand only the first entry; the next step handles the tail.
+            withParam: "{{=toJson(fromJSON(inputs.parameters.workflows)[:1])}}"
+        - - name: remaining-workflows
+            template: post-enroll-sequence
+            when: "{{=len(fromJSON(inputs.parameters.workflows)) > 1}}"
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{inputs.parameters.node_uuid}}"
+                - name: workflows
+                  value: "{{=toJson(fromJSON(inputs.parameters.workflows)[1:])}}"
     - name: enroll-server
       outputs:
         parameters:
@@ -85,8 +111,6 @@ spec:
           - /run/enrollment/node-uuid
           - --ip-address
           - "{{workflow.parameters.ip_address}}"
-          - --post-inspection-runbooks
-          - "{{workflow.parameters.post_inspection_runbooks}}"
           - --firmware-update
           - "{{workflow.parameters.firmware_update}}"
           - --raid-configure
