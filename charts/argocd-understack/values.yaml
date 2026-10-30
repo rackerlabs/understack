@@ -374,7 +374,7 @@ site:
     wave: 2
     # -- Chart version for Cinder
     # renovate: datasource=helm depName=cinder registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.73+a39ebbeb1
+    chartVersion: 2026.2.13+8b2de5583
 
   # -- Ironic (Bare Metal Service)
   ironic:
