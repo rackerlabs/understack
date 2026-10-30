@@ -105,7 +105,7 @@ conf:
       sync_power_state_interval: 300
       sync_power_state_workers: 20
       # Trait Based Networking (TBN): dynamically portgroup category=network
-      # ports at vif_attach time. See trait-based-networking-cm.yaml for the
+      # ports at vif_attach time. See trait_based_networking.yaml for the
       # trait definitions.
       enable_trait_based_networking: true
       trait_based_networking_config_file: /etc/ironic/trait-based-networking/trait_based_networking.yaml
