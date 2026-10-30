@@ -84,6 +84,8 @@ conf:
       enabled_power_interfaces: redfish,idrac-redfish,fake
       enabled_raid_interfaces: redfish,idrac-redfish,agent,no-raid
       enabled_vendor_interfaces: redfish,idrac-redfish,no-vendor
+      # default bonding mode for portgroups (LACP)
+      default_portgroup_mode: 802.3ad
       # the service account belongs to the service project but our nodes
       # will live in the infra domain in the baremetal project so the
       # service account needs to have permissions outside of just the
