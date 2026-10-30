@@ -55,6 +55,24 @@ helm --namespace openstack \
 
 At this point Ironic will go through some initialization and start up.
 
+## PCI device capabilities
+
+The optional `pci-device-capabilities` inspection hook reads a list of bounded
+dictionaries from the `[ironic_understack]` section of `ironic.conf`. In the
+OpenStack-Helm values this is configured as:
+
+```yaml
+conf:
+  ironic:
+    ironic_understack:
+      pci_device_capabilities:
+        - "{vendor_id:0x1002,product_id:0x75a8,name:gpu_amd_mi350p}"
+```
+
+OpenStack-Helm joins the list into one `pci_device_capabilities` value in
+`ironic.conf`, and oslo.config parses each bounded dictionary as a separate
+device.
+
 ## Validating Ironic
 
 You can run an OpenStack client in the cluster to validate it is running correctly.

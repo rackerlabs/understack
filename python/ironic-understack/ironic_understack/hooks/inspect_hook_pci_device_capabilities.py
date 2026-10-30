@@ -13,12 +13,16 @@ CAP_PREFIX = "pci_device_"
 class PciDeviceCapabilitiesHook(base.InspectionHook):
     """Control a node's PCI device capabilities based on PCI device IDs.
 
-    When this hook is configured with config in the config file that looks like:
+    The hook reads configuration from the ``[ironic_understack]`` section of the
+    config file:
 
-      ironic_understack:
-        pci_device_capabilities:
-          1002:75a8: "amd_gpu_mi350p"
-          8086:2002: "intel_duperkard_2"
+    [ironic_understack]
+    pci_device_capabilities = "{vendor_id:0x1002,product_id:0x75a8,name:amd_gpu_mi350p}"
+
+    The Helm configuration for this looks like:
+
+    pci_device_capabilities:
+    - "{vendor_id:0x1002,product_id:0x75a8,name:amd_gpu_mi350p}"
 
     Upon inspection, a `capability` will be added to the node for each matching
     PCI device that is present in the inventory.
@@ -38,12 +42,8 @@ class PciDeviceCapabilitiesHook(base.InspectionHook):
 
     def __call__(self, task, inventory, plugin_data):
         """Set node capabilities for each applicable PCI device."""
-        capability_names: dict[str, str] = (
-            CONF.ironic_understack.pci_device_capabilities
-        )
-
+        capability_names = configured_capability_names()
         if capability_names is None:
-            LOG.debug("ironic_understack.pci_device_capabilities not configured.")
             return
 
         pci_devices = inventory.get("pci_devices")
@@ -66,6 +66,34 @@ class PciDeviceCapabilitiesHook(base.InspectionHook):
 
         task.node.set_property("capabilities", ",".join(new_capabilities))
         task.node.save()
+
+
+def configured_capability_names() -> dict[str, str] | None:
+    """Return configured PCI device capability names.
+
+    An omitted option means that this hook is not configured.  An explicitly
+    empty list intentionally removes any capabilities owned by this hook.
+    """
+    devices = CONF.ironic_understack.pci_device_capabilities
+    if devices is None:
+        LOG.debug("PCI device capabilities are not configured")
+        return None
+
+    capability_names = {}
+    required_keys = {"vendor_id", "product_id", "name"}
+    for index, device in enumerate(devices):
+        if not isinstance(device, dict) or set(device) != required_keys:
+            raise ValueError(
+                f"PCI device capability entry {index} must contain exactly "
+                "vendor_id, product_id, and name"
+            )
+        if not all(isinstance(device[key], str) for key in required_keys):
+            raise ValueError(
+                f"PCI device capability entry {index} must contain string values"
+            )
+        capability_names[pci_device_slug(device)] = device["name"]
+
+    return capability_names
 
 
 def pci_device_capabilities(
@@ -100,6 +128,6 @@ def pci_device_capabilities(
 
 def pci_device_slug(pci_device: dict[str, str]) -> str:
     """Return device ID in a format like "8086:4002"."""
-    vendor_id = pci_device["vendor_id"].removeprefix("0x")
-    product_id = pci_device["product_id"].removeprefix("0x")
+    vendor_id = pci_device["vendor_id"].lower().removeprefix("0x")
+    product_id = pci_device["product_id"].lower().removeprefix("0x")
     return f"{vendor_id}:{product_id}"

@@ -1,4 +1,5 @@
 from oslo_config import cfg
+from oslo_config import types
 
 CONF = cfg.CONF
 
@@ -31,10 +32,11 @@ def setup_conf():
                 "1d": "bmc",
             },
         ),
-        cfg.DictOpt(
+        cfg.ListOpt(
             "pci_device_capabilities",
-            help="Dictionary of pci device IDs (xxxx:xxxx) to capability name",
-            default={},
+            item_type=types.Dict(bounds=True),
+            help="List of PCI device dictionaries and capability names",
+            default=None,
         ),
     ]
     cfg.CONF.register_group(grp)
