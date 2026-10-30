@@ -85,3 +85,38 @@ def test_apply_system_info_ignores_empty_fields(task):
     panos_inspect._apply_system_info(task.node, {"model": "", "serial": ""})
     assert task.node.properties == {}
     assert task.node.extra == {}
+
+
+@pytest.mark.parametrize(
+    ("current", "derived", "expected"),
+    [
+        ("f20-3-network", None, "f20-3-network"),
+        ("f20-3-network", "f20-3/f20-4-network", "f20-3-network"),
+        (None, "f20-3-network", "f20-3-network"),
+    ],
+    ids=["not-wiped", "not-replaced", "filled-in"],
+)
+def test_existing_port_keeps_its_physical_network(
+    task, mocker, current, derived, expected
+):
+    task.node.name = "fw1"
+    macs = {"ethernet1/1": "60:15:2b:54:1a:10", "ethernet1/2": "60:15:2b:54:1a:11"}
+    task.ports = [Mock(address=mac, physical_network=current) for mac in macs.values()]
+    neighbors = [
+        {
+            "local_interface": interface,
+            "system_name": "f20-3-1.iad3",
+            "port_id": f"Ethernet1/{n}",
+            "chassis_id": "c4:7e:e0:e4:55:3f",
+        }
+        for n, interface in enumerate(macs, start=43)
+    ]
+    mocker.patch.object(
+        panos_inspect.vlan_group_name_convention,
+        "vlan_group_names",
+        return_value={"f20-3-1.iad3": derived},
+    )
+
+    panos_inspect._update_ports_from_neighbors(task, neighbors, macs)
+
+    assert [p.physical_network for p in task.ports] == [expected, expected]

@@ -402,7 +402,8 @@ def _update_ports_from_neighbors(
             existing_port.address = mac_address
             existing_port.local_link_connection = inspected_port.local_link_connection
             existing_port.extra = {"bios_name": local_interface}
-            existing_port.physical_network = physical_network
+            if physical_network and not existing_port.physical_network:
+                existing_port.physical_network = physical_network
             existing_port.category = category
             existing_port.name = port_name
             existing_port.save()
@@ -441,7 +442,7 @@ def _validate_firewall_readiness(task) -> None:
     :raises HardwareInspectionFailure: if requirements not met
     """
     node = task.node
-    ports = list(task.ports())
+    ports = list(task.ports)
 
     # Check port categories (should have been assigned during port creation)
     categories = {getattr(p, "category", None) for p in ports}

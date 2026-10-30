@@ -7,6 +7,7 @@ from ironicclient.common.apiclient import exceptions as ironic_exceptions
 
 from understack_workflows import firewall
 from understack_workflows import helpers
+from understack_workflows import ironic_node
 from understack_workflows import netdev_reconciler
 from understack_workflows.ironic.client import IronicClient
 
@@ -98,6 +99,8 @@ def enroll_fw(
     driver = (driver or "").strip()
     if not driver:
         raise ValueError("enroll-fw requires a non-empty --driver")
+    if not (physical_network or "").strip():
+        raise ValueError("enroll-fw requires --physical-network")
     resource_class = _require_specific_resource_class(resource_class)
     management_switch, management_switch_port = _require_management_location(
         management_switch, management_switch_port
@@ -135,6 +138,19 @@ def enroll_fw(
         )
         return node.uuid
 
+    if not ports:
+        return _enroll_by_inspection(
+            client=client,
+            name=name,
+            physical_network=physical_network,
+            resource_class=resource_class,
+            driver=driver,
+            external_cmdb_id=external_cmdb_id,
+            driver_info=driver_info,
+            extra=extra,
+            properties=properties,
+        )
+
     # New or re-enrollable node: the engine writes the metadata inside the
     # enrollment lifecycle (at create, or patched before the node becomes
     # available), so the node is never allocatable in an under-described state.
@@ -158,6 +174,85 @@ def _get_node_or_none(client: IronicClient, name: str):
         return client.get_node(name)
     except ironic_exceptions.NotFound:
         return None
+
+
+def _enroll_by_inspection(
+    *,
+    client: IronicClient,
+    name: str,
+    physical_network: str,
+    resource_class: str,
+    driver: str,
+    external_cmdb_id: int | str | None,
+    driver_info: dict,
+    extra: dict,
+    properties: dict,
+) -> str:
+    """Enroll a firewall without ports and let inspection find and label them.
+
+    Provided only once it has an outside and an inside port, which get the
+    given physical_network.
+    """
+    if external_cmdb_id not in (None, ""):
+        extra = {**extra, "external_cmdb_id": external_cmdb_id}
+    node, created = netdev_reconciler.find_or_create_netdev_node(
+        client=client,
+        name=name,
+        resource_class=resource_class,
+        driver=driver,
+        driver_info=driver_info,
+        extra=extra,
+        properties=properties,
+    )
+    if node.provision_state != "manageable":
+        ironic_node.transition(node, target_state="manage", expected_state="manageable")
+    if not created:
+        netdev_reconciler.update_node_metadata(
+            client=client,
+            node=node,
+            resource_class=resource_class,
+            driver_info=driver_info,
+            extra=extra,
+            properties=properties,
+        )
+
+    logger.info("[node:%s] Inspecting to discover and label the ports", node.uuid)
+    ironic_node.transition(node, target_state="inspect", expected_state="manageable")
+    role_ports = [
+        port
+        for port in client.list_ports(node.uuid)
+        if getattr(port, "category", None) in netdev_reconciler.PORT_ROLES
+    ]
+    if not {port.category for port in role_ports}.issuperset(
+        netdev_reconciler.PORT_ROLES
+    ):
+        raise RuntimeError(
+            f"[node:{node.uuid}] Inspection did not give the node an outside and "
+            "an inside port; leaving it manageable"
+        )
+
+    for port in role_ports:
+        if port.physical_network != physical_network:
+            logger.info(
+                "[node:%s] Setting physical_network=%s on port %s (was %s)",
+                node.uuid,
+                physical_network,
+                port.name,
+                port.physical_network,
+            )
+            client.update_port(
+                port.uuid,
+                [
+                    {
+                        "op": "add",
+                        "path": "/physical_network",
+                        "value": physical_network,
+                    }
+                ],
+            )
+
+    ironic_node.transition(node, target_state="provide", expected_state="available")
+    return node.uuid
 
 
 def _update_active_firewall(
@@ -196,14 +291,15 @@ def _update_active_firewall(
             f"{resource_class!r} on an in-service firewall"
         )
 
-    netdev_ports = netdev_reconciler.build_netdev_ports(ports)
-    _reject_structural_drift(
-        client=client,
-        node=node,
-        name=name,
-        physical_network=physical_network,
-        netdev_ports=netdev_ports,
-    )
+    # Without ports there is nothing to compare: inspection owns them.
+    if ports:
+        _reject_structural_drift(
+            client=client,
+            node=node,
+            name=name,
+            physical_network=physical_network,
+            netdev_ports=netdev_reconciler.build_netdev_ports(ports),
+        )
 
     active_extra = dict(extra)
     if external_cmdb_id not in (None, ""):
@@ -271,21 +367,18 @@ def argument_parser():
     parser.add_argument(
         "--physical-network",
         required=True,
-        help="Port physical_network",
+        help="Port physical_network, the VLAN group in Nautobot (e.g. f20-3-network)",
     )
     parser.add_argument(
         "--ports",
-        required=False,
         default="[]",
-        help="Optional JSON array of ports to override LLDP discovery (same format "
-        "as enroll-netdev). By default, ports are discovered automatically via LLDP "
-        "during inspection. Use this option to manually specify ports that may not "
-        "be discovered properly or to override auto-discovered values. 'switch' must "
+        help="JSON array of ports (same format as enroll-netdev). 'switch' must "
         "be the switch FQDN (e.g. n11-22-1.dfw3.rackspace.net) so the Nautobot "
         "sync can resolve the cable. Optional per-port 'bios_name' (the device "
         "interface name); defaults to the label. At least two ports: the "
         "lowest-numbered interface becomes the router's outside NIC (gateway) "
-        "and the next one its inside NIC (subnets).",
+        "and the next one its inside NIC (subnets). Leave it out to have "
+        "inspection discover the ports over LLDP and label them.",
     )
     parser.add_argument(
         "--resource-class",
