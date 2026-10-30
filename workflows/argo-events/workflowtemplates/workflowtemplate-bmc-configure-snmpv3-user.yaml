@@ -28,7 +28,7 @@ spec:
       volumes:
         - name: openstack
           secret:
-            secretName: baremetal-manage
+            secretName: baremetal-vendor
             items:
               - key: clouds.yaml
                 path: clouds.yaml

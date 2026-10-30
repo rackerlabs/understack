@@ -6,6 +6,7 @@ resources:
   - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
   - secrets/operate-workflow-sa.token.yaml
   - secrets/baremetal-manage.yaml
+  - secrets/baremetal-vendor.yaml
   - secrets/secret-netapp.yaml
   - eventsources/nautobot-webhook.yaml
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
