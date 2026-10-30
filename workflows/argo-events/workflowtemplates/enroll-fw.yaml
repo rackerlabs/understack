@@ -8,7 +8,8 @@ metadata:
       Defined in `workflows/argo-events/workflowtemplates/enroll-fw.yaml`.
       Reuses enroll-netdev for the node/port lifecycle and additionally records
       firewall management details in driver_info and the HA mate serial in extra.
-      Defaults to the panos hardware type.
+      Defaults to the panos hardware type. Without ports, it inspects the
+      firewall to discover and label them, and only then makes it available.
 
       The workflow reads site-specific configuration from the
       `enroll-fw-config` ConfigMap. After enrollment, it runs the templates
@@ -35,9 +36,13 @@ spec:
   arguments:
     parameters:
       - name: name
+      # Needed only with ports.
       - name: physical_network
-      # JSON array of ports (same format as enroll-netdev).
+        value: ""
+      # JSON array of ports (same format as enroll-netdev). Leave it as [] to
+      # let inspection discover and label the ports.
       - name: ports
+        value: "[]"
       - name: external_cmdb_id
         value: ""
       - name: resource_class
