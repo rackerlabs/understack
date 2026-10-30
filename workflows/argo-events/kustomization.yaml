@@ -23,6 +23,7 @@ resources:
   - workflowtemplates/inspect-server.yaml
   - workflowtemplates/bmc-password.yaml
   - workflowtemplates/snmpv3-password.yaml
+  - workflowtemplates/workflowtemplate-bmc-configure-snmpv3-user.yaml
   - workflowtemplates/server-firmware-update.yaml
   - workflowtemplates/resync-nautobot.yaml
   # CronWorkflows
