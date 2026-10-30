@@ -1,29 +1,4 @@
-# Trait Based Networking (TBN) config. category=network ports auto-attach via
-# the CUSTOM_NETWORK_PORTGROUP / default handlers. category=storage ports
-# attach only when a VIF requests the CUSTOM_STORAGE_ATTACH trait.
-#
-# Applied to a node only when CUSTOM_NETWORK_PORTGROUP appears in the
-# node's instance_info.traits (Nova copies matching flavor/image traits
-# there during deploy). Add the trait to a node with:
-#   openstack baremetal node add trait <node> CUSTOM_NETWORK_PORTGROUP
-# and require it on a flavor with:
-#   openstack flavor set --property trait:CUSTOM_NETWORK_PORTGROUP=required <flavor>
-CUSTOM_NETWORK_PORTGROUP:
-  order: 1
-  actions:
-    # Group every free port with category=network (that shares the same
-    # physical_network as the first one matched, and has
-    # available_for_dynamic_portgroup=True) into a new dynamic portgroup,
-    # then attach that portgroup to the network being requested.
-    - action: group_and_attach_ports
-      filter: port.category == 'network'
-      min_count: 2
-    # Fallback for nodes that only have a single category=network port
-    # (group_and_attach_ports requires at least 2 and would NoMatch, so
-    # this action picks up the single remaining port instead).
-    - action: attach_port
-      filter: port.category == 'network'
-      max_count: 1
+# Trait Based Networking (TBN) config
 
 # Match each parent VIF's role tag to its NIC category.
 CUSTOM_NETDEV_ROLE_ATTACH:
@@ -46,16 +21,21 @@ CUSTOM_STORAGE_ATTACH:
       filter: port.category == 'storage'
       max_count: 1
 
-# Overrides Ironic's built-in fallback trait (CUSTOM_DEFAULT_TBN_TRAIT),
-# which normally attaches the first available port or portgroup regardless
-# of category. Redefining it here keeps that fallback scoped to
-# category=network too, so a category=storage port is never auto-attached
-# by TBN even when no other trait matches.
+# Default Trait Based Networking (TBN) config.
+# category=network ports auto-attach first attempting any static portgroups
+# then they attempt to bond (portgroup) two ports together and lastly
+# fallback to attaching just a single port.
 CUSTOM_DEFAULT_TBN_TRAIT:
   actions:
     - action: attach_portgroup
       filter: port.is_portgroup && port.category == 'network'
       max_count: 1
+    # Group 2 free ports with category=network into a new dynamic portgroup,
+    # then attach that portgroup to the network being requested.
+    - action: group_and_attach_ports
+      filter: port.category == 'network' && vif.tags == 'bond-lacp'
+      min_count: 2
+      max_count: 2
     - action: attach_port
       filter: port.category == 'network'
       max_count: 1
