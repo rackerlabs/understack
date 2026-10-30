@@ -53,6 +53,9 @@ for svc_role in ${SVC_ROLES}; do
     openstack role add --user "${SVC_ID}" --system all reader
     openstack role add --user "${SVC_ID}" --system all member
     ;;
+  system-admin)
+    openstack role add --user "${SVC_ID}" --system all admin
+    ;;
   ?*.manager)
     # DOMAIN.manager is granted on the domain itself, not inherited by projects
     openstack role add --user "${SVC_ID}" --domain "${svc_role%%.*}" manager
