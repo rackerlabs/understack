@@ -275,8 +275,12 @@ def argument_parser():
     )
     parser.add_argument(
         "--ports",
-        required=True,
-        help="JSON array of ports (same format as enroll-netdev). 'switch' must "
+        required=False,
+        default="[]",
+        help="Optional JSON array of ports to override LLDP discovery (same format "
+        "as enroll-netdev). By default, ports are discovered automatically via LLDP "
+        "during inspection. Use this option to manually specify ports that may not "
+        "be discovered properly or to override auto-discovered values. 'switch' must "
         "be the switch FQDN (e.g. n11-22-1.dfw3.rackspace.net) so the Nautobot "
         "sync can resolve the cable. Optional per-port 'bios_name' (the device "
         "interface name); defaults to the label. At least two ports: the "
