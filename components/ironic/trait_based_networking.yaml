@@ -1,0 +1,41 @@
+# Trait Based Networking (TBN) config
+
+# Match each parent VIF's role tag to its NIC category.
+CUSTOM_NETDEV_ROLE_ATTACH:
+  order: 1
+  actions:
+    - action: attach_port
+      filter: port.category == 'outside' && vif.tags == 'outside'
+      max_count: 1
+    - action: attach_port
+      filter: port.category == 'inside' && vif.tags == 'inside'
+      max_count: 1
+
+# Attaches a single category=storage port for a storage VIF. Single-port
+# only for now (A/B grouping is deferred). Require it on a flavor with:
+#   openstack flavor set --property trait:CUSTOM_STORAGE_SWITCH=required <flavor>
+CUSTOM_STORAGE_SWITCH:
+  order: 1
+  actions:
+    - action: attach_port
+      filter: port.category == 'storage' && network.tags == 'storage'
+      max_count: 1
+
+# Default Trait Based Networking (TBN) config.
+# category=network ports auto-attach first attempting any static portgroups
+# then they attempt to bond (portgroup) two ports together and lastly
+# fallback to attaching just a single port.
+CUSTOM_DEFAULT_TBN_TRAIT:
+  actions:
+    - action: attach_portgroup
+      filter: port.is_portgroup && port.category == 'network'
+      max_count: 1
+    # Group 2 free ports with category=network into a new dynamic portgroup,
+    # then attach that portgroup to the network being requested.
+    - action: group_and_attach_ports
+      filter: port.category == 'network' && vif.tags == 'bond-lacp'
+      min_count: 2
+      max_count: 2
+    - action: attach_port
+      filter: port.category == 'network'
+      max_count: 1

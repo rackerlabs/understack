@@ -84,6 +84,8 @@ conf:
       enabled_power_interfaces: redfish,idrac-redfish,fake
       enabled_raid_interfaces: redfish,idrac-redfish,agent,no-raid
       enabled_vendor_interfaces: redfish,idrac-redfish,no-vendor
+      # default bonding mode for portgroups (LACP)
+      default_portgroup_mode: 802.3ad
       # the service account belongs to the service project but our nodes
       # will live in the infra domain in the baremetal project so the
       # service account needs to have permissions outside of just the
@@ -105,7 +107,7 @@ conf:
       sync_power_state_interval: 300
       sync_power_state_workers: 20
       # Trait Based Networking (TBN): dynamically portgroup category=network
-      # ports at vif_attach time. See trait-based-networking-cm.yaml for the
+      # ports at vif_attach time. See trait_based_networking.yaml for the
       # trait definitions.
       enable_trait_based_networking: true
       trait_based_networking_config_file: /etc/ironic/trait-based-networking/trait_based_networking.yaml
