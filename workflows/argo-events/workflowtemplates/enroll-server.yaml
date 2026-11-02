@@ -50,6 +50,10 @@ spec:
         value: calvin
       - name: external_cmdb_id
         value: ""
+      - name: rack
+        value: ""
+      - name: position
+        value: ""
   templates:
     - name: main
       inputs:
@@ -78,6 +82,16 @@ spec:
               parameters:
                 - name: post_inspection_runbooks
                   value: "{{inputs.parameters.post_inspection_runbooks}}"
+        - - name: set-node-extra
+            template: set-node-extra
+            when: >-
+              "{{workflow.parameters.external_cmdb_id}}" != "" ||
+              "{{workflow.parameters.rack}}" != "" ||
+              "{{workflow.parameters.position}}" != ""
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
         - - name: post-enroll
             templateRef:
               name: "{{item}}"
@@ -136,3 +150,34 @@ spec:
             value: "{{workflow.uid}}"
           - name: OS_CLOUD
             value: understack
+    - name: set-node-extra
+      inputs:
+        parameters:
+          - name: node_uuid
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
+        command:
+          - sh
+          - -c
+          - |
+            set -eu
+            set -- baremetal node set
+            [ -n "${EXTERNAL_CMDB_ID}" ] && set -- "$@" --extra "external_cmdb_id=${EXTERNAL_CMDB_ID}"
+            [ -n "${RACK}" ] && set -- "$@" --extra "rack=${RACK}"
+            [ -n "${POSITION}" ] && set -- "$@" --extra "position=${POSITION}"
+            exec openstack "$@" "${NODE_UUID}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+          - name: NODE_UUID
+            value: "{{inputs.parameters.node_uuid}}"
+          - name: EXTERNAL_CMDB_ID
+            value: "{{workflow.parameters.external_cmdb_id}}"
+          - name: RACK
+            value: "{{workflow.parameters.rack}}"
+          - name: POSITION
+            value: "{{workflow.parameters.position}}"
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
