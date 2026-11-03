@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: delete-server
+  annotations:
+    workflows.argoproj.io/description: |
+      Handle Ironic node deletion. Optional site hooks must succeed before
+      the existing event dispatcher removes the Nautobot inventory record.
+      Configure delete-server-config.pre_delete_workflows as a JSON list of
+      WorkflowTemplate names. Each hook must expose a run template accepting
+      node_uuid. Without configuration, deletion runs without site hooks.
+spec:
+  entrypoint: main
+  serviceAccountName: workflow
+  # Bound lock waiting, all hooks, and inventory deletion in the submitted workflow.
+  activeDeadlineSeconds: 3600
+  arguments:
+    parameters:
+      - name: event-json
+      - name: node_uuid
+      # Omitted: use site configuration. Explicit []: skip pre-deletion hooks.
+      - name: pre_delete_workflows
+        valueFrom:
+          configMapKeyRef:
+            name: delete-server-config
+            key: pre_delete_workflows
+          default: "[]"
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: event-json
+          - name: node_uuid
+          - name: pre_delete_workflows
+            value: "{{workflow.parameters.pre_delete_workflows}}"
+      # Share registration's per-node lock through inventory deletion.
+      # Hooks must not acquire this same lock again.
+      synchronization:
+        mutexes:
+          - name: "server-node-{{inputs.parameters.node_uuid}}"
+      steps:
+        - - name: pre-delete
+            templateRef:
+              name: "{{item}}"
+              template: run
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{inputs.parameters.node_uuid}}"
+            withParam: "{{inputs.parameters.pre_delete_workflows}}"
+        - - name: delete-nautobot
+            templateRef:
+              name: openstack-oslo-event
+              template: main
+            arguments:
+              parameters:
+                - name: event-json
+                  value: "{{inputs.parameters.event-json}}"
