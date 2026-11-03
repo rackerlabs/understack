@@ -33,7 +33,7 @@ links open the current version on GitHub:
 | Go operators and CLIs | [understackctl][go-understackctl], [dexop][go-dexop], [nautobotop][go-nautobotop], [Ironic hardware exporter][go-ihe] |
 | Helm charts | [ArgoCD UnderStack chart][chart-argocd], [site workflows][chart-workflows] |
 | Ansible | [Playbooks and roles][ansible] |
-| Containers | [Ironic][container-ironic], [Nautobot][container-nautobot], [Neutron][container-neutron], [Nova][container-nova] |
+| Containers | [Ironic][container-ironic], [Keystone][container-keystone], [Nautobot][container-nautobot], [Neutron][container-neutron], [Nova][container-nova] |
 | End-to-end tests | [understack-tests][tests] |
 
 Python packages use [uv](https://docs.astral.sh/uv/) with `pytest` and `ruff`;
@@ -75,6 +75,7 @@ Two things to know before you add a page:
 [chart-workflows]: https://github.com/rackerlabs/understack/blob/main/charts/site-workflows/README.md
 [ansible]: https://github.com/rackerlabs/understack/blob/main/ansible/README.md
 [container-ironic]: https://github.com/rackerlabs/understack/blob/main/containers/ironic/README.md
+[container-keystone]: https://github.com/rackerlabs/understack/blob/main/containers/keystone/README.md
 [container-nautobot]: https://github.com/rackerlabs/understack/blob/main/containers/nautobot/README.md
 [container-neutron]: https://github.com/rackerlabs/understack/blob/main/containers/neutron/README.md
 [container-nova]: https://github.com/rackerlabs/understack/blob/main/containers/nova/README.md
