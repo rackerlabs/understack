@@ -116,7 +116,34 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
         extra={"mate_serial": "026701010045"},
         properties={},
         assign_roles=True,
+        traits={"CUSTOM_PRIMARY": False, "CUSTOM_SECONDARY": False},
     )
+
+
+@pytest.mark.parametrize(
+    ("ha_role", "traits"),
+    [
+        ("primary", {"CUSTOM_PRIMARY": True, "CUSTOM_SECONDARY": False}),
+        ("secondary", {"CUSTOM_PRIMARY": False, "CUSTOM_SECONDARY": True}),
+    ],
+)
+def test_enroll_fw_hands_the_ha_role_trait_to_the_engine(mocker, ha_role, traits):
+    _mock_client(mocker, node=None)
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, ha_role=ha_role)
+
+    assert engine.call_args.kwargs["traits"] == traits
+
+
+def test_enroll_fw_requires_a_mate_serial_with_an_ha_role(mocker):
+    client = mocker.patch.object(enroll_fw, "IronicClient")
+    fields = {**FW_FIELDS, "mate_serial": ""}
+
+    with pytest.raises(ValueError, match="--mate-serial with --ha-role"):
+        enroll_fw.enroll_fw(**BASE_ARGS, **fields, ha_role="primary")
+
+    client.assert_not_called()
 
 
 def test_enroll_fw_optional_fw_fields_can_be_omitted(mocker):
@@ -336,6 +363,30 @@ def test_active_node_rejects_resource_class_change(mocker):
     client.update_node.assert_not_called()
 
 
+def test_active_node_with_the_same_ha_role_gets_metadata_updates(mocker):
+    client = _mock_client(mocker, node=_node(), node_ports=[_actual_port()])
+    client.get_node_traits.return_value = ["CUSTOM_PRIMARY", "CUSTOM_OTHER"]
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, ha_role="primary")
+
+    client.update_node.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("current", "ha_role"),
+    [(["CUSTOM_PRIMARY"], "secondary"), ([], "primary"), (["CUSTOM_PRIMARY"], "")],
+    ids=["primary-to-secondary", "add-role", "drop-role"],
+)
+def test_active_node_rejects_an_ha_role_change(mocker, current, ha_role):
+    client = _mock_client(mocker, node=_node(), node_ports=[_actual_port()])
+    client.get_node_traits.return_value = current
+
+    with pytest.raises(RuntimeError, match="HA traits"):
+        enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, ha_role=ha_role)
+
+    client.update_node.assert_not_called()
+
+
 # --- argument parsing -------------------------------------------------------
 
 
@@ -523,6 +574,19 @@ def test_enroll_without_ports_is_not_provided_without_both_roles(mocker):
     client.update_port.assert_not_called()
 
 
+def test_enroll_without_ports_marks_a_secondary_before_providing(mocker):
+    client, _engine, transition = _enroll_without_ports(mocker, ["outside", "inside"])
+    calls = mocker.Mock()
+    calls.attach_mock(client.add_node_trait, "add_node_trait")
+    calls.attach_mock(transition, "transition")
+
+    enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS, ha_role="secondary")
+
+    client.add_node_trait.assert_called_once_with("node-uuid", "CUSTOM_SECONDARY")
+    steps = [kwargs.get("target_state", name) for name, _, kwargs in calls.mock_calls]
+    assert steps == ["manage", "add_node_trait", "inspect", "provide"]
+
+
 def test_active_node_without_ports_updates_metadata_only(mocker):
     client = _mock_client(mocker, node=_node())
 
@@ -557,5 +621,26 @@ def test_argument_parser_requires_physical_network():
                 "switch1",
                 "--management-switch-port",
                 "eth1",
+            ]
+        )
+
+
+def test_argument_parser_rejects_an_unknown_ha_role():
+    parser = enroll_fw.argument_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "--name",
+                "fw1",
+                "--physical-network",
+                "net",
+                "--resource-class",
+                "pa1410",
+                "--management-switch",
+                "switch1",
+                "--management-switch-port",
+                "eth1",
+                "--ha-role",
+                "standby",
             ]
         )

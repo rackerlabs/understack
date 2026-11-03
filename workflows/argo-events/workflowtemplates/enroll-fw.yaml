@@ -58,6 +58,9 @@ spec:
       - name: management_switch_port
       - name: mate_serial
         value: ""
+      # primary or secondary in an HA pair (needs mate_serial); "" if not HA.
+      - name: ha_role
+        value: ""
       # Device identity, read by the Nautobot device sync. serial -> extra;
       # vendor/model -> properties. 'switch' in ports must be the switch FQDN.
       - name: serial
@@ -138,6 +141,8 @@ spec:
           - "{{workflow.parameters.management_switch_port}}"
           - --mate-serial
           - "{{workflow.parameters.mate_serial}}"
+          - --ha-role
+          - "{{workflow.parameters.ha_role}}"
           - --serial
           - "{{workflow.parameters.serial}}"
           - --vendor

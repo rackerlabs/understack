@@ -25,6 +25,7 @@ def _node(
     lessee="project-1",
     instance_name="router-1",
     maintenance=False,
+    traits=None,
 ):
     return Node(
         id=node_id,
@@ -35,6 +36,7 @@ def _node(
         instance_name=instance_name,
         lessee=lessee,
         extra={} if extra is _DEFAULT_EXTRA else extra,
+        traits=traits or [],
     )
 
 
@@ -484,6 +486,22 @@ class TestNodeSelection:
         )
 
         assert client.available_node_for_resource_class("pa1410").id == "n2"
+
+    @pytest.mark.parametrize(
+        ("traits", "picked"),
+        [(["CUSTOM_PRIMARY"], "n1"), (["CUSTOM_SECONDARY"], "n2")],
+        ids=["primary", "secondary-skipped"],
+    )
+    def test_never_picks_an_ha_secondary(self, mocker, traits, picked):
+        client = _client(mocker)
+        client.irclient.nodes.return_value = iter(
+            [
+                _node(state="available", router_id=None, traits=traits),
+                _node(node_id="n2", state="available", router_id=None),
+            ]
+        )
+
+        assert client.available_node_for_resource_class("pa1410").id == picked
 
 
 class TestReconcileDiscovery:

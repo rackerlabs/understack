@@ -35,6 +35,9 @@ _PROVISION_TIMEOUT = 300
 _RECONCILE_PROVISION_TIMEOUT = 60
 _PANOS_DRIVER = "panos"
 _ROUTER_RELEASE_MARKER = "understack_router_release"  # release is in progress
+# enroll-fw sets it on the secondary of an HA pair (understack_workflows
+# firewall.py); change both together.
+_HA_SECONDARY_TRAIT = "CUSTOM_SECONDARY"
 # Adoption sets it in instance_info.traits when a port has a role.
 ROLE_ATTACH_TRAIT = "CUSTOM_NETDEV_ROLE_ATTACH"
 _TENANT_VIF_KEY = "tenant_vif_port_id"
@@ -100,8 +103,9 @@ class IronicClient:
     ) -> BaremetalNode | None:
         """Return the first available Ironic node with the given resource class.
 
-        Select the first matching Palo Alto node, excluding maintenance,
-        instance associations and pending releases. No ranking is applied.
+        Select the first matching Palo Alto node, excluding maintenance, HA
+        secondaries, instance associations and pending releases. No ranking is
+        applied.
         """
         for node in self.irclient.nodes(
             driver=_PANOS_DRIVER,
@@ -112,6 +116,9 @@ class IronicClient:
         ):
             # Already claimed, or reserved by a release still cleaning up.
             if node.instance_id or _ROUTER_RELEASE_MARKER in (node.extra or {}):
+                continue
+            # A secondary is only ever claimed with its primary.
+            if _HA_SECONDARY_TRAIT in (node.traits or []):
                 continue
             LOG.info(
                 "Selected available Palo Alto node %s (name=%s) for resource_class=%s",
