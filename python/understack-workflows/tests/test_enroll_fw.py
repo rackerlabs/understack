@@ -450,3 +450,112 @@ def test_active_node_with_port_roles_still_gets_metadata_updates(mocker):
     engine.assert_not_called()
     client.update_port.assert_not_called()
     client.update_node.assert_called_once()  # metadata only
+
+
+# --- enrollment without ports (inspection labels them) ----------------------
+
+
+def _enroll_without_ports(mocker, categories, physnet=None):
+    """Mock a new node whose inspection leaves ports with these categories."""
+    client = _mock_client(
+        mocker,
+        node_ports=[
+            SimpleNamespace(
+                uuid=f"port-{i}",
+                name=f"fw:ethernet1/{i}",
+                category=c,
+                physical_network=physnet,
+            )
+            for i, c in enumerate(categories, start=1)
+        ],
+    )
+    mocker.patch.object(
+        enroll_fw.netdev_reconciler,
+        "find_or_create_netdev_node",
+        return_value=(_node(provision_state="enroll"), True),
+    )
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+    transition = mocker.patch.object(enroll_fw.ironic_node, "transition")
+    return client, engine, transition
+
+
+def _steps(transition):
+    return [call.kwargs["target_state"] for call in transition.call_args_list]
+
+
+def _physnet_updates(client):
+    return {call.args[0]: call.args[1] for call in client.update_port.call_args_list}
+
+
+def test_enroll_without_ports_inspects_before_providing(mocker):
+    client, engine, transition = _enroll_without_ports(
+        mocker, ["outside", "inside", None]
+    )
+
+    node_uuid = enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
+
+    assert node_uuid == "node-uuid"
+    engine.assert_not_called()
+    assert _steps(transition) == ["manage", "inspect", "provide"]
+    # Only the role ports get the physical network.
+    patch = [{"op": "add", "path": "/physical_network", "value": "f20-1-network"}]
+    assert _physnet_updates(client) == {"port-1": patch, "port-2": patch}
+
+
+def test_enroll_without_ports_keeps_a_matching_physical_network(mocker):
+    client, _engine, transition = _enroll_without_ports(
+        mocker, ["outside", "inside"], physnet="f20-1-network"
+    )
+
+    enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
+
+    client.update_port.assert_not_called()
+    assert _steps(transition) == ["manage", "inspect", "provide"]
+
+
+def test_enroll_without_ports_is_not_provided_without_both_roles(mocker):
+    client, _engine, transition = _enroll_without_ports(mocker, ["outside", None])
+
+    with pytest.raises(RuntimeError, match="an outside and an inside port"):
+        enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
+
+    assert _steps(transition) == ["manage", "inspect"]
+    client.update_port.assert_not_called()
+
+
+def test_active_node_without_ports_updates_metadata_only(mocker):
+    client = _mock_client(mocker, node=_node())
+
+    enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
+
+    client.list_ports.assert_not_called()  # nothing to compare
+    client.update_node.assert_called_once()
+
+
+@pytest.mark.parametrize("ports", [BASE_ARGS["ports"], []], ids=["ports", "no-ports"])
+def test_enroll_fw_requires_a_physical_network(mocker, ports):
+    client = _mock_client(mocker)
+
+    with pytest.raises(ValueError, match="--physical-network"):
+        enroll_fw.enroll_fw(
+            **{**BASE_ARGS, "physical_network": " ", "ports": ports}, **FW_FIELDS
+        )
+
+    client.get_node.assert_not_called()
+
+
+def test_argument_parser_requires_physical_network():
+    parser = enroll_fw.argument_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "--name",
+                "fw1",
+                "--resource-class",
+                "pa1410",
+                "--management-switch",
+                "switch1",
+                "--management-switch-port",
+                "eth1",
+            ]
+        )
