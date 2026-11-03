@@ -108,5 +108,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           generate_release_notes: true
-          # only link upgrade notes that exist
-          body: ${{ steps.collect.outputs.collected == 'true' && format('**Upgrading?** See the [{0} upgrade notes](https://rackerlabs.github.io/understack/release-notes/{1}/#changelog-{0}).', github.ref_name, steps.collect.outputs.series) || '' }}
+          # Use a hidden placeholder when there are no upgrade notes.
+          body: ${{ steps.collect.outputs.collected == 'true' && format('**Upgrading?** See the [{0} upgrade notes](https://rackerlabs.github.io/understack/release-notes/{1}/#changelog-{0}).', github.ref_name, steps.collect.outputs.series) || '<!-- Release notes managed by this workflow. -->' }}
