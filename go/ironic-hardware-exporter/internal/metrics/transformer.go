@@ -38,6 +38,7 @@ func sensorFamilies(nodes map[string]*cache.NodeEntry) []MetricFamily {
 	lastSeen := MetricFamily{Name: "ironic_node_last_seen_timestamp_seconds", Help: "Unix timestamp of the last hardware metrics event received for this node"}
 	tempVal := MetricFamily{Name: "ironic_node_temperature_celsius", Help: "Temperature reading in Celsius from a node sensor"}
 	tempHealth := MetricFamily{Name: "ironic_node_temperature_health", Help: "Temperature sensor health; value is always 1, health state is in the label"}
+	tempThreshold := MetricFamily{Name: "ironic_node_temperature_threshold_celsius", Help: "Configured temperature threshold in Celsius; the threshold kind (e.g. upper_critical) is in the threshold label"}
 	powerVal := MetricFamily{Name: "ironic_node_power_output_watts", Help: "Power output in watts from a node power supply"}
 	powerHealth := MetricFamily{Name: "ironic_node_power_health", Help: "Power supply health; value is always 1, health state is in the label"}
 	driveEnabled := MetricFamily{Name: "ironic_node_drive_enabled", Help: "1 if the drive is in Enabled state, 0 otherwise"}
@@ -52,16 +53,39 @@ func sensorFamilies(nodes map[string]*cache.NodeEntry) []MetricFamily {
 		}
 
 		for key, t := range n.Sensors.Temperature {
+			sensorName := ""
+			if t.Name != nil {
+				sensorName = *t.Name
+			}
 			if t.ReadingCelsius != nil {
 				tempVal.Samples = append(tempVal.Samples, Sample{
-					Labels: []Label{{Name: "node_uuid", Value: n.NodeUUID}, {Name: "node_name", Value: n.NodeName}, {Name: "sensor", Value: key}, {Name: "context", Value: t.PhysicalContext}},
+					Labels: []Label{{Name: "node_uuid", Value: n.NodeUUID}, {Name: "node_name", Value: n.NodeName}, {Name: "sensor", Value: key}, {Name: "sensor_name", Value: sensorName}, {Name: "context", Value: t.PhysicalContext}},
 					Value:  *t.ReadingCelsius,
 				})
 			}
 			if t.Health != nil {
 				tempHealth.Samples = append(tempHealth.Samples, Sample{
-					Labels: []Label{{Name: "node_uuid", Value: n.NodeUUID}, {Name: "node_name", Value: n.NodeName}, {Name: "sensor", Value: key}, {Name: "health", Value: *t.Health}},
+					Labels: []Label{{Name: "node_uuid", Value: n.NodeUUID}, {Name: "node_name", Value: n.NodeName}, {Name: "sensor", Value: key}, {Name: "sensor_name", Value: sensorName}, {Name: "health", Value: *t.Health}},
 					Value:  1,
+				})
+			}
+			for _, th := range []struct {
+				kind    string
+				reading *float64
+			}{
+				{"upper_non_critical", t.UpperThresholdNonCritical},
+				{"upper_critical", t.UpperThresholdCritical},
+				{"upper_fatal", t.UpperThresholdFatal},
+				{"lower_non_critical", t.LowerThresholdNonCritical},
+				{"lower_critical", t.LowerThresholdCritical},
+				{"lower_fatal", t.LowerThresholdFatal},
+			} {
+				if th.reading == nil {
+					continue
+				}
+				tempThreshold.Samples = append(tempThreshold.Samples, Sample{
+					Labels: []Label{{Name: "node_uuid", Value: n.NodeUUID}, {Name: "node_name", Value: n.NodeName}, {Name: "sensor", Value: key}, {Name: "sensor_name", Value: sensorName}, {Name: "context", Value: t.PhysicalContext}, {Name: "threshold", Value: th.kind}},
+					Value:  *th.reading,
 				})
 			}
 		}
@@ -99,7 +123,7 @@ func sensorFamilies(nodes map[string]*cache.NodeEntry) []MetricFamily {
 		}
 	}
 
-	return []MetricFamily{lastSeen, tempVal, tempHealth, powerVal, powerHealth, driveEnabled, driveHealth}
+	return []MetricFamily{lastSeen, tempVal, tempHealth, tempThreshold, powerVal, powerHealth, driveEnabled, driveHealth}
 }
 
 func stateFamilies(nodes map[string]*cache.NodeEntry) []MetricFamily {

@@ -50,10 +50,20 @@ type SensorPayload struct {
 // JSON: "reading_celsius": 0   Go sees: &0.0  (reading is actually zero)
 type TemperatureSensor struct {
 	Identity        string   `json:"identity"`
+	Name            *string  `json:"name"`            // human-readable sensor name, nil if absent
 	ReadingCelsius  *float64 `json:"reading_celsius"` // nil if null
 	PhysicalContext string   `json:"physical_context"`
 	State           *string  `json:"state"`  // nil if null
 	Health          *string  `json:"health"` // nil if null
+
+	// Threshold readings reported by the BMC. Each is nil when the BMC does
+	// not publish that threshold for the sensor.
+	UpperThresholdNonCritical *float64 `json:"upper_threshold_non_critical"`
+	UpperThresholdCritical    *float64 `json:"upper_threshold_critical"`
+	UpperThresholdFatal       *float64 `json:"upper_threshold_fatal"`
+	LowerThresholdNonCritical *float64 `json:"lower_threshold_non_critical"`
+	LowerThresholdCritical    *float64 `json:"lower_threshold_critical"`
+	LowerThresholdFatal       *float64 `json:"lower_threshold_fatal"`
 }
 
 // PowerSensor — one power supply reading.

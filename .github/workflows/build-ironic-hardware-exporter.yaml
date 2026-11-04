@@ -13,9 +13,28 @@ on:
       - "ironic-hardware-exporter/v*"
     paths:
       - "go/ironic-hardware-exporter/**"
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "go/ironic-hardware-exporter/**"
+      - ".github/workflows/build-ironic-hardware-exporter.yaml"
+      - ".github/workflows/build-container-reuse.yaml"
 
 jobs:
+  # Builds a pr-<number> test image on pull requests only.
+  build-ironic-hardware-exporter-pr:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: ironic-hardware-exporter
+      dockerfile_path: ./go/ironic-hardware-exporter/Dockerfile
+      context_path: "./go/ironic-hardware-exporter/"
   build-ironic-hardware-exporter:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -93,6 +112,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   chart:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     needs:
       - build-ironic-hardware-exporter
