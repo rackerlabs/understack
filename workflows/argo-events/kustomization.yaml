@@ -18,6 +18,7 @@ resources:
   - workflowtemplates/enroll-server.yaml
   - workflowtemplates/reclean-server.yaml
   - workflowtemplates/openstack-oslo-event.yaml
+  - workflowtemplates/delete-server.yaml
   - workflowtemplates/netapp-configure-net.yaml
   - workflowtemplates/ansible-run.yaml
   - workflowtemplates/inspect-server.yaml
