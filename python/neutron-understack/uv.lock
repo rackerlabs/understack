@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.12.*"
 
 [[package]]
@@ -691,8 +691,8 @@ wheels = [
 
 [[package]]
 name = "neutron"
-version = "28.0.0.0b3.dev316"
-source = { git = "https://github.com/rackerlabs/neutron.git?rev=b0678e56e9c5a7ec2f335c4271465fc1c3202e2a#b0678e56e9c5a7ec2f335c4271465fc1c3202e2a" }
+version = "28.0.0.0b3.dev373"
+source = { git = "https://github.com/rackerlabs/neutron.git?rev=c2a02e767671a050fd240cdb60a1accde1e451f9#c2a02e767671a050fd240cdb60a1accde1e451f9" }
 dependencies = [
     { name = "alembic" },
     { name = "debtcollector" },
@@ -750,8 +750,8 @@ dependencies = [
 
 [[package]]
 name = "neutron-lib"
-version = "3.24.1.dev8"
-source = { git = "https://github.com/rackerlabs/neutron-lib.git?rev=6d0367183cc92656ba449acefd830cb4e11f2f5b#6d0367183cc92656ba449acefd830cb4e11f2f5b" }
+version = "3.24.1.dev10"
+source = { git = "https://github.com/rackerlabs/neutron-lib.git?rev=275d4c95657ed4c3028401b48c15204d8a965420#275d4c95657ed4c3028401b48c15204d8a965420" }
 dependencies = [
     { name = "debtcollector" },
     { name = "keystoneauth1" },
@@ -783,6 +783,7 @@ dependencies = [
 name = "neutron-understack"
 version = "0.1.0"
 source = { editable = "." }
+default-groups = ["test"]
 dependencies = [
     { name = "keystoneauth1" },
     { name = "neutron" },
@@ -810,8 +811,8 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "keystoneauth1", specifier = ">=3.14.0" },
-    { name = "neutron", git = "https://github.com/rackerlabs/neutron.git?rev=b0678e56e9c5a7ec2f335c4271465fc1c3202e2a" },
-    { name = "neutron-lib", git = "https://github.com/rackerlabs/neutron-lib.git?rev=6d0367183cc92656ba449acefd830cb4e11f2f5b" },
+    { name = "neutron", git = "https://github.com/rackerlabs/neutron.git?rev=c2a02e767671a050fd240cdb60a1accde1e451f9" },
+    { name = "neutron-lib", git = "https://github.com/rackerlabs/neutron-lib.git?rev=275d4c95657ed4c3028401b48c15204d8a965420" },
     { name = "openstacksdk", specifier = ">=4.9.0" },
     { name = "oslo-config", specifier = ">=9.7.1" },
     { name = "oslo-log", specifier = ">=7.1.0" },

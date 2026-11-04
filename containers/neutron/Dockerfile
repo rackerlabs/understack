@@ -6,12 +6,12 @@ FROM quay.io/airshipit/neutron:${OPENSTACK_VERSION}-ubuntu_noble AS build
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # renovate: name=openstack/neutron repo=https://github.com/rackerlabs/neutron.git branch=understack/2026.1
-ARG NEUTRON_GIT_REF=b0678e56e9c5a7ec2f335c4271465fc1c3202e2a
+ARG NEUTRON_GIT_REF=c2a02e767671a050fd240cdb60a1accde1e451f9
 ADD --keep-git-dir=true https://github.com/rackerlabs/neutron.git#${NEUTRON_GIT_REF} /src/neutron
 RUN git -C /src/neutron fetch --unshallow --tags
 
 # renovate: name=openstack/neutron-lib repo=https://github.com/rackerlabs/neutron-lib.git branch=understack/2026.1
-ARG NEUTRON_LIB_GIT_REF=6d0367183cc92656ba449acefd830cb4e11f2f5b
+ARG NEUTRON_LIB_GIT_REF=275d4c95657ed4c3028401b48c15204d8a965420
 ADD --keep-git-dir=true https://github.com/rackerlabs/neutron-lib.git#${NEUTRON_LIB_GIT_REF} /src/neutron-lib
 RUN git -C /src/neutron-lib fetch --unshallow --tags
 

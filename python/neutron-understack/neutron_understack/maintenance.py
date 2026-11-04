@@ -10,6 +10,7 @@ Reconciles Ironic nodes only; gateway/subnet wiring is out of scope.
 
 # Recheck has_lock_periodic and MAINTENANCE_NB_IDL_LOCK_NAME on every Neutron
 # upgrade because they are internal Neutron APIs.
+from neutron.common.ovn import constants as ovn_const
 from neutron.objects import router as l3_obj
 from neutron.plugins.ml2.drivers.ovn.mech_driver.ovsdb import maintenance
 from neutron_lib import context as n_context
@@ -39,7 +40,7 @@ class NetdevRouterMaintenancePeriodics:
         # Take the maintenance lock so exactly one neutron-server runs these
         # periodics.
         self._idl = ovn_client._nb_idl.idl
-        self._idl.set_lock(maintenance.MAINTENANCE_NB_IDL_LOCK_NAME)
+        self._idl.set_lock(ovn_const.MAINTENANCE_NB_IDL_LOCK_NAME)
 
     @property
     def has_lock(self):

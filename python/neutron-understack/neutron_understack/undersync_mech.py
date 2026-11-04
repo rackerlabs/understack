@@ -1,5 +1,6 @@
 import logging
 
+from neutron.objects import trunk as trunk_objects
 from neutron_lib import constants as p_const
 from neutron_lib import exceptions as exc
 from neutron_lib.api.definitions import portbindings
@@ -9,9 +10,11 @@ from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
+from neutron_lib.services.trunk import constants as trunk_consts
 from oslo_config import cfg
 
 from neutron_understack import config
+from neutron_understack import trunk as trunk_driver
 from neutron_understack import utils
 from neutron_understack.undersync_client import Undersync
 
@@ -48,9 +51,9 @@ def _missing_physnet_msg(port_id: str) -> str:
 class UndersyncDriver(MechanismDriver):
     """Tells Undersync which vlan groups need their switch config reconciled.
 
-    Sole owner of the Undersync client. Allocates nothing and mutates no trunk
-    state: it observes what the understack driver did and names the affected
-    physical_network to Undersync.
+    Sole owner of the Undersync client. It allocates nothing: it observes what
+    the understack driver did, names the affected physical_network to
+    Undersync, and marks the affected trunk ACTIVE once sync() returns.
 
     Must be listed *after* ``understack`` in ml2 ``mechanism_drivers``: ML2
     invokes ``*_postcommit`` in that order, so understack has finished releasing
@@ -96,6 +99,7 @@ class UndersyncDriver(MechanismDriver):
             )
 
         for callback, resource, event in (
+            (self._trunk_after_create, resources.TRUNK, events.AFTER_CREATE),
             (self._subports_after_create, resources.SUBPORTS, events.AFTER_CREATE),
             (self._subports_after_delete, resources.SUBPORTS, events.AFTER_DELETE),
             (self._trunk_after_delete, resources.TRUNK, events.AFTER_DELETE),
@@ -109,6 +113,9 @@ class UndersyncDriver(MechanismDriver):
             )
 
     def update_port_postcommit(self, context: PortContext) -> None:
+        if self._restore_trunk_subport_binding(context):
+            return
+
         if not utils.is_baremetal_port(context):
             return
 
@@ -123,6 +130,48 @@ class UndersyncDriver(MechanismDriver):
         physnet = port[portbindings.PROFILE].get("physical_network")
         if physnet:
             self.undersync.sync(physnet)
+            self._record_parent_trunk_state(context)
+
+    @staticmethod
+    def _restore_trunk_subport_binding(context: PortContext) -> bool:
+        """Ensure a baremetal trunk subport carries the binding we own.
+
+        That is parent_name and tag in its profile, which Nova reads, and the
+        vif_type for its parent's state. ML2 unbinds a port and marks it DOWN
+        whenever its host or profile is changed through the API, and anything
+        else may have left the profile out, so any update to the port repairs
+        it. Returns True for a baremetal trunk subport, which has nothing else
+        to do here.
+        """
+        port = context.current
+        if port.get("device_owner") != trunk_consts.TRUNK_SUBPORT_OWNER:
+            return False
+
+        subport_trunk = utils.fetch_subport_trunk(context.plugin_context, port["id"])
+        if not subport_trunk or not utils.binding_is_baremetal(
+            subport_trunk.parent_binding
+        ):
+            return False
+        parent_port_id = subport_trunk.parent_port_id
+        segmentation_id = subport_trunk.segmentation_id
+
+        status = (
+            trunk_consts.TRUNK_ACTIVE_STATUS
+            if utils.binding_is_bound(subport_trunk.parent_binding)
+            else trunk_consts.TRUNK_DOWN_STATUS
+        )
+        profile = port.get(portbindings.PROFILE) or {}
+        if (
+            port[portbindings.VIF_TYPE] != trunk_driver.subport_vif_type(status)
+            or profile.get("parent_name") != parent_port_id
+            or profile.get("tag") != segmentation_id
+        ):
+            trunk_driver.claim_subports(
+                parent_port_id,
+                [{"port_id": port["id"], "segmentation_id": segmentation_id}],
+                status,
+            )
+        return True
 
     def delete_port_postcommit(self, context: PortContext) -> None:
         # Releasing the segment stays with the understack driver; we only
@@ -150,20 +199,39 @@ class UndersyncDriver(MechanismDriver):
             )
 
     def _subports_after_create(self, resource, event, trunk_plugin, payload):
-        self._sync_trunk_parent(payload.states[0])
+        trunk = payload.states[0]
+        if self._sync_trunk_parent(trunk):
+            trunk_driver.update_trunk_state(
+                trunk,
+                payload.metadata["subports"],
+                trunk_consts.TRUNK_ACTIVE_STATUS,
+            )
 
     def _subports_after_delete(self, resource, event, trunk_plugin, payload):
-        self._sync_trunk_parent(payload.states[0])
+        if self._sync_trunk_parent(payload.states[0]):
+            # The post-delete trunk's sub_ports field is unloaded. The original
+            # object still addresses the same trunk row; only its status is
+            # updated here, while the trunk driver has already released the
+            # removed ports.
+            trunk = payload.states[0]
+            trunk_driver.update_trunk_state(trunk, [], trunk_consts.TRUNK_ACTIVE_STATUS)
+
+    def _trunk_after_create(self, resource, event, trunk_plugin, payload):
+        trunk = payload.states[0]
+        if self._sync_trunk_parent(trunk):
+            trunk_driver.update_trunk_state(
+                trunk, trunk.sub_ports, trunk_consts.TRUNK_ACTIVE_STATUS
+            )
 
     def _trunk_after_delete(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         if trunk.sub_ports:
             self._sync_trunk_parent(trunk)
 
-    def _sync_trunk_parent(self, trunk) -> None:
+    def _sync_trunk_parent(self, trunk) -> bool:
         parent_port = utils.fetch_port_object(trunk.port_id)
         if not utils.parent_port_is_bound(parent_port):
-            return
+            return False
 
         physnet = utils.active_port_binding(parent_port).profile.get(
             api.PHYSICAL_NETWORK
@@ -173,10 +241,30 @@ class UndersyncDriver(MechanismDriver):
             # abortable, so the binding profile changed underneath us. Raising
             # postcommit from a cancellable subscription surfaces as a 500.
             LOG.error(_missing_physnet_msg(parent_port.id))
-            return
+            return False
 
         LOG.debug("notifying Undersync of vlan group %s", physnet)
         self.undersync.sync(physnet)
+        return True
+
+    @staticmethod
+    def _record_parent_trunk_state(context: PortContext) -> None:
+        trunk_details = context.current.get("trunk_details")
+        if not trunk_details:
+            return
+        trunk = trunk_objects.Trunk.get_object(
+            context.plugin_context, id=trunk_details["trunk_id"]
+        )
+        if not trunk:
+            return
+        status = (
+            trunk_consts.TRUNK_ACTIVE_STATUS
+            if utils.is_port_bound_to_switchport(context)
+            else trunk_consts.TRUNK_DOWN_STATUS
+        )
+        if trunk_driver.trunk_state_is_current(context.plugin_context, trunk, status):
+            return
+        trunk_driver.update_trunk_state(trunk, trunk.sub_ports, status)
 
     def bind_port(self, context: PortContext) -> None:
         port = context.current

@@ -3,6 +3,7 @@ from neutron.objects.ports import Port
 from neutron.objects.trunk import SubPort
 from neutron.services.trunk.drivers import base as trunk_base
 from neutron.services.trunk.models import Trunk
+from neutron_lib import constants as p_const
 from neutron_lib import exceptions as exc
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
@@ -37,6 +38,81 @@ def _missing_physnet_msg(port_id: str) -> str:
     )
 
 
+def subport_vif_type(status: str) -> str:
+    """A subport is bound to the switchport, via its parent, while the trunk is up."""
+    if status == trunk_consts.TRUNK_ACTIVE_STATUS:
+        return portbindings.VIF_TYPE_OTHER
+    return portbindings.VIF_TYPE_UNBOUND
+
+
+def subport_port_status(status: str) -> str:
+    """A subport's port status follows its trunk's."""
+    if status == trunk_consts.TRUNK_ACTIVE_STATUS:
+        return p_const.PORT_STATUS_ACTIVE
+    return p_const.PORT_STATUS_DOWN
+
+
+def claim_subports(
+    parent_port_id: str, subports: list[SubPort | dict], status: str
+) -> None:
+    """Claim the supplied subports and write the binding Nova reads from them."""
+    if not subports:
+        return
+    port_status = subport_port_status(status)
+    vif_type = subport_vif_type(status)
+    # One transaction for every subport, so a failure leaves none of them
+    # half-written.
+    with utils.get_admin_session() as session:
+        claimed = set(
+            utils.update_port_fields_if_owner(
+                session,
+                [subport["port_id"] for subport in subports],
+                {
+                    "device_owner": trunk_consts.TRUNK_SUBPORT_OWNER,
+                    "status": port_status,
+                },
+                trunk_consts.TRUNK_SUBPORT_OWNER,
+            )
+        )
+        if claimed:
+            utils.set_subports_trunk_binding(
+                session,
+                parent_port_id,
+                {
+                    subport["port_id"]: subport["segmentation_id"]
+                    for subport in subports
+                    if subport["port_id"] in claimed
+                },
+                vif_type,
+            )
+
+
+def trunk_state_is_current(context, trunk: Trunk, status: str) -> bool:
+    """Whether the trunk and all its subports already have the state for status.
+
+    Takes a trunk freshly read, as its status is compared as it stands.
+    """
+    if trunk.status != status:
+        return False
+    if not trunk.sub_ports:
+        return True
+    return utils.subports_in_state(
+        context,
+        trunk.port_id,
+        {sub["port_id"]: sub["segmentation_id"] for sub in trunk.sub_ports},
+        trunk_consts.TRUNK_SUBPORT_OWNER,
+        subport_port_status(status),
+        subport_vif_type(status),
+    )
+
+
+def update_trunk_state(trunk: Trunk, subports: list[SubPort], status: str) -> None:
+    """Claim the supplied subports and record their trunk's state."""
+    claim_subports(trunk.port_id, subports, status)
+    LOG.debug("setting trunk %s status to %s", trunk.id, status)
+    trunk.update(status=status)
+
+
 class UnderstackTrunkDriver(trunk_base.DriverBase):
     @property
     def is_loaded(self):
@@ -66,6 +142,12 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
             cancellable=True,
         )
         registry.subscribe(
+            self.subports_added_post,
+            resources.SUBPORTS,
+            events.AFTER_CREATE,
+            cancellable=True,
+        )
+        registry.subscribe(
             self.subports_deleted,
             resources.SUBPORTS,
             events.AFTER_DELETE,
@@ -78,11 +160,42 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
             cancellable=True,
         )
         registry.subscribe(
+            self.trunk_created_post,
+            resources.TRUNK,
+            events.AFTER_CREATE,
+            cancellable=True,
+        )
+        registry.subscribe(
             self.trunk_deleted,
             resources.TRUNK,
             events.AFTER_DELETE,
             cancellable=True,
         )
+
+    @staticmethod
+    def _prepare_trunk_state(trunk: Trunk, subports: list[SubPort]) -> None:
+        """Claim subports DOWN until fabric reconciliation is requested."""
+        parent_port = utils.fetch_port_object(trunk.port_id)
+        if not utils.is_port_baremetal(parent_port):
+            return
+        update_trunk_state(trunk, subports, trunk_consts.TRUNK_DOWN_STATUS)
+
+    @staticmethod
+    def _release_subports(subports: list[SubPort]) -> None:
+        """Return ports that are leaving the trunk to an unowned DOWN state."""
+        # Written straight to the port row, as ml2/ovn did: update_port_status()
+        # would re-enter the mechanism drivers, and a revision bump would send
+        # ovn's maintenance worker chasing an LSP that has not changed.
+        with utils.get_admin_session() as session:
+            released = utils.update_port_fields_if_owner(
+                session,
+                [subport["port_id"] for subport in subports],
+                {"device_owner": "", "status": p_const.PORT_STATUS_DOWN},
+                trunk_consts.TRUNK_SUBPORT_OWNER,
+                include_unowned=False,
+            )
+            if released:
+                utils.clear_subports_trunk_binding(session, released)
 
     def _handle_tenant_vlan_id_and_switchport_config(
         self, subports: list[SubPort], trunk: Trunk
@@ -178,12 +291,11 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         self._handle_segment_deallocation(trunk_details.get("sub_ports", []), host)
 
     def _clean_parent_port_switchport_config(
-        self, trunk: Trunk, subports: list[SubPort]
+        self, parent_port: Port, subports: list[SubPort]
     ) -> None:
-        parent_port_obj = utils.fetch_port_object(trunk.port_id)
-        if not utils.parent_port_is_bound(parent_port_obj):
+        if not utils.parent_port_is_bound(parent_port):
             return
-        parent_binding = utils.active_port_binding(parent_port_obj)
+        parent_binding = utils.active_port_binding(parent_port)
         self._handle_segment_deallocation(subports, parent_binding.host)
 
     def _delete_unused_segment(self, segment_id: str) -> NetworkSegment:
@@ -208,10 +320,17 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         subports = payload.metadata["subports"]
         self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
 
+    def subports_added_post(self, resource, event, trunk_plugin, payload):
+        self._prepare_trunk_state(payload.states[0], payload.metadata["subports"])
+
     def subports_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = payload.metadata["subports"]
-        self._clean_parent_port_switchport_config(trunk, subports)
+        parent_port = utils.fetch_port_object(trunk.port_id)
+        self._clean_parent_port_switchport_config(parent_port, subports)
+        if not utils.is_port_baremetal(parent_port):
+            return
+        self._release_subports(subports)
 
     def trunk_created(self, resource, event, trunk_plugin, payload):
         trunk = payload.latest_state
@@ -219,8 +338,16 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         if subports:
             self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
 
+    def trunk_created_post(self, resource, event, trunk_plugin, payload):
+        """Claim its subports DOWN until fabric reconciliation is requested."""
+        trunk = payload.states[0]
+        self._prepare_trunk_state(trunk, trunk.sub_ports)
+
     def trunk_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = trunk.sub_ports
         if subports:
-            self._clean_parent_port_switchport_config(trunk, subports)
+            parent_port = utils.fetch_port_object(trunk.port_id)
+            self._clean_parent_port_switchport_config(parent_port, subports)
+            if utils.is_port_baremetal(parent_port):
+                self._release_subports(subports)

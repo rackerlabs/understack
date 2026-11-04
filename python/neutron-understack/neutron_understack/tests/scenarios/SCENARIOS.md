@@ -233,6 +233,26 @@ These scenarios load the real neutron trunk service plugin
 adds/removes must reconcile the parent's switch (VLAN group).
 `utils.fetch_network_node_trunk_id` (live OVN + Ironic discovery) is stubbed.
 
+The Understack trunk driver claims unowned subports as `trunk:subport` and
+updates ports it already owns. It never replaces a semantic owner such as
+`network:router_interface` or `network:router_gateway`. It first records the
+trunk and the subports it owns as DOWN. The trunk plugin also forces a trunk
+back to DOWN on each subport add/remove. The Undersync mechanism driver changes
+them to ACTIVE immediately after `undersync.sync()` returns. That means ACTIVE
+records that reconciliation was requested successfully; there is not yet a
+feedback loop confirming that the switch applied the change. Parent unbind
+changes the trunk and subports back to DOWN after requesting reconciliation.
+
+The driver also owns the subport's binding, which ml2/ovn used to write: the
+binding profile carries `parent_name` (the parent port) and `tag` (the
+segmentation ID), which Nova reads to put the VLAN link in `network_data.json`,
+and `vif_type` is `other` while the parent is bound to a switchport (trunk
+ACTIVE) and `unbound` otherwise. They are written straight to the binding row,
+so ml2/ovn is not re-entered, and removed when the subport leaves the trunk.
+ML2 clears a subport's binding whenever its host or profile changes through the
+API, so `update_port_postcommit` puts them back on any update to a baremetal
+trunk subport.
+
 ### TRUNK-SUB-ADD — subport attach syncs the parent's physnet
 - given: a bound baremetal parent port on `physnet1` with a trunk, and a subport
   port on another network
@@ -248,6 +268,9 @@ adds/removes must reconcile the parent's switch (VLAN group).
     that row is the record that the subport's network is carried on this VLAN
     of the parent's switchport
   - `undersync.sync(physnet1)` reconciles the parent port's switch
+  - the subport is claimed (`device_owner=trunk:subport`, status ACTIVE), its
+    binding profile carries `parent_name` and `tag` with `vif_type=other`, and
+    the trunk reports ACTIVE
 
 ### TRUNK-SUB-DEL — subport removal syncs the parent's physnet
 - given: the TRUNK-SUB-ADD setup with the subport attached
@@ -257,7 +280,9 @@ adds/removes must reconcile the parent's switch (VLAN group).
   **because that row was the last reference to it**, and
   `undersync.sync(physnet1)` reconciles the parent port's switch. Had another
   port or subport still been bound to that segment, only the row would go and
-  the segment would stay.
+  the segment would stay. The port is released (`device_owner` cleared, status
+  DOWN, `parent_name` and `tag` removed, `vif_type=unbound`) and the trunk
+  reports ACTIVE again.
 
 ### TRUNK-PARENT-NOIP — subport add syncs when the parent has no IP
 - given: a bound baremetal parent on a subnetted network but with no fixed IP,
@@ -291,14 +316,38 @@ adds/removes must reconcile the parent's switch (VLAN group).
 - then: trunk membership is recorded, but no subport binding level row or
   dynamic VLAN segment is created and no `undersync.sync` occurs — with no
   parent binding there is no physnet to carry the subport on and nothing to
-  reconcile
+  reconcile. The parent is a plain port, not a baremetal one, so the trunk is
+  not ours to manage either: it stays DOWN and the subport is left unclaimed.
+
+### TRUNK-SUBPORT-RESTORE-01 — ML2 clearing a subport's binding is undone
+- given: a bound baremetal parent with a trunk and an attached subport, ACTIVE
+  with `parent_name`, `tag` and `vif_type=other`
+- when: the subport's `binding:profile` is changed through the API (which makes
+  ML2 replace the profile and reset `vif_type` to `unbound`)
+- then: `update_port_postcommit` writes `parent_name`, `tag` and `vif_type=other`
+  back, and what the caller put in the profile is kept
+
+### TRUNK-PARENT-UPDATE-01 — a parent update writes the trunk only if it drifted
+- given: a bound baremetal parent with a trunk and an attached subport, all ACTIVE
+- when: the parent port is updated (its description changes)
+- then: nothing is written to the trunk or its subports. If the trunk has been
+  left DOWN, the next parent update takes it back to ACTIVE
 
 ### TRUNK-SEGID-RANGE-01 — subport seg_id outside the allowed range is rejected
 - given: a bound baremetal parent with a trunk
 - when: a subport is added with a segmentation_id outside `[1, 3799]`
 - then: `SubportSegmentationIDError` (raised in the SUBPORTS PRECOMMIT_CREATE
   callback, surfaced as `CallbackFailure`), with no binding level or dynamic
-  segment allocated
+  segment allocated and the port left unclaimed
+
+### TRUNK-STATUS-PARENT-BIND-01 — a trunk activates when its parent is attached
+- given: an *unbound* baremetal parent with a trunk and one subport — the usual
+  order of events, since a trunk is built before the node is deployed
+- when: the parent port is vif-attached to `physnet1`
+- then: while unbound, trunk and subport are DOWN with nothing allocated, though
+  the subport already carries `parent_name`, `tag` and `vif_type=unbound`; the
+  vif-attach then binds the subport (dynamic segment + level-0 row), syncs
+  `physnet1`, takes both to ACTIVE and sets `vif_type=other`
 
 ### TRUNK-ORDER-01 — subport removal deallocates before it notifies Undersync
 - given: a bound baremetal parent with a trunk and an attached subport
@@ -473,8 +522,13 @@ Port create / bind / delete (no new test doubles):
   (early return, no sync).
 
 Trunk (no new test doubles):
-- TRUNK-CREATE-WITH-SUBPORTS-01 — trunk created with subports present
-  (`trunk_created` path); confirm whether it syncs (it may not — possible gap).
+- TRUNK-CREATE-WITH-SUBPORTS-01 — trunk created with subports inline. The driver
+  handles it (TRUNK PRECOMMIT_CREATE allocates, AFTER_CREATE pushes and sets the
+  status; unit-tested in `test_trunk.py`), but it is not observable here: the
+  precommit allocation writes through its own session (`utils.get_admin_session`),
+  and closing that session rolls the trunk's own insert back on the harness's
+  shared sqlite connection. Needs the precommit writes to join the caller's
+  transaction — which would also stop them leaking if the create is rolled back.
 - TRUNK-PARENT-UNBIND-01 — unbinding a trunked baremetal parent runs `clean_trunk`
   (subport teardown) alongside BM-BIND-04's segment handling.
 

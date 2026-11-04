@@ -1,9 +1,88 @@
+import contextlib
+
 import pytest
 from neutron.plugins.ml2.driver_context import portbindings
+from neutron_lib import constants as p_const
 from neutron_lib import exceptions as exc
+from neutron_lib.services.trunk import constants as trunk_consts
 
 from neutron_understack import utils
 from neutron_understack.trunk import SubportSegmentationIDError
+from neutron_understack.trunk import claim_subports
+from neutron_understack.trunk import update_trunk_state
+
+
+@pytest.fixture
+def trunk_status(mocker, trunk):
+    """Capture the driver's trunk status write, which would hit the DB."""
+    return mocker.patch.object(trunk, "update")
+
+
+SESSION = object()
+
+
+@pytest.fixture
+def subport_binding(mocker):
+    """Capture the driver's writes to the subport's binding rows.
+
+    The driver writes every subport in one admin session, which SESSION stands in for.
+    """
+    mocker.patch(
+        "neutron_understack.utils.get_admin_session",
+        return_value=contextlib.nullcontext(SESSION),
+    )
+    return mocker.patch.multiple(
+        "neutron_understack.utils",
+        set_subports_trunk_binding=mocker.DEFAULT,
+        clear_subports_trunk_binding=mocker.DEFAULT,
+    )
+
+
+@pytest.fixture
+def subport_fields(mocker, subport_binding):
+    """Capture the driver's writes to the subport's port row."""
+    return mocker.patch(
+        "neutron_understack.utils.update_port_fields_if_owner",
+        side_effect=lambda session, port_ids, fields, owner, **kwargs: list(port_ids),
+    )
+
+
+def assert_subport_owned(subport_fields, subport, status):
+    subport_fields.assert_called_once_with(
+        SESSION,
+        [subport["port_id"]],
+        {"device_owner": trunk_consts.TRUNK_SUBPORT_OWNER, "status": status},
+        trunk_consts.TRUNK_SUBPORT_OWNER,
+    )
+
+
+def assert_subport_binding_set(subport_binding, trunk, subport, vif_type):
+    subport_binding["set_subports_trunk_binding"].assert_called_once_with(
+        SESSION,
+        trunk.port_id,
+        {subport["port_id"]: subport["segmentation_id"]},
+        vif_type,
+    )
+
+
+def assert_subport_released(subport_fields, subport, subport_binding=None):
+    subport_fields.assert_called_once_with(
+        SESSION,
+        [subport["port_id"]],
+        {"device_owner": "", "status": p_const.PORT_STATUS_DOWN},
+        trunk_consts.TRUNK_SUBPORT_OWNER,
+        include_unowned=False,
+    )
+    if subport_binding is not None:
+        subport_binding["clear_subports_trunk_binding"].assert_called_once_with(
+            SESSION, [subport["port_id"]]
+        )
+
+
+@pytest.fixture
+def _bound_parent(mocker, port_object):
+    mocker.patch("neutron_understack.utils.fetch_port_object", return_value=port_object)
+    mocker.patch("neutron_understack.utils.parent_port_is_bound", return_value=True)
 
 
 class TestSubportsAdded:
@@ -100,6 +179,25 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
         )
         add_subports_networks.assert_called_once()
 
+    @pytest.mark.usefixtures("_bound_parent")
+    def test_subports_add_post(
+        self,
+        understack_trunk_driver,
+        trunk_payload,
+        subport,
+        trunk_status,
+        subport_fields,
+        subport_binding,
+        trunk,
+    ):
+        understack_trunk_driver.subports_added_post(None, None, None, trunk_payload)
+
+        trunk_status.assert_called_once_with(status=trunk_consts.TRUNK_DOWN_STATUS)
+        assert_subport_owned(subport_fields, subport, p_const.PORT_STATUS_DOWN)
+        assert_subport_binding_set(
+            subport_binding, trunk, subport, portbindings.VIF_TYPE_UNBOUND
+        )
+
     def test_when_parent_port_is_unbound(
         self, mocker, understack_trunk_driver, trunk, subport, port_object
     ):
@@ -117,9 +215,18 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
         add_subports_networks.assert_not_called()
 
 
+@pytest.mark.usefixtures("_bound_parent")
 class TestSubportsDeleted:
     def test_that_clean_parent_port_is_triggered(
-        self, mocker, understack_trunk_driver, trunk_payload, trunk, subport
+        self,
+        mocker,
+        port_object,
+        understack_trunk_driver,
+        trunk_payload,
+        trunk,
+        subport,
+        trunk_status,
+        subport_fields,
     ):
         mocker.patch.object(
             understack_trunk_driver, "_clean_parent_port_switchport_config"
@@ -129,14 +236,42 @@ class TestSubportsDeleted:
 
         (
             understack_trunk_driver._clean_parent_port_switchport_config.assert_called_once_with(
-                trunk, [subport]
+                port_object, [subport]
             )
         )
 
+    def test_that_the_subport_is_released(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk_payload,
+        subport,
+        trunk_status,
+        subport_fields,
+        subport_binding,
+    ):
+        mocker.patch.object(
+            understack_trunk_driver, "_clean_parent_port_switchport_config"
+        )
 
+        understack_trunk_driver.subports_deleted("", "", "", trunk_payload)
+
+        assert_subport_released(subport_fields, subport, subport_binding)
+        trunk_status.assert_not_called()
+
+
+@pytest.mark.usefixtures("_bound_parent")
 class TestTrunkDeleted:
     def test_when_subports_are_present(
-        self, mocker, understack_trunk_driver, trunk_payload, trunk, subport
+        self,
+        mocker,
+        port_object,
+        understack_trunk_driver,
+        trunk_payload,
+        trunk,
+        subport,
+        subport_fields,
+        subport_binding,
     ):
         mocker.patch.object(
             understack_trunk_driver, "_clean_parent_port_switchport_config"
@@ -146,9 +281,12 @@ class TestTrunkDeleted:
 
         (
             understack_trunk_driver._clean_parent_port_switchport_config.assert_called_once_with(
-                trunk, [subport]
+                port_object, [subport]
             )
         )
+        # The trunk row is gone, so there is no status to record; the ports the
+        # trunk owned are handed back.
+        assert_subport_released(subport_fields, subport, subport_binding)
 
     def test_when_subports_are_not_present(
         self, mocker, understack_trunk_driver, trunk_payload, trunk, subport
@@ -183,7 +321,9 @@ class Test_CleanParentPortSwitchportConfig:
             understack_trunk_driver, "_handle_segment_deallocation"
         )
 
-        understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
+        understack_trunk_driver._clean_parent_port_switchport_config(
+            port_object, [subport]
+        )
 
         deallocate.assert_called_once_with([subport], str(host_id))
 
@@ -198,7 +338,9 @@ class Test_CleanParentPortSwitchportConfig:
             understack_trunk_driver, "_handle_segment_deallocation"
         )
 
-        understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
+        understack_trunk_driver._clean_parent_port_switchport_config(
+            port_object, [subport]
+        )
 
         deallocate.assert_not_called()
 
@@ -264,6 +406,113 @@ class Test_HandleSegmentDeallocation:
 
         utils.release_dynamic_segment.assert_not_called()
         port_binding_level.delete.assert_called_once()
+
+
+class TestTrunkStatus:
+    """The trunk driver claims ports DOWN before reconciliation is requested."""
+
+    @pytest.mark.usefixtures("_bound_parent")
+    def test_created_trunk_on_a_bound_parent_starts_down(
+        self,
+        understack_trunk_driver,
+        trunk_payload,
+        subport,
+        trunk_status,
+        subport_fields,
+        subport_binding,
+        trunk,
+    ):
+        understack_trunk_driver.trunk_created_post(None, None, None, trunk_payload)
+
+        trunk_status.assert_called_once_with(status=trunk_consts.TRUNK_DOWN_STATUS)
+        assert_subport_owned(subport_fields, subport, p_const.PORT_STATUS_DOWN)
+        assert_subport_binding_set(
+            subport_binding, trunk, subport, portbindings.VIF_TYPE_UNBOUND
+        )
+
+    def test_created_trunk_on_an_unbound_parent_stays_down(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk_payload,
+        port_object,
+        subport,
+        trunk_status,
+        subport_fields,
+        subport_binding,
+        trunk,
+    ):
+        mocker.patch(
+            "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch(
+            "neutron_understack.utils.parent_port_is_bound", return_value=False
+        )
+
+        understack_trunk_driver.trunk_created_post(None, None, None, trunk_payload)
+
+        trunk_status.assert_called_once_with(status=trunk_consts.TRUNK_DOWN_STATUS)
+        # Still this trunk's subport, just not carried by any switch yet.
+        assert_subport_owned(subport_fields, subport, p_const.PORT_STATUS_DOWN)
+        assert_subport_binding_set(
+            subport_binding, trunk, subport, portbindings.VIF_TYPE_UNBOUND
+        )
+
+    def test_a_trunk_on_a_non_baremetal_parent_is_left_to_ovn(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk_payload,
+        port_object,
+        trunk_status,
+        subport_fields,
+        subport_binding,
+    ):
+        port_object.bindings[0].vnic_type = portbindings.VNIC_NORMAL
+        mocker.patch(
+            "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+
+        understack_trunk_driver.trunk_created_post(None, None, None, trunk_payload)
+
+        trunk_status.assert_not_called()
+        subport_fields.assert_not_called()
+        subport_binding["set_subports_trunk_binding"].assert_not_called()
+
+
+class TestClaimSubports:
+    def test_the_trunk_itself_is_not_written(
+        self, trunk, subport, trunk_status, subport_fields, subport_binding
+    ):
+        claim_subports(trunk.port_id, [subport], trunk_consts.TRUNK_ACTIVE_STATUS)
+
+        assert_subport_owned(subport_fields, subport, p_const.PORT_STATUS_ACTIVE)
+        assert_subport_binding_set(
+            subport_binding, trunk, subport, portbindings.VIF_TYPE_OTHER
+        )
+        trunk_status.assert_not_called()
+
+
+class TestUpdateTrunkState:
+    def test_an_active_trunk_binds_its_subports_to_the_switchport(
+        self, trunk, subport, trunk_status, subport_fields, subport_binding
+    ):
+        update_trunk_state(trunk, [subport], trunk_consts.TRUNK_ACTIVE_STATUS)
+
+        assert_subport_owned(subport_fields, subport, p_const.PORT_STATUS_ACTIVE)
+        assert_subport_binding_set(
+            subport_binding, trunk, subport, portbindings.VIF_TYPE_OTHER
+        )
+
+    def test_a_subport_owned_by_another_service_is_left_alone(
+        self, trunk, subport, trunk_status, subport_fields, subport_binding
+    ):
+        subport_fields.side_effect = None
+        subport_fields.return_value = []
+
+        update_trunk_state(trunk, [subport], trunk_consts.TRUNK_ACTIVE_STATUS)
+
+        subport_binding["set_subports_trunk_binding"].assert_not_called()
 
 
 class TestConfigureTrunk:
@@ -406,6 +655,8 @@ class TestMissingPhysicalNetwork:
             understack_trunk_driver, "_handle_segment_deallocation"
         )
 
-        understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
+        understack_trunk_driver._clean_parent_port_switchport_config(
+            port_object, [subport]
+        )
 
         deallocate.assert_called_once_with([subport], str(host_id))
