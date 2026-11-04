@@ -11,6 +11,8 @@ metadata:
       `enroll-server-config` ConfigMap. During enrollment, it runs
       `post_inspection_runbooks` before providing the node. After enrollment,
       it runs the templates listed in `post_enroll_workflows`.
+      Both lists can be overridden per enrollment; an explicit [] disables
+      the corresponding hooks. Post-enrollment workflows run concurrently.
 kind: WorkflowTemplate
 spec:
   # Labels make runs filterable in the Argo UI (`argo list -l`) and give
@@ -36,6 +38,15 @@ spec:
   arguments:
     parameters:
       - name: ip_address
+      # JSON array of independent WorkflowTemplate names, executed concurrently.
+      # Each must expose a `run` template accepting `node_uuid`.
+      # Omitted: use site configuration. Explicit []: skip post-enrollment hooks.
+      - name: post_enroll_workflows
+        valueFrom:
+          configMapKeyRef:
+            name: enroll-server-config
+            key: post_enroll_workflows
+          default: "[]"
       - name: post_inspection_runbooks
         valueFrom:
           configMapKeyRef:
@@ -60,16 +71,8 @@ spec:
         parameters:
           - name: post_inspection_runbooks
             value: "{{workflow.parameters.post_inspection_runbooks}}"
-          # A site can configure this value with a JSON array of
-          # WorkflowTemplate names. Each WorkflowTemplate must expose a `run`
-          # template that accepts `node_uuid`. If the ConfigMap is absent, no
-          # post-enrollment templates are run.
           - name: post_enroll_workflows
-            valueFrom:
-              configMapKeyRef:
-                name: enroll-server-config
-                key: post_enroll_workflows
-              default: "[]"
+            value: "{{workflow.parameters.post_enroll_workflows}}"
       outputs:
         parameters:
           - name: node_uuid

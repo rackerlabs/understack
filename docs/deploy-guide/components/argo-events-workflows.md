@@ -88,8 +88,18 @@ data:
 ```
 
 Missing ConfigMaps or keys default to `[]`. Set a value to `[]` to disable it.
-For a single server enrollment, override the runbooks with
-`-p post_inspection_runbooks='["runbook"]'`, or pass `[]` to skip them.
+For a single server enrollment, override either list with workflow parameters:
+
+```bash
+argo submit -n argo-events --from workflowtemplate/enroll-server \
+  -p ip_address=BMC_IP \
+  -p post_inspection_runbooks='["runbook"]' \
+  -p post_enroll_workflows='["configure-monitoring"]' --watch
+```
+
+Pass `[]` for either parameter to skip that stage for this server. Site defaults
+still apply when the corresponding parameter is omitted. Deploying monitoring
+templates does not require enabling them in the site's enrollment defaults.
 
 Each named `WorkflowTemplate` must be in the same namespace and expose a `run`
 template that accepts the enrolled server's `node_uuid`:
