@@ -1,0 +1,5 @@
+ M go/ironic-hardware-exporter/internal/metrics/transformer.go
+ M go/ironic-hardware-exporter/internal/metrics/transformer_test.go
+ M go/ironic-hardware-exporter/internal/parser/message.go
+ M go/ironic-hardware-exporter/internal/parser/message_test.go
+ M go/ironic-hardware-exporter/internal/parser/testdata/metric.json

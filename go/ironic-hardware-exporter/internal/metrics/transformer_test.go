@@ -55,13 +55,23 @@ func TestTransform_SkipsZeroLastSeen(t *testing.T) {
 func TestTransform_TemperatureSensor(t *testing.T) {
 	reading := 26.0
 	health := "OK"
+	name := "System Board Inlet Temp"
+	upperCrit := 37.0
+	lowerCrit := -7.0
 	nodes := map[string]*cache.NodeEntry{
 		"uuid-1": {
 			NodeUUID: "uuid-1",
 			NodeName: "Dell-Test",
 			Sensors: parser.SensorPayload{
 				Temperature: map[string]parser.TemperatureSensor{
-					"1@System.Embedded.1": {ReadingCelsius: &reading, PhysicalContext: "SystemBoard", Health: &health},
+					"1@System.Embedded.1": {
+						Name:                   &name,
+						ReadingCelsius:         &reading,
+						PhysicalContext:        "SystemBoard",
+						Health:                 &health,
+						UpperThresholdCritical: &upperCrit,
+						LowerThresholdCritical: &lowerCrit,
+					},
 				},
 			},
 		},
@@ -78,6 +88,9 @@ func TestTransform_TemperatureSensor(t *testing.T) {
 	if findLabel(fVal.Samples[0].Labels, "context") != "SystemBoard" {
 		t.Error("expected context=SystemBoard label")
 	}
+	if findLabel(fVal.Samples[0].Labels, "sensor_name") != name {
+		t.Errorf("expected sensor_name=%q label", name)
+	}
 
 	fHealth := findFamily(families, "ironic_node_temperature_health")
 	if fHealth == nil || len(fHealth.Samples) == 0 {
@@ -85,6 +98,31 @@ func TestTransform_TemperatureSensor(t *testing.T) {
 	}
 	if findLabel(fHealth.Samples[0].Labels, "health") != "OK" {
 		t.Error("expected health=OK label")
+	}
+	if findLabel(fHealth.Samples[0].Labels, "sensor_name") != name {
+		t.Errorf("expected sensor_name=%q label on health metric", name)
+	}
+
+	fThresh := findFamily(families, "ironic_node_temperature_threshold_celsius")
+	if fThresh == nil {
+		t.Fatal("expected temperature_threshold family")
+	}
+	// Exactly the two non-nil thresholds should produce samples.
+	if len(fThresh.Samples) != 2 {
+		t.Fatalf("expected 2 threshold samples, got %d", len(fThresh.Samples))
+	}
+	got := map[string]float64{}
+	for _, s := range fThresh.Samples {
+		got[findLabel(s.Labels, "threshold")] = s.Value
+		if findLabel(s.Labels, "sensor_name") != name {
+			t.Error("expected sensor_name label on threshold metric")
+		}
+	}
+	if got["upper_critical"] != 37 {
+		t.Errorf("unexpected upper_critical threshold: %v", got["upper_critical"])
+	}
+	if got["lower_critical"] != -7 {
+		t.Errorf("unexpected lower_critical threshold: %v", got["lower_critical"])
 	}
 }
 
