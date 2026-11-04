@@ -1368,3 +1368,87 @@ def test_firewall_enroll_still_allows_a_left_out_network_port(mocker):
 
     # The left-out port is only warned about.
     assert fake_ironic.port.update.call_count == 2
+
+
+def test_update_node_traits_changes_only_the_given_traits():
+    client = MagicMock()
+    client.get_node_traits.return_value = ["CUSTOM_SECONDARY", "CUSTOM_OTHER"]
+
+    changed = netdev_reconciler.update_node_traits(
+        client=client,
+        node=MagicMock(uuid="node-123"),
+        traits={"CUSTOM_PRIMARY": True, "CUSTOM_SECONDARY": False},
+    )
+
+    assert changed is True
+    client.add_node_trait.assert_called_once_with("node-123", "CUSTOM_PRIMARY")
+    client.remove_node_trait.assert_called_once_with("node-123", "CUSTOM_SECONDARY")
+
+
+def test_update_node_traits_is_a_noop_when_they_already_match():
+    client = MagicMock()
+    client.get_node_traits.return_value = ["CUSTOM_PRIMARY"]
+
+    changed = netdev_reconciler.update_node_traits(
+        client=client,
+        node=MagicMock(uuid="node-123"),
+        traits={"CUSTOM_PRIMARY": True, "CUSTOM_SECONDARY": False},
+    )
+
+    assert changed is False
+    client.add_node_trait.assert_not_called()
+    client.remove_node_trait.assert_not_called()
+
+
+def test_enroll_sets_traits_before_the_node_is_available(mocker):
+    fake_ironic, node = make_ironic_client()
+    fake_ironic.node.get_traits.return_value = []
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, traits={"CUSTOM_SECONDARY": True})
+
+    fake_ironic.node.add_trait.assert_called_once_with(node.uuid, "CUSTOM_SECONDARY")
+    calls = fake_ironic.mock_calls
+    trait_at = next(i for i, c in enumerate(calls) if c[0] == "node.add_trait")
+    provide_at = next(
+        i
+        for i, c in enumerate(calls)
+        if c[0] == "node.set_provision_state" and c.args[1] == "provide"
+    )
+    assert trait_at < provide_at
+
+
+def test_enroll_updates_traits_in_place_on_an_up_to_date_available_node(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = _available_node()
+    fake_ironic.port.list.return_value = matching_ports()
+    fake_ironic.node.get_traits.return_value = ["CUSTOM_PRIMARY"]
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(
+        **ENROLL_ARGS, traits={"CUSTOM_PRIMARY": False, "CUSTOM_SECONDARY": True}
+    )
+
+    fake_ironic.node.add_trait.assert_called_once_with("node-123", "CUSTOM_SECONDARY")
+    fake_ironic.node.remove_trait.assert_called_once_with("node-123", "CUSTOM_PRIMARY")
+    fake_ironic.node.set_provision_state.assert_not_called()
+
+
+def test_enroll_without_traits_never_reads_them(mocker):
+    # enroll-netdev passes no traits; its nodes' traits are not ours to touch.
+    fake_ironic, _ = make_ironic_client()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS)
+
+    fake_ironic.node.get_traits.assert_not_called()

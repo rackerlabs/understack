@@ -186,11 +186,13 @@ def enroll(
     extra: dict | None = None,
     properties: dict | None = None,
     assign_roles: bool = False,
+    traits: dict[str, bool] | None = None,
 ) -> str:
     """Enroll a netdev node and its ports, then make it available.
 
     ``assign_roles`` (enroll-fw only) labels ports outside/inside; other netdev
-    devices are left as they were.
+    devices are left as they were. ``traits`` maps a node trait to whether the
+    node should have it, set before the node is made available.
     """
     effective_resource_class = resource_class or DEFAULT_RESOURCE_CLASS
     effective_driver = driver or DEFAULT_DRIVER
@@ -293,6 +295,8 @@ def enroll(
             extra=node_extra,
             properties=node_properties,
         )
+    if traits and update_node_traits(client=client, node=node, traits=traits):
+        metadata_changed = True
 
     if not pending and state == "available":
         if metadata_changed:
@@ -459,6 +463,29 @@ def update_node_metadata(
 
     logger.info("[node:%s] Updating node metadata %s", node.uuid, updates)
     client.update_node(node.uuid, args_array_to_patch("add", updates))
+    return True
+
+
+def update_node_traits(
+    *, client: IronicClient, node: Node, traits: dict[str, bool]
+) -> bool:
+    """Add or remove the given traits; any other trait is left alone.
+
+    Returns True if a trait changed.
+    """
+    current = set(client.get_node_traits(node.uuid))
+    to_add = sorted(t for t, wanted in traits.items() if wanted and t not in current)
+    to_remove = sorted(t for t, wanted in traits.items() if not wanted and t in current)
+    if not (to_add or to_remove):
+        return False
+
+    logger.info(
+        "[node:%s] Updating node traits add=%s remove=%s", node.uuid, to_add, to_remove
+    )
+    for trait in to_add:
+        client.add_node_trait(node.uuid, trait)
+    for trait in to_remove:
+        client.remove_node_trait(node.uuid, trait)
     return True
 
 

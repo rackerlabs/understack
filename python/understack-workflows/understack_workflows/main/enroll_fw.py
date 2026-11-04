@@ -37,6 +37,7 @@ def main() -> None:
         management_switch=args.management_switch,
         management_switch_port=args.management_switch_port,
         mate_serial=args.mate_serial,
+        ha_role=args.ha_role,
         serial=args.serial,
         vendor=args.vendor,
         model=args.model,
@@ -92,6 +93,7 @@ def enroll_fw(
     management_switch: str = "",
     management_switch_port: str = "",
     mate_serial: str = "",
+    ha_role: str = "",
     serial: str = "",
     vendor: str = "",
     model: str = "",
@@ -101,6 +103,9 @@ def enroll_fw(
         raise ValueError("enroll-fw requires a non-empty --driver")
     if not (physical_network or "").strip():
         raise ValueError("enroll-fw requires --physical-network")
+    if ha_role and not (mate_serial or "").strip():
+        raise ValueError("enroll-fw requires --mate-serial with --ha-role")
+    traits = firewall.ha_role_traits(ha_role)
     resource_class = _require_specific_resource_class(resource_class)
     management_switch, management_switch_port = _require_management_location(
         management_switch, management_switch_port
@@ -135,6 +140,7 @@ def enroll_fw(
             driver_info=driver_info,
             extra=extra,
             properties=properties,
+            traits=traits,
         )
         return node.uuid
 
@@ -149,6 +155,7 @@ def enroll_fw(
             driver_info=driver_info,
             extra=extra,
             properties=properties,
+            traits=traits,
         )
 
     # New or re-enrollable node: the engine writes the metadata inside the
@@ -165,6 +172,7 @@ def enroll_fw(
         extra=extra,
         properties=properties,
         assign_roles=True,
+        traits=traits,
     )
 
 
@@ -187,6 +195,7 @@ def _enroll_by_inspection(
     driver_info: dict,
     extra: dict,
     properties: dict,
+    traits: dict[str, bool],
 ) -> str:
     """Enroll a firewall without ports and let inspection find and label them.
 
@@ -215,6 +224,7 @@ def _enroll_by_inspection(
             extra=extra,
             properties=properties,
         )
+    netdev_reconciler.update_node_traits(client=client, node=node, traits=traits)
 
     logger.info("[node:%s] Inspecting to discover and label the ports", node.uuid)
     ironic_node.transition(node, target_state="inspect", expected_state="manageable")
@@ -268,6 +278,7 @@ def _update_active_firewall(
     driver_info: dict,
     extra: dict,
     properties: dict,
+    traits: dict[str, bool],
 ) -> None:
     """Update firewall metadata on an in-service (active) node, in place.
 
@@ -289,6 +300,14 @@ def _update_active_firewall(
             f"[node:{node.uuid}] Node is active with resource_class "
             f"{node_resource_class!r}; refusing to change it to "
             f"{resource_class!r} on an in-service firewall"
+        )
+
+    current = set(client.get_node_traits(node.uuid)) & set(traits)
+    wanted = {trait for trait, on in traits.items() if on}
+    if current != wanted:
+        raise RuntimeError(
+            f"[node:{node.uuid}] Node is active with HA traits {sorted(current)}; "
+            f"refusing to change them to {sorted(wanted)} on an in-service firewall"
         )
 
     # Without ports there is nothing to compare: inspection owns them.
@@ -423,6 +442,13 @@ def argument_parser():
         required=False,
         default="",
         help="HA mate serial number -> extra.mate_serial",
+    )
+    parser.add_argument(
+        "--ha-role",
+        choices=["", *firewall.HA_ROLE_TRAITS],
+        default="",
+        help="HA role, set as node trait CUSTOM_PRIMARY or CUSTOM_SECONDARY "
+        "(needs --mate-serial). Routers never get a secondary.",
     )
     parser.add_argument(
         "--serial",
