@@ -84,9 +84,7 @@ jobs:
         with:
           base: main
           branch: release-notes/${{ github.ref_name }}
-          # the '[Bot] docs: ' prefix is whitelisted in
-          # .github/pr-title-checker-config.json
-          title: "[Bot] docs: release notes for ${{ github.ref_name }}"
+          title: "docs: release notes for ${{ github.ref_name }}"
           commit-message: "docs: release notes for ${{ github.ref_name }}"
           labels: documentation
           body: |
