@@ -302,19 +302,6 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         )
         self.undersync_mock.sync.assert_not_called()
 
-    # The understack driver raises SubportSegmentationIDError in bind_port, but
-    # ML2 has no way to abort a bind: it logs the failure and tries the next
-    # mechanism driver, which binds the port. This asserts the desired behavior;
-    # strict=True flips an unexpected pass into a failure, prompting removal of
-    # the xfail once the upstream Neutron fix is backported.
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "native VLAN collision on parent bind is detected but ML2 cannot "
-            "abort a bind; it falls through to the next mechanism driver and the "
-            "port binds (vif_type=other). Needs the upstream Neutron fix backported"
-        ),
-    )
     @pytest.mark.scenario("TRUNK-PARENT-BIND-NATIVE-01")
     def test_unbound_trunk_rejects_native_vlan_collision_on_parent_bind(self):
         """Binding must revalidate subports once the native VLAN is known."""

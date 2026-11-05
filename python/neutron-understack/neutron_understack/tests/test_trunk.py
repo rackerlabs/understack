@@ -22,6 +22,10 @@ def trunk_status(mocker, trunk):
 SESSION = object()
 
 
+def test_subport_segmentation_id_error_aborts_port_binding():
+    assert issubclass(SubportSegmentationIDError, exc.PortBindingError)
+
+
 @pytest.fixture
 def subport_binding(mocker):
     """Capture the driver's writes to the subport's binding rows.

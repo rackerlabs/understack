@@ -22,7 +22,7 @@ SUPPORTED_INTERFACES = (portbindings.VIF_TYPE_OTHER,)
 SUPPORTED_SEGMENTATION_TYPES = (trunk_consts.SEGMENTATION_TYPE_VLAN,)
 
 
-class SubportSegmentationIDError(exc.NeutronException):
+class SubportSegmentationIDError(exc.PortBindingError):
     message = (
         "VLAN %(seg_id)s on physical network %(physical_network)s cannot be "
         "used as both the native VLAN for trunk %(trunk_id)s and the "
