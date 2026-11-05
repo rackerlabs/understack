@@ -286,23 +286,6 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
                     physical_network=physical_network,
                 )
 
-    def check_trunk_native_vlan(
-        self,
-        trunk_details: dict,
-        physical_network: str,
-        native_vlan_id: int,
-    ) -> None:
-        """Check a candidate parent native VLAN against existing subports."""
-        if trunk_details["trunk_id"] == utils.fetch_network_node_trunk_id():
-            return
-
-        self._check_native_vlan_conflict(
-            subports=trunk_details.get("sub_ports", []),
-            trunk_id=trunk_details["trunk_id"],
-            physical_network=physical_network,
-            native_vlan_id=native_vlan_id,
-        )
-
     def configure_trunk(
         self,
         trunk_details: dict,
@@ -310,11 +293,14 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         physical_network: str,
         native_vlan_id: int,
     ) -> None:
-        self.check_trunk_native_vlan(
-            trunk_details=trunk_details,
-            physical_network=physical_network,
-            native_vlan_id=native_vlan_id,
-        )
+        if trunk_details["trunk_id"] != utils.fetch_network_node_trunk_id():
+            self._check_native_vlan_conflict(
+                subports=trunk_details.get("sub_ports", []),
+                trunk_id=trunk_details["trunk_id"],
+                physical_network=physical_network,
+                native_vlan_id=native_vlan_id,
+            )
+
         subports = trunk_details.get("sub_ports", [])
         parent_port_obj = utils.fetch_port_object(port_id)
         self._add_subports_networks_to_parent_port_switchport(
