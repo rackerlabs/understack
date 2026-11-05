@@ -262,8 +262,6 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
 
         physical_network = bindings[0].profile.get("physical_network")
         if not physical_network:
-            # The create path reports the more specific missing-physnet error
-            # when it attempts to configure the parent switchport.
             return
 
         native_segment = utils.network_segment_by_physnet(
