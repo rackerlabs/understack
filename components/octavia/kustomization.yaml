@@ -4,5 +4,4 @@ kind: Kustomization
 
 resources:
   - octavia-rabbitmq-queue.yaml
-  - octavia-mariadb-db.yaml
   - job-octavia-post-deploy.yaml

@@ -7,6 +7,9 @@ endpoints:
   oslo_db:
     hosts:
       default: mariadb-primary
+  oslo_db_persistence:
+    hosts:
+      default: mariadb-primary
   oslo_messaging:
     statefulset:
       replicas: 3
@@ -169,9 +172,23 @@ pod:
       requests:
         memory: "512Mi"
 
+# The chart declares the Database, User, Grant and Connection resources for both
+# the octavia and octavia_persistence databases instead of the db-init job. The
+# password is read from the octavia-db-password secret in the deploy repo
+# rather than rendered from Helm values.
+mariadb_db:
+  api_group: k8s.mariadb.com
+  # the MariaDB resource is named mariadb, while clients connect through the
+  # mariadb-primary service set in endpoints.oslo_db.hosts
+  mariadb_ref: mariadb
+  password_secret:
+    create: false
+
 manifests:
   job_db_init: false
+  mariadb_db: true
   job_rabbit_init: false
+  rabbitmq_topology: false
   pod_rally_test: false
   secret_db: false
   secret_db_persistence: false
