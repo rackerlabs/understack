@@ -14,6 +14,11 @@ conf:
       volume_backend_name: netapp_nvme
       volume_driver: cinder_understack.dynamic_netapp_driver.NetappCinderDynamicDriver
   cinder:
+    database:
+      # The MariaDB operator writes the connection string into the
+      # cinder-db-conn secret, which the chart projects into the config
+      # directory, so the chart must not generate one from the DB password.
+      connection: null
     DEFAULT:
       enabled_backends: netapp_nvme
       default_volume_type: __DEFAULT__
@@ -182,13 +187,26 @@ dependencies:
       services: []
 
 
+# The chart declares the Database, User, Grant and Connection resources instead
+# of the db-init job. The password is read from the cinder-db-password secret
+# in the deploy repo rather than rendered from Helm values.
+mariadb_db:
+  api_group: k8s.mariadb.com
+  # the MariaDB resource is named mariadb, while clients connect through the
+  # mariadb-primary service set in endpoints.oslo_db.hosts
+  mariadb_ref: mariadb
+  password_secret:
+    create: false
+
 manifests:
   job_backup_storage_init: false
   job_bootstrap: false
   job_clean: false
   job_db_init: false
   job_db_drop: false
+  mariadb_db: true
   job_rabbit_init: false
+  rabbitmq_topology: false
   job_storage_init: false
   pod_rally_test: false
   secret_db: false
