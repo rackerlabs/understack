@@ -66,6 +66,11 @@ conf:
     # allow node lessee to get console
     "baremetal:node:get_console": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s)"
   ironic:
+    database:
+      # The MariaDB operator writes the connection string into the
+      # ironic-db-conn secret, which is projected into the config directory
+      # below, so the chart must not generate one from the DB password.
+      connection: null
     DEFAULT:
       # hardware types we have enabled in ironic
       enabled_hardware_types: redfish,idrac,netdev,panos,manual-management
@@ -256,11 +261,24 @@ dependencies:
       services: []
 
 
+# The chart declares the Database, User, Grant and Connection resources instead
+# of the db-init job. The password is read from the ironic-db-password secret
+# in the deploy repo rather than rendered from Helm values.
+mariadb_db:
+  api_group: k8s.mariadb.com
+  # the MariaDB resource is named mariadb, while clients connect through the
+  # mariadb-primary service set in endpoints.oslo_db.hosts
+  mariadb_ref: mariadb
+  password_secret:
+    create: false
+
 manifests:
   job_db_init: false
   job_db_drop: false
+  mariadb_db: true
   job_manage_cleaning_network: false
   job_rabbit_init: false
+  rabbitmq_topology: false
   secret_db: false
   secret_rabbitmq: false
   secret_registry: false
@@ -285,9 +303,13 @@ pod:
     ironic_api:
       - secret:
           name: ironic-ks-etc
+      - secret:
+          name: ironic-db-conn
     ironic_conductor:
       - secret:
           name: ironic-ks-etc
+      - secret:
+          name: ironic-db-conn
       - secret:
           name: network-device-credentials-ini
           optional: true
@@ -300,6 +322,11 @@ pod:
     ironic_novncproxy:
       - secret:
           name: ironic-ks-etc
+      - secret:
+          name: ironic-db-conn
+    ironic_db_sync:
+      - secret:
+          name: ironic-db-conn
   mounts:
     ironic_conductor:
       ironic_conductor:
