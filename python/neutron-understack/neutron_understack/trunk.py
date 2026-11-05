@@ -207,13 +207,36 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
     def _handle_tenant_vlan_id_and_switchport_config(
         self, subports: list[SubPort], trunk: Trunk
     ) -> None:
-        parent_port_obj = utils.fetch_port_object(trunk.port_id)
-        self._check_subports_segmentation_id(subports, trunk.id, parent_port_obj)
+        self._assert_segmentation_id_in_range(subports, trunk.id)
 
+        parent_port_obj = utils.fetch_port_object(trunk.port_id)
         if utils.parent_port_is_bound(parent_port_obj):
+            self._check_subports_segmentation_id(subports, trunk.id, parent_port_obj)
             self._add_subports_networks_to_parent_port_switchport(
                 parent_port_obj, subports
             )
+
+    def _assert_segmentation_id_in_range(
+        self, subports: list[SubPort], trunk_id: str
+    ) -> None:
+        """Validate tenant VLAN tags are within range.
+
+        The network-node trunk is exempt because its segmentation IDs are
+        internally-allocated fabric VLANs, not tenant-selected mapped VLANs.
+        """
+        if trunk_id == utils.fetch_network_node_trunk_id():
+            return
+
+        minimum, maximum = cfg.CONF.ml2_understack.default_tenant_vlan_id_range
+        for subport in subports:
+            seg_id = int(subport["segmentation_id"])
+            if not minimum <= seg_id <= maximum:
+                raise SubportSegmentationIDRangeError(
+                    seg_id=seg_id,
+                    subport_id=subport["port_id"],
+                    minimum=minimum,
+                    maximum=maximum,
+                )
 
     def _check_subports_segmentation_id(
         self, subports: list[SubPort], trunk_id: str, parent_port: Port
@@ -231,20 +254,6 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         cannot conflict with the parent through VLAN mapping.
         """
         if trunk_id == utils.fetch_network_node_trunk_id():
-            return
-
-        minimum, maximum = cfg.CONF.ml2_understack.default_tenant_vlan_id_range
-        for subport in subports:
-            seg_id = int(subport["segmentation_id"])
-            if not minimum <= seg_id <= maximum:
-                raise SubportSegmentationIDRangeError(
-                    seg_id=seg_id,
-                    subport_id=subport["port_id"],
-                    minimum=minimum,
-                    maximum=maximum,
-                )
-
-        if not utils.parent_port_is_bound(parent_port):
             return
 
         bindings = [i for i in parent_port.bindings if i.status == p_const.ACTIVE]
