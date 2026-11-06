@@ -4,6 +4,7 @@ import random
 import uuid
 
 import pytest
+from neutron.conf.plugins.ml2 import config as ml2_config
 from neutron.db.models.segment import NetworkSegment
 from neutron.db.models_v2 import Network
 from neutron.db.models_v2 import Port as PortModel
@@ -289,7 +290,7 @@ def understack_driver(oslo_config) -> UnderstackDriver:
 
 
 @pytest.fixture
-def understack_trunk_driver() -> UnderstackTrunkDriver:
+def understack_trunk_driver(oslo_config) -> UnderstackTrunkDriver:
     return UnderstackTrunkDriver.create()
 
 
@@ -356,6 +357,7 @@ def oslo_config():
     # register the ml2_understack options
     understack_config.register_ml2_understack_opts(conf_fixture.conf)
     understack_config.register_understack_vni_opts(conf_fixture.conf)
+    ml2_config.register_ml2_plugin_opts(conf_fixture.conf)
     yield conf_fixture
     conf_fixture.cleanUp()
 

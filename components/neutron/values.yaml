@@ -45,7 +45,7 @@ conf:
   plugins:
     ml2_conf:
       ml2:
-        extension_drivers: 'port_security'
+        extension_drivers: 'port_security,understack_fabric_vlan'
         # ovn is listed first so it creates virtual ports for routers before
         # our baremetal drivers run, matching the recommended ordering from
         # https://docs.openstack.org/networking-baremetal/latest/

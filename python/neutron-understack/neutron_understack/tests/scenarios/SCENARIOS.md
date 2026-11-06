@@ -480,6 +480,57 @@ flavor + service profile (`driver` = the PaloAlto class, `metainfo.resource_clas
 - when: the router is deleted
 - then: the ROUTER AFTER_DELETE callback returns the node to the pool
 
+## Fabric VLAN networks (understack_fabric_vlan extension)
+
+With the `understack_fabric_vlan` ML2 extension driver enabled, a VXLAN network
+may have a `fabric_vlan`: one VLAN id, from the VLAN network segment range on
+physical network `[ml2_understack] fabric_vlan_physical_network`, used on every
+physnet. It is stored as a `vni_vlan_mapping` pairing the network's VNI with
+the VLAN, scoped by that same physnet. The tests use a shared range on the
+default physnet `understack_fabric_vlan` (3000:3010).
+
+### SVLAN-01 — VXLAN network reserves its fabric_vlan
+- when: a VXLAN network is created with an in-range `fabric_vlan`, by an admin
+  or a project member
+- then: 201, and create and show report the `fabric_vlan`
+
+### SVLAN-02 — fabric_vlan is optional
+- when: a VXLAN network is created without `fabric_vlan`
+- then: 201 and `fabric_vlan` is `None`; its segments get dynamic VLANs as
+  before
+
+### SVLAN-03 — fabric_vlan validation
+- then: out of range is 400; a non-VXLAN network reports `None`, and 400 if it
+  supplies one
+
+### SVLAN-04 — fabric_vlan is unique across networks
+- then: reusing a held `fabric_vlan` is 409; deleting the network releases its
+  `vni_vlan_mapping` and the VLAN is reusable
+
+### SVLAN-05 — fabric_vlan can be gained, not changed
+- when: a VXLAN network without a `fabric_vlan` is updated with one
+- then: 200 and the VLAN is reserved (409 if held, 400 if out of range); once
+  set it cannot be changed or cleared (400). Segments already bound keep their
+  VLAN
+
+### SVLAN-06 — binding allocates the fabric VLAN on every physnet
+- when: ports on the network are vif-attached on two physnets
+- then: both dynamic VLAN segments carry `fabric_vlan`; the same holds for a
+  `fabric_vlan` gained after the network was created
+
+### SVLAN-07 — binding fails if the physnet already has the VLAN
+- given: `(physnet, fabric_vlan)` is allocated by a provider VLAN network
+- when: a port on the fabric_vlan network is vif-attached on that physnet
+- then: `VlanIdInUse`; the port is `binding_failed` with no binding levels
+
+### SVLAN-08 — extension disabled
+- then: networks have no `fabric_vlan` attribute
+
+### SVLAN-09 — trunk subport tagged with its network's fabric_vlan
+- given: a bound trunk parent and a subport on a fabric_vlan network
+- then: the `fabric_vlan` tag skips `allowed_tenant_vlan_id_ranges()` and the
+  subport segment carries it; any other tag in the fabric range is rejected
+
 ## Current limitations and follow-up
 
 - The Palo Alto external-gateway lifecycle landed on `main` after this scenario
