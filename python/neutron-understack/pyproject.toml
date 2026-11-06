@@ -85,7 +85,7 @@ default-groups = ["test"]
 # containers/neutron/Dockerfile (NEUTRON_GIT_REF / NEUTRON_LIB_GIT_REF).
 [tool.uv.sources]
 # renovate: name=openstack/neutron repo=https://github.com/rackerlabs/neutron.git branch=understack/2026.1
-neutron = { git = "https://github.com/rackerlabs/neutron.git", rev = "94d6f825e6edfafa158a9e0492a32fce7ee23747" }
+neutron = { git = "https://github.com/rackerlabs/neutron.git", rev = "8a418eb484c7f5e63674c52189b097d06468e955" }
 
 # renovate: name=openstack/neutron-lib repo=https://github.com/rackerlabs/neutron-lib.git branch=understack/2026.1
 neutron-lib = { git = "https://github.com/rackerlabs/neutron-lib.git", rev = "275d4c95657ed4c3028401b48c15204d8a965420" }
