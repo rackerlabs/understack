@@ -26,6 +26,7 @@ from oslo_config import cfg
 from oslo_serialization import jsonutils
 from sqlalchemy import and_
 
+from neutron_understack.api.definitions import understack_fabric_vlan
 from neutron_understack.ironic import IronicClient
 from neutron_understack.ml2_type_annotations import NetworkSegmentDict
 from neutron_understack.ml2_type_annotations import PortContext
@@ -553,6 +554,7 @@ def allocate_dynamic_segment(
     network_id: str,
     network_type: str = "vlan",
     physnet: str | None = None,
+    segmentation_id: int | None = None,
 ) -> NetworkSegmentDict:
     context = n_context.get_admin_context()
     core_plugin = directory.get_plugin()
@@ -565,6 +567,8 @@ def allocate_dynamic_segment(
             "physical_network": physnet,
             "network_type": network_type,
         }
+        if segmentation_id is not None:
+            segment_dict["segmentation_id"] = segmentation_id
 
         segment = core_plugin.type_manager.allocate_dynamic_segment(
             context, network_id, segment_dict
@@ -682,6 +686,22 @@ def parent_port_is_bound(port: port_obj.Port) -> bool:
 def fetch_subport_network_id(subport_id: str) -> str:
     neutron_port = fetch_port_object(subport_id)
     return neutron_port.network_id
+
+
+def fabric_vlan_enabled() -> bool:
+    return understack_fabric_vlan.ALIAS in cfg.CONF.ml2.extension_drivers
+
+
+def network_fabric_vlan(network_id: str) -> int | None:
+    """Return the network's fabric_vlan, or None.
+
+    Returns None without a lookup when the extension driver is disabled.
+    """
+    if not fabric_vlan_enabled():
+        return None
+    context = n_context.get_admin_context()
+    network = directory.get_plugin().get_network(context, network_id)
+    return network.get(understack_fabric_vlan.FABRIC_VLAN)
 
 
 def is_valid_vlan_network_segment(network_segment: dict):

@@ -14,6 +14,7 @@ from oslo_config import cfg
 from neutron_understack import config
 from neutron_understack import routers
 from neutron_understack import utils
+from neutron_understack.api.definitions import understack_fabric_vlan
 from neutron_understack.l3_router import svi as svi_router
 from neutron_understack.trunk import UnderstackTrunkDriver
 
@@ -371,12 +372,18 @@ class UnderstackDriver(MechanismDriver):
             )
             dynamic_segment = current_vlan_segment
         else:
-            dynamic_segment = context.allocate_dynamic_segment(
-                segment={
-                    "network_type": p_const.TYPE_VLAN,
-                    "physical_network": physnet,
-                },
+            segment_spec = {
+                "network_type": p_const.TYPE_VLAN,
+                "physical_network": physnet,
+            }
+            # Request fabric_vlan explicitly; VlanIdInUse fails the binding if
+            # the physnet already has it.
+            fabric_vlan = context.network.current.get(
+                understack_fabric_vlan.FABRIC_VLAN
             )
+            if fabric_vlan is not None:
+                segment_spec["segmentation_id"] = fabric_vlan
+            dynamic_segment = context.allocate_dynamic_segment(segment=segment_spec)
 
         LOG.debug("bind_port_segment: Native VLAN segment %s", dynamic_segment)
 
