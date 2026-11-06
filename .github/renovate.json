@@ -29,6 +29,11 @@
       "commitMessageTopic": "Argo Workflows"
     },
     {
+      "description": "go mod tidy can raise the go directive to match a dependency, which breaks the container builds pinned to an older golang image; require a human to review Go module updates",
+      "matchManagers": ["gomod"],
+      "automerge": false
+    },
+    {
       "matchPackageNames": ["go", "golang"],
       "matchManagers": ["asdf", "gomod"],
       "groupName": "Go",

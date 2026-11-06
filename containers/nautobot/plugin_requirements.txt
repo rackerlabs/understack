@@ -1,5 +1,11 @@
 # Commit versions below are needed for some packages as the latest version of
 # them are not running on python 3.12 yet.
 nautobot[sso]==3.1.8
-nautobot-golden-config==3.0.7
-nautobot-plugin-nornir==3.2.1
+nautobot-golden-config==3.0.8
+nautobot-plugin-nornir==3.2.5
+
+# Pin scrapli to avoid breaking changes in 2026.x that removed the Scrapli class
+# Golden Config and nornir-scrapli require the legacy API
+scrapli>=2024.1.30,<2026.0.0
+scrapli-netconf>=2024.1.30,<2026.0.0
+scrapli-community>=2024.1.30,<2026.0.0

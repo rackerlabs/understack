@@ -14,6 +14,10 @@ from ironic_understack.utils.ironic_wrapper import ironic_ports_for_node
 
 LOG = logging.getLogger(__name__)
 
+# Physnet suffixes realized through ML2 + Undersync. Other derived physnets
+# (e.g. "-storage-appliance", "enrol") are nulled so they don't reach binding.
+REALIZED_PHYSNET_SUFFIXES = ("-network", "-storage")
+
 
 class InspectHookUpdateBaremetalPorts(base.InspectionHook):
     """Hook to update ports according to LLDP data."""
@@ -161,7 +165,9 @@ def _set_port_attributes(
             )
             port.local_link_connection = inspected_port.local_link_connection
 
-        if physical_network and not physical_network.endswith("-network"):
+        if physical_network and not physical_network.endswith(
+            REALIZED_PHYSNET_SUFFIXES
+        ):
             physical_network = None
 
         if port.physical_network != physical_network:

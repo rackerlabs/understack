@@ -1,6 +1,6 @@
 ---
 kustomize_paths:
-- operators/rabbitmq-system
+- components/rabbitmq-system
 deploy_overrides:
   helm:
     mode: none

@@ -18,15 +18,14 @@ resources:
   - workflowtemplates/enroll-server.yaml
   - workflowtemplates/reclean-server.yaml
   - workflowtemplates/openstack-oslo-event.yaml
+  - workflowtemplates/delete-server.yaml
   - workflowtemplates/netapp-configure-net.yaml
   - workflowtemplates/ansible-run.yaml
   - workflowtemplates/inspect-server.yaml
   - workflowtemplates/bmc-password.yaml
+  - workflowtemplates/snmpv3-password.yaml
+  - workflowtemplates/workflowtemplate-bmc-configure-snmpv3-user.yaml
   - workflowtemplates/server-firmware-update.yaml
-  # Alert automation
-  - sensors/alertmanager-webhook-sensor.yaml
-  - eventsources/alertmanager-webhook-eventsource.yaml
-  - workflowtemplates/alert-automation-neutron-agent-down.yaml
   - workflowtemplates/resync-nautobot.yaml
   # CronWorkflows
   - cronworkflows/resync-nautobot.yaml

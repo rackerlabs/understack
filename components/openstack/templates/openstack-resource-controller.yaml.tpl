@@ -21,8 +21,10 @@ spec:
       engineVersion: v2
       type: Opaque
       metadata:
+        annotations:
+          understack.rackspace.com/keystone-roles: infra-readwrite
         labels:
-          understack.rackspace.com/keystone-role: infra-readwrite
+          keystone.understack.rackspace.com/account: "true"
           understack.rackspace.com/keystone-user: "openstack-resource-controller-{{ .Values.regionName }}"
       data:
         password: "{{ `{{ .password }}` }}"

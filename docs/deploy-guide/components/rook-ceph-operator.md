@@ -2,7 +2,7 @@
 charts:
 - rook-ceph
 kustomize_paths:
-- operators/rook
+- components/rook
 deploy_overrides:
   helm:
     mode: values_files

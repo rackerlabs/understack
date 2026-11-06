@@ -1,0 +1,395 @@
+import logging
+from uuid import UUID
+
+from neutron_lib import constants as p_const
+from neutron_lib.api.definitions import portbindings
+from neutron_lib.callbacks import events
+from neutron_lib.callbacks import priority_group
+from neutron_lib.callbacks import registry
+from neutron_lib.callbacks import resources
+from neutron_lib.plugins.ml2 import api
+from neutron_lib.plugins.ml2.api import MechanismDriver
+from oslo_config import cfg
+
+from neutron_understack import config
+from neutron_understack import routers
+from neutron_understack import utils
+from neutron_understack.l3_router import svi as svi_router
+from neutron_understack.trunk import UnderstackTrunkDriver
+
+from .ml2_type_annotations import NetworkContext
+from .ml2_type_annotations import PortContext
+
+LOG = logging.getLogger(__name__)
+
+
+SUPPORTED_VNIC_TYPES = [portbindings.VNIC_BAREMETAL, portbindings.VNIC_NORMAL]
+ROUTER_INTERFACE_OWNERS = (
+    p_const.DEVICE_OWNER_ROUTER_INTF,
+    p_const.DEVICE_OWNER_ROUTER_GW,
+)
+
+
+def _is_router_interface_port(port):
+    return port.get("device_owner") in ROUTER_INTERFACE_OWNERS
+
+
+class UnderstackDriver(MechanismDriver):
+    # See MechanismDriver docs for resource_provider_uuid5_namespace
+    resource_provider_uuid5_namespace = UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
+
+    @property
+    def connectivity(self):  # type: ignore
+        return portbindings.CONNECTIVITY_L2
+
+    def initialize(self):
+        config.register_ml2_understack_opts(cfg.CONF)
+
+        self.trunk_driver = UnderstackTrunkDriver.create()
+        self.subscribe()
+
+    def subscribe(self):
+        registry.subscribe(
+            routers.handle_router_interface_removal,
+            resources.PORT,
+            events.PRECOMMIT_DELETE,
+            cancellable=True,
+        )
+        # Runs after neutron's OVN handler (PRIORITY_DEFAULT) has created the
+        # internal LRP, so the unified network HCG and the LRP both exist.
+        # Smaller priority is called earlier, so use a larger value to run later.
+        registry.subscribe(
+            routers.link_vxlan_network_ha_chassis_group,
+            resources.ROUTER_INTERFACE,
+            events.AFTER_CREATE,
+            priority=priority_group.PRIORITY_DEFAULT + 1000,
+        )
+        # Handles uplink cleanup when a subnet is explicitly detached from a
+        # router (remove_router_interface). This path does not reliably fire
+        # PORT PRECOMMIT_DELETE, so we subscribe to the ROUTER_INTERFACE event
+        # directly. The PORT PRECOMMIT_DELETE handler remains for the router-
+        # deletion path (delete_router skips ROUTER_INTERFACE events).
+        registry.subscribe(
+            routers.handle_router_interface_after_delete,
+            resources.ROUTER_INTERFACE,
+            events.AFTER_DELETE,
+        )
+
+    def create_network_precommit(self, context):
+        pass
+
+    def create_network_postcommit(self, context: NetworkContext):
+        pass
+
+    def update_network_precommit(self, context: NetworkContext):
+        pass
+
+    def update_network_postcommit(self, context: NetworkContext):
+        pass
+
+    def delete_network_precommit(self, context: NetworkContext):
+        pass
+
+    def delete_network_postcommit(self, context: NetworkContext):
+        pass
+
+    def create_subnet_precommit(self, context):
+        pass
+
+    def create_subnet_postcommit(self, context):
+        pass
+
+    def update_subnet_precommit(self, context):
+        pass
+
+    def update_subnet_postcommit(self, context):
+        pass
+
+    def delete_subnet_precommit(self, context):
+        pass
+
+    def delete_subnet_postcommit(self, context):
+        pass
+
+    def create_port_precommit(self, context: PortContext):
+        # Early SVI address scope check fires before port is committed and
+        # before create_port_postcommit, so invalid subnets never reach the
+        # VLAN allocation / trunk steps.
+        # Neutron surfaces the BadRequest back through the router-interface API.
+        # update_port_precommit covers existing-port attaches.
+        if utils.is_router_interface(context):
+            LOG.info(
+                "create_port_precommit: checking SVI scope validation for "
+                "router port %s device_id=%s",
+                context.current["id"],
+                context.current.get("device_id"),
+            )
+            checked = svi_router.validate_svi_router_port(
+                context.plugin_context, context.current
+            )
+            if checked:
+                LOG.info(
+                    "create_port_precommit: SVI scope check passed for port %(port)s "
+                    "network %(network)s router %(router)s",
+                    {
+                        "port": context.current["id"],
+                        "network": context.current.get("network_id"),
+                        "router": context.current.get("device_id"),
+                    },
+                )
+            else:
+                LOG.debug(
+                    "create_port_precommit: SVI scope check not applicable for "
+                    "port %(port)s owner %(owner)s router %(router)s",
+                    {
+                        "port": context.current["id"],
+                        "owner": context.current.get("device_owner"),
+                        "router": context.current.get("device_id"),
+                    },
+                )
+
+    def create_port_postcommit(self, context: PortContext) -> None:
+        # Provide network node(s) with connectivity to the networks where this
+        # router port is attached to.
+        #
+        port = context.current
+        LOG.debug(
+            "Created port %(port)s on network %(net)s",
+            {"port": port["id"], "net": port["network_id"]},
+        )
+
+        if utils.is_router_interface(context):
+            LOG.info(
+                "Router interface port %(port)s detected on network %(net)s "
+                "device_id=%(router)s owner=%(owner)s fixed_ips=%(fixed_ips)s "
+                "- handing off to routers.create_port_postcommit",
+                {
+                    "port": port["id"],
+                    "net": port["network_id"],
+                    "router": port.get("device_id"),
+                    "owner": port.get("device_owner"),
+                    "fixed_ips": port.get("fixed_ips", []),
+                },
+            )
+            try:
+                routers.create_port_postcommit(context)
+            except Exception:
+                LOG.exception(
+                    "Router interface postcommit failed for port %(port)s "
+                    "network %(network)s router %(router)s owner %(owner)s "
+                    "fixed_ips=%(fixed_ips)s",
+                    {
+                        "port": port["id"],
+                        "network": port["network_id"],
+                        "router": port.get("device_id"),
+                        "owner": port.get("device_owner"),
+                        "fixed_ips": port.get("fixed_ips", []),
+                    },
+                )
+                raise
+
+    def update_port_precommit(self, context: PortContext):
+        if not utils.is_router_interface(context):
+            return
+
+        original = context.original
+        current = context.current
+        became_router_interface = not _is_router_interface_port(
+            original
+        ) and _is_router_interface_port(current)
+        fixed_ips_changed = original.get("fixed_ips", []) != current.get(
+            "fixed_ips", []
+        )
+
+        if not (became_router_interface or fixed_ips_changed):
+            LOG.debug(
+                "update_port_precommit: SVI scope check not needed for port "
+                "%(port)s owner %(owner)s router %(router)s",
+                {
+                    "port": current["id"],
+                    "owner": current.get("device_owner"),
+                    "router": current.get("device_id"),
+                },
+            )
+            return
+
+        LOG.info(
+            "update_port_precommit: checking SVI scope validation for router "
+            "port %(port)s device_id=%(router)s became_router_interface=%(became)s "
+            "fixed_ips_changed=%(fixed_ips_changed)s",
+            {
+                "port": current["id"],
+                "router": current.get("device_id"),
+                "became": became_router_interface,
+                "fixed_ips_changed": fixed_ips_changed,
+            },
+        )
+        checked = svi_router.validate_svi_router_port(context.plugin_context, current)
+        if checked:
+            LOG.info(
+                "update_port_precommit: SVI scope check passed for port %(port)s "
+                "network %(network)s router %(router)s",
+                {
+                    "port": current["id"],
+                    "network": current.get("network_id"),
+                    "router": current.get("device_id"),
+                },
+            )
+        else:
+            LOG.debug(
+                "update_port_precommit: SVI scope check not applicable for "
+                "port %(port)s owner %(owner)s router %(router)s",
+                {
+                    "port": current["id"],
+                    "owner": current.get("device_owner"),
+                    "router": current.get("device_id"),
+                },
+            )
+
+    def update_port_postcommit(self, context: PortContext) -> None:
+        if utils.is_baremetal_port(context) and utils.is_port_unbinding(context):
+            self._tenant_network_port_cleanup(context)
+
+    def _tenant_network_port_cleanup(self, context: PortContext):
+        """Tenant network port cleanup in the UnderCloud infrastructure.
+
+        This is triggered in the update_port_postcommit call as in the
+        delete_port_postcommit call there is no binding profile information
+        anymore, hence there is no way for us to identify which baremetal port
+        needs cleanup.
+
+        Only in the update_port_postcommit do we have access to the original
+        context, from which we can access the binding information.
+        """
+        trunk_details = context.current.get("trunk_details", {})
+        segment_id = context.original_top_bound_segment["id"]
+
+        LOG.debug("releasing vlan segment %s from interface", segment_id)
+
+        segment = utils.network_segment_by_id(segment_id)
+        if segment:
+            utils.release_segment_if_unused(segment)
+
+        if trunk_details:
+            self.trunk_driver.clean_trunk(
+                trunk_details=trunk_details,
+                host=context.original_host,
+            )
+
+    def delete_port_precommit(self, context):
+        pass
+
+    def delete_port_postcommit(self, context: PortContext) -> None:
+        if utils.is_baremetal_port(context):
+            self._release_segment_on_delete(context)
+
+    def _release_segment_on_delete(self, context: PortContext) -> None:
+        # _tenant_network_port_cleanup only runs on the bound->unbound
+        # update_port_postcommit transition; a port deleted while still bound
+        # skips it, leaking the segment and its VLAN. The undersync driver
+        # reconciles the switch in its own delete_port_postcommit.
+        port = context.current
+
+        physnet = port[portbindings.PROFILE].get("physical_network")
+        if not physnet:
+            return
+
+        segment = utils.network_segment_by_physnet(port["network_id"], physnet)
+        if segment:
+            utils.release_segment_if_unused(segment)
+
+    def bind_port(self, context: PortContext) -> None:
+        """Bind the VXLAN network segment and allocate dynamic VLAN segments.
+
+        Our "context" knows a Port, a Network and a list of Segments.
+
+        We find the first (hopefully only) segment of type vxlan.  This is the
+        one we bind.  There may be other segments, but we only bind the vxlan
+        one.
+
+        We obtain the dynamic segment for this (network, physnet) pair.
+
+        If there are no VXLAN segments, then bind a VLAN segment instead (this
+        is required for VLAN-type networks like the provisioning network).
+
+        Then make the required call in to the black box: context.set_binding
+        which tells the framework that we have dealt with this port and they
+        don't need to retry or handle this some other way.
+
+        We expect to receive a call to update_port_postcommit soon after this,
+        which means that changes made here will get pushed to the switch at that
+        time.
+        """
+        port = context.current
+        LOG.debug(
+            "Attempting to bind port %(port)s on network %(net)s",
+            {"port": port["id"], "net": port["network_id"]},
+        )
+
+        vnic_type = port.get(portbindings.VNIC_TYPE, portbindings.VNIC_NORMAL)
+        if vnic_type not in SUPPORTED_VNIC_TYPES:
+            LOG.debug("Refusing to bind due to unsupported vnic_type: %s", vnic_type)
+            return
+
+        for segment in context.segments_to_bind:
+            if segment[api.NETWORK_TYPE] == p_const.TYPE_VXLAN:
+                self._bind_port_segment(context, segment)
+                return
+
+    def _bind_port_segment(self, context: PortContext, segment):
+        network_id = context.current["network_id"]
+        mac_address = context.current["mac_address"]
+
+        port = context.current
+
+        physnet = port[portbindings.PROFILE].get("physical_network")
+
+        if not physnet:
+            LOG.error(
+                "bind_port_segment: physical_network is required in the "
+                "binding_profile for baremetal port binding, but was not found. "
+                "port_id=%(port_id)s mac_address=%(mac)s network_id=%(network_id)s.",
+                {
+                    "port_id": port["id"],
+                    "mac": mac_address,
+                    "network_id": network_id,
+                },
+            )
+            return
+
+        LOG.debug(
+            "bind_port_segment: interface network %s vlan group %s",
+            network_id,
+            physnet,
+        )
+
+        current_vlan_segment = utils.vlan_segment_for_physnet(context, physnet)
+        if current_vlan_segment:
+            LOG.info(
+                "vlan segment: %(segment)s already preset for physnet: %(physnet)s",
+                {"segment": current_vlan_segment, "physnet": physnet},
+            )
+            dynamic_segment = current_vlan_segment
+        else:
+            dynamic_segment = context.allocate_dynamic_segment(
+                segment={
+                    "network_type": p_const.TYPE_VLAN,
+                    "physical_network": physnet,
+                },
+            )
+
+        LOG.debug("bind_port_segment: Native VLAN segment %s", dynamic_segment)
+
+        trunk_details = context.current.get("trunk_details") or {}
+        port_id = context.current["id"]
+        if trunk_details:
+            self.trunk_driver.configure_trunk(trunk_details, port_id)
+
+        LOG.debug("continue_binding for segment: %s", segment)
+        context.continue_binding(
+            segment_id=segment[api.ID],
+            next_segments_to_bind=[dynamic_segment],
+        )
+
+    def check_vlan_transparency(self, context):
+        pass

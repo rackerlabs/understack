@@ -4,7 +4,6 @@
       "color": "EEEEEE"
     },
     "CHECKS": {
-      "prefixes": ["[Bot] docs: "],
       "regexp": "^(feat|fix|docs|test|ci|chore)!?(\\(.*\\))?!?:.*"
     },
     "MESSAGES": {

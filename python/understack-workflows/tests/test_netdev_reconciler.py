@@ -80,8 +80,9 @@ def test_enroll_creates_node_ports_logs_and_makes_available(mocker, caplog):
         return_value=fake_ironic,
     )
 
-    netdev_reconciler.enroll(**ENROLL_ARGS, resource_class=None)
+    node_uuid = netdev_reconciler.enroll(**ENROLL_ARGS, resource_class=None)
 
+    assert node_uuid == node.uuid
     fake_ironic.node.create.assert_called_once_with(
         automated_clean=False,
         driver="netdev",
@@ -260,8 +261,9 @@ def test_enroll_patches_physical_network_drift_on_existing_port(mocker):
         return_value=fake_ironic,
     )
 
-    netdev_reconciler.enroll(**ENROLL_ARGS)
+    node_uuid = netdev_reconciler.enroll(**ENROLL_ARGS)
 
+    assert node_uuid == "node-123"
     fake_ironic.port.update.assert_called_once_with(
         "uuid-port1",
         [{"op": "add", "path": "/physical_network", "value": "f20-1-network"}],
@@ -445,9 +447,9 @@ def test_available_node_steps_down_before_metadata_patch(mocker):
         return -1
 
     manage_idx = first_index(
-        lambda c: c[0] == "node.set_provision_state"
-        and len(c[1]) > 1
-        and c[1][1] == "manage"
+        lambda c: (
+            c[0] == "node.set_provision_state" and len(c[1]) > 1 and c[1][1] == "manage"
+        )
     )
     metadata_idx = first_index(lambda c: c[0] == "node.update")
 
@@ -472,8 +474,9 @@ def test_enroll_is_true_noop_when_available_and_everything_matches(mocker):
         return_value=fake_ironic,
     )
 
-    netdev_reconciler.enroll(**ENROLL_ARGS)
+    node_uuid = netdev_reconciler.enroll(**ENROLL_ARGS)
 
+    assert node_uuid == "node-123"
     # Nothing drifted: no metadata patch, no port work, no state churn.
     fake_ironic.node.update.assert_not_called()
     fake_ironic.port.update.assert_not_called()
@@ -521,11 +524,94 @@ def test_enroll_fails_on_existing_node_with_other_driver(mocker):
         return_value=fake_ironic,
     )
 
-    with pytest.raises(RuntimeError, match="refusing to enroll it as a netdev"):
+    with pytest.raises(RuntimeError, match="refusing to enroll it as 'netdev'"):
         netdev_reconciler.enroll(**ENROLL_ARGS)
 
     fake_ironic.node.create.assert_not_called()
     fake_ironic.port.create.assert_not_called()
+
+
+def test_enroll_defaults_to_the_netdev_driver(mocker):
+    fake_ironic, _ = make_ironic_client()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS)
+
+    node_data = fake_ironic.node.create.call_args.kwargs
+    assert node_data["driver"] == "netdev"
+
+
+def test_enroll_creates_the_node_with_the_requested_driver(mocker):
+    # The caller that knows it is enrolling a specific appliance passes its
+    # own hardware type, so the node is identifiable from the driver alone.
+    fake_ironic, _ = make_ironic_client()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, driver="panos")
+
+    node_data = fake_ironic.node.create.call_args.kwargs
+    assert node_data["driver"] == "panos"
+
+
+@pytest.mark.parametrize(
+    ("existing_driver", "requested_driver"),
+    [("netdev", "panos"), ("panos", "netdev")],
+)
+def test_enroll_refuses_to_re_enrol_a_node_as_a_different_driver(
+    mocker, existing_driver, requested_driver
+):
+    # A node enrolled as one hardware type must not be silently switched to
+    # another; changing a driver is a deliberate operator action.
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = SimpleNamespace(
+        uuid="node-123", driver=existing_driver, provision_state="available"
+    )
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    with pytest.raises(
+        RuntimeError, match=f"refusing to enroll it as '{requested_driver}'"
+    ):
+        netdev_reconciler.enroll(**ENROLL_ARGS, driver=requested_driver)
+
+    fake_ironic.node.create.assert_not_called()
+    fake_ironic.node.update.assert_not_called()
+    fake_ironic.node.set_provision_state.assert_not_called()
+    fake_ironic.port.create.assert_not_called()
+    fake_ironic.port.update.assert_not_called()
+
+
+def test_enroll_reuses_a_node_already_on_the_requested_driver(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = SimpleNamespace(
+        uuid="node-123",
+        driver="panos",
+        provision_state="available",
+        resource_class="generic",
+    )
+    fake_ironic.port.list.return_value = matching_ports()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, driver="panos")
+
+    fake_ironic.node.create.assert_not_called()
+    fake_ironic.node.update.assert_not_called()
+    fake_ironic.node.set_provision_state.assert_not_called()
+    fake_ironic.port.create.assert_not_called()
+    fake_ironic.port.update.assert_not_called()
 
 
 def test_enroll_fails_on_node_in_unexpected_state(mocker):
@@ -1086,3 +1172,283 @@ def test_enroll_does_not_touch_port_with_real_switch_id_and_matching_metadata(
     # update and no state churn on the available node.
     fake_ironic.port.update.assert_not_called()
     fake_ironic.node.set_provision_state.assert_not_called()
+
+
+# --- port roles (outside / inside), assigned by enroll-fw -------------------
+
+
+def _port(label, bios_name=None):
+    return netdev_reconciler.NetdevPort(
+        label=label,
+        mac=f"00:00:00:00:00:{len(label):02x}",
+        switch="leaf-1",
+        interface="Ethernet1/1",
+        bios_name=bios_name or label,
+    )
+
+
+def _roles(ports):
+    return {
+        port.label: port.category for port in netdev_reconciler.assign_port_roles(ports)
+    }
+
+
+def test_lowest_interface_is_outside_comparing_numbers():
+    # Given in reverse; as plain text "ethernet1/10" would sort before "ethernet1/9".
+    ports = [_port("ethernet1/10"), _port("ethernet1/9")]
+
+    assert _roles(ports) == {"ethernet1/9": "outside", "ethernet1/10": "inside"}
+
+
+def test_more_than_two_ports_label_only_the_two_lowest():
+    ports = [_port("ethernet1/3"), _port("ethernet1/1"), _port("ethernet1/2")]
+
+    assert _roles(ports) == {
+        "ethernet1/1": "outside",
+        "ethernet1/2": "inside",
+        "ethernet1/3": None,
+    }
+
+
+def test_a_single_port_is_refused():
+    with pytest.raises(ValueError, match="at least two data ports"):
+        netdev_reconciler.assign_port_roles([_port("ethernet1/1")])
+
+
+def test_the_device_interface_name_wins_over_the_label():
+    ports = [
+        _port("port-a", bios_name="ethernet1/20"),
+        _port("port-b", bios_name="ethernet1/19"),
+    ]
+
+    assert _roles(ports) == {"port-b": "outside", "port-a": "inside"}
+
+
+_THIRD_PORT = {
+    "label": "port3",
+    "mac": "00:11:22:33:44:77",
+    "switch": "spine03.example.net",
+    "intf": "Ethernet1/3",
+}
+_THREE_PORTS = {**ENROLL_ARGS, "ports": [*ENROLL_ARGS["ports"], _THIRD_PORT]}
+
+
+def test_firewall_enroll_sets_the_role_categories(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.port.create.side_effect = None
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**_THREE_PORTS, assign_roles=True)
+
+    created = fake_ironic.port.create.call_args_list
+    # The third port gets no category.
+    assert [c.kwargs.get("category") for c in created] == ["outside", "inside", None]
+
+
+def test_other_netdev_enroll_keeps_network_ports(mocker):
+    fake_ironic, _ = make_ironic_client()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS)
+
+    categories = [c.kwargs["category"] for c in fake_ironic.port.create.call_args_list]
+    assert categories == ["network", "network"]
+
+
+def _available_node():
+    return SimpleNamespace(
+        uuid="node-123",
+        driver="netdev",
+        provision_state="available",
+        resource_class="generic",
+        extra={},
+    )
+
+
+def test_firewall_enroll_is_noop_when_roles_already_match(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = _available_node()
+    ports = matching_ports()
+    ports[0].category = "outside"
+    ports[1].category = "inside"
+    fake_ironic.port.list.return_value = ports
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, assign_roles=True)
+
+    fake_ironic.port.update.assert_not_called()
+    fake_ironic.node.set_provision_state.assert_not_called()
+
+
+def test_firewall_enroll_labels_an_already_enrolled_available_node(mocker):
+    # Ports enrolled before roles existed are "network".
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = _available_node()
+    fake_ironic.port.list.return_value = [
+        *matching_ports(),
+        existing_port(
+            "port3", "00:11:22:33:44:77", "spine03.example.net", "Ethernet1/3"
+        ),
+    ]
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**_THREE_PORTS, assign_roles=True)
+
+    fake_ironic.port.update.assert_has_calls(
+        [
+            call(
+                "uuid-port1",
+                [{"op": "add", "path": "/category", "value": "outside"}],
+            ),
+            call(
+                "uuid-port2",
+                [{"op": "add", "path": "/category", "value": "inside"}],
+            ),
+            call("uuid-port3", [{"op": "remove", "path": "/category"}]),
+        ]
+    )
+
+
+@pytest.mark.parametrize("role", ["outside", "inside"])
+def test_firewall_enroll_refuses_a_left_out_port_that_still_has_a_role(mocker, role):
+    # A second NIC labelled for the same side could carry the router instead.
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = _available_node()
+    stale = existing_port(
+        "port3",
+        "00:11:22:33:44:77",
+        "spine03.example.net",
+        "Ethernet1/3",
+        category=role,
+    )
+    fake_ironic.port.list.return_value = [*matching_ports(), stale]
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    with pytest.raises(RuntimeError, match=f"leaf01:port3 .* still has role '{role}'"):
+        netdev_reconciler.enroll(**ENROLL_ARGS, assign_roles=True)
+
+    # Refused before anything changed.
+    fake_ironic.port.update.assert_not_called()
+    fake_ironic.port.create.assert_not_called()
+    fake_ironic.node.set_provision_state.assert_not_called()
+
+
+def test_firewall_enroll_still_allows_a_left_out_network_port(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = _available_node()
+    other = existing_port(
+        "port3", "00:11:22:33:44:77", "spine03.example.net", "Ethernet1/3"
+    )
+    fake_ironic.port.list.return_value = [*matching_ports(), other]
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, assign_roles=True)
+
+    # The left-out port is only warned about.
+    assert fake_ironic.port.update.call_count == 2
+
+
+def test_update_node_traits_changes_only_the_given_traits():
+    client = MagicMock()
+    client.get_node_traits.return_value = ["CUSTOM_SECONDARY", "CUSTOM_OTHER"]
+
+    changed = netdev_reconciler.update_node_traits(
+        client=client,
+        node=MagicMock(uuid="node-123"),
+        traits={"CUSTOM_PRIMARY": True, "CUSTOM_SECONDARY": False},
+    )
+
+    assert changed is True
+    client.add_node_trait.assert_called_once_with("node-123", "CUSTOM_PRIMARY")
+    client.remove_node_trait.assert_called_once_with("node-123", "CUSTOM_SECONDARY")
+
+
+def test_update_node_traits_is_a_noop_when_they_already_match():
+    client = MagicMock()
+    client.get_node_traits.return_value = ["CUSTOM_PRIMARY"]
+
+    changed = netdev_reconciler.update_node_traits(
+        client=client,
+        node=MagicMock(uuid="node-123"),
+        traits={"CUSTOM_PRIMARY": True, "CUSTOM_SECONDARY": False},
+    )
+
+    assert changed is False
+    client.add_node_trait.assert_not_called()
+    client.remove_node_trait.assert_not_called()
+
+
+def test_enroll_sets_traits_before_the_node_is_available(mocker):
+    fake_ironic, node = make_ironic_client()
+    fake_ironic.node.get_traits.return_value = []
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, traits={"CUSTOM_SECONDARY": True})
+
+    fake_ironic.node.add_trait.assert_called_once_with(node.uuid, "CUSTOM_SECONDARY")
+    calls = fake_ironic.mock_calls
+    trait_at = next(i for i, c in enumerate(calls) if c[0] == "node.add_trait")
+    provide_at = next(
+        i
+        for i, c in enumerate(calls)
+        if c[0] == "node.set_provision_state" and c.args[1] == "provide"
+    )
+    assert trait_at < provide_at
+
+
+def test_enroll_updates_traits_in_place_on_an_up_to_date_available_node(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = _available_node()
+    fake_ironic.port.list.return_value = matching_ports()
+    fake_ironic.node.get_traits.return_value = ["CUSTOM_PRIMARY"]
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(
+        **ENROLL_ARGS, traits={"CUSTOM_PRIMARY": False, "CUSTOM_SECONDARY": True}
+    )
+
+    fake_ironic.node.add_trait.assert_called_once_with("node-123", "CUSTOM_SECONDARY")
+    fake_ironic.node.remove_trait.assert_called_once_with("node-123", "CUSTOM_PRIMARY")
+    fake_ironic.node.set_provision_state.assert_not_called()
+
+
+def test_enroll_without_traits_never_reads_them(mocker):
+    # enroll-netdev passes no traits; its nodes' traits are not ours to touch.
+    fake_ironic, _ = make_ironic_client()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS)
+
+    fake_ironic.node.get_traits.assert_not_called()

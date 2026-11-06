@@ -8,6 +8,7 @@ from typing import Any
 
 from openstack_sync.hooks.framework import HookConfig
 from openstack_sync.hooks.framework import PruneRequest
+from openstack_sync.hooks.framework import ReconcileResult
 from openstack_sync.hooks.framework import SyncPlugin
 from openstack_sync.hooks.framework import build_crd_hook_config
 from openstack_sync.hooks.framework import hook_enabled
@@ -33,8 +34,9 @@ class IronicRunbookPlugin(SyncPlugin):
             delay=self.config.ready_delay,
         )
 
-    def reconcile(self, conn: Any, spec: dict[str, Any], cache: Any) -> list[str]:
-        return reconcile_module.sync_runbook(conn, spec, cache)
+    def reconcile(self, conn: Any, spec: dict[str, Any], cache: Any) -> ReconcileResult:
+        notes = reconcile_module.sync_runbook(conn, spec, cache)
+        return ReconcileResult(notes=notes)
 
     def prune_resources(self, conn: Any, request: PruneRequest) -> None:
         prune_module.prune_removed_runbooks(

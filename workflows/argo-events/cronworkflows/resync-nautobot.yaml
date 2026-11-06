@@ -19,7 +19,8 @@ metadata:
 
       Defined in `workflows/argo-events/cronworkflows/resync-nautobot.yaml`
 spec:
-  schedule: "0 2 * * *"
+  schedules:
+    - "0 2 * * *"
   timezone: "UTC"
   concurrencyPolicy: "Forbid"
   successfulJobsHistoryLimit: 3

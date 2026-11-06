@@ -1,9 +1,11 @@
+import copy
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
 from neutron.plugins.ml2.driver_context import portbindings
 from neutron_lib import constants
+from oslo_serialization import jsonutils
 from sqlalchemy import Column
 from sqlalchemy import String
 from sqlalchemy import create_engine
@@ -40,6 +42,26 @@ class TestParentPortIsBound:
         assert result is False
 
 
+class TestIsPortBaremetal:
+    def test_a_baremetal_active_binding(self, port_object):
+        assert utils.is_port_baremetal(port_object) is True
+
+    def test_a_normal_active_binding(self, port_object):
+        port_object.bindings[0].vnic_type = portbindings.VNIC_NORMAL
+        assert utils.is_port_baremetal(port_object) is False
+
+    def test_the_active_binding_decides_not_the_first(self, port_object):
+        # The first binding is baremetal but inactive; the active one is not.
+        inactive = port_object.bindings[0]
+        inactive.status = constants.INACTIVE
+        active = copy.deepcopy(inactive)
+        active.status = constants.ACTIVE
+        active.vnic_type = portbindings.VNIC_NORMAL
+        port_object.bindings.append(active)
+
+        assert utils.is_port_baremetal(port_object) is False
+
+
 Base = declarative_base()
 
 
@@ -48,6 +70,25 @@ class Port(Base):
     id = Column(String, primary_key=True)
     device_id = Column(String)
     device_owner = Column(String)
+
+
+class PortBinding(Base):
+    __tablename__ = "ml2_port_bindings"
+    port_id = Column(String, primary_key=True)
+    host = Column(String, primary_key=True)
+    status = Column(String)
+    vif_type = Column(String)
+    profile = Column(String)
+
+    def __getitem__(self, key):
+        """Read like a neutron model, which the binding helper indexes."""
+        return getattr(self, key)
+
+
+@pytest.fixture(autouse=True)
+def _fake_port_binding_model():
+    with patch.object(utils.models_ml2, "PortBinding", PortBinding):
+        yield
 
 
 @pytest.fixture
@@ -87,6 +128,164 @@ class TestPortFieldManipulation:
         assert port.device_id == "new-id"
         assert port.device_owner == "owner"
 
+    def test_update_port_fields_if_owner_updates_an_expected_owner(
+        self, db_session, sample_port
+    ):
+        port_id = sample_port.id
+        updated = utils.update_port_fields_if_owner(
+            db_session,
+            [port_id],
+            {"device_id": "new-id", "device_owner": "trunk:subport"},
+            "owner",
+        )
+
+        db_session.expire_all()
+        port = db_session.query(Port).filter_by(id=port_id).one()
+        assert updated == [port_id]
+        assert port.device_id == "new-id"
+        assert port.device_owner == "trunk:subport"
+
+    def test_update_port_fields_if_owner_preserves_another_services_port(
+        self, db_session, sample_port
+    ):
+        port_id = sample_port.id
+        updated = utils.update_port_fields_if_owner(
+            db_session,
+            [port_id],
+            {"device_id": "new-id", "device_owner": "trunk:subport"},
+            "trunk:subport",
+        )
+
+        db_session.expire_all()
+        port = db_session.query(Port).filter_by(id=port_id).one()
+        assert updated == []
+        assert port.device_id == "original"
+        assert port.device_owner == "owner"
+
+    def test_update_port_fields_if_owner_can_leave_unowned_ports_alone(
+        self, db_session, sample_port
+    ):
+        db_session.add(Port(id="port-2", device_id="two", device_owner=""))
+        db_session.commit()
+
+        updated = utils.update_port_fields_if_owner(
+            db_session,
+            ["port-1", "port-2"],
+            {"device_owner": "released"},
+            "owner",
+            include_unowned=False,
+        )
+
+        db_session.expire_all()
+        owners = {port.id: port.device_owner for port in db_session.query(Port)}
+        assert updated == ["port-1"]
+        assert owners == {"port-1": "released", "port-2": ""}
+
+    def test_update_port_fields_if_owner_returns_only_the_ports_it_updated(
+        self, db_session, sample_port
+    ):
+        db_session.add(Port(id="port-2", device_id="two", device_owner=""))
+        db_session.add(Port(id="port-3", device_id="three", device_owner="router"))
+        db_session.commit()
+
+        updated = utils.update_port_fields_if_owner(
+            db_session,
+            ["port-1", "port-2", "port-3"],
+            {"device_owner": "trunk:subport"},
+            "owner",
+        )
+
+        db_session.expire_all()
+        owners = {port.id: port.device_owner for port in db_session.query(Port)}
+        assert sorted(updated) == ["port-1", "port-2"]
+        assert owners == {
+            "port-1": "trunk:subport",
+            "port-2": "trunk:subport",
+            "port-3": "router",
+        }
+
+    def test_subport_trunk_binding_sets_and_clears_keys(self, db_session, sample_port):
+        port_id = sample_port.id
+        db_session.add(
+            PortBinding(
+                port_id=port_id,
+                host="h",
+                status=constants.ACTIVE,
+                vif_type=portbindings.VIF_TYPE_UNBOUND,
+                profile=jsonutils.dumps({"physical_network": "physnet"}),
+            )
+        )
+        db_session.add(
+            PortBinding(
+                port_id=port_id,
+                host="other",
+                status=constants.INACTIVE,
+                vif_type=portbindings.VIF_TYPE_UNBOUND,
+                profile=jsonutils.dumps({}),
+            )
+        )
+        db_session.flush()
+
+        utils.set_subports_trunk_binding(
+            db_session, "parent-id", {port_id: 200}, portbindings.VIF_TYPE_OTHER
+        )
+
+        binding = db_session.query(PortBinding).filter_by(host="h").one()
+        assert binding.vif_type == portbindings.VIF_TYPE_OTHER
+        assert jsonutils.loads(binding.profile) == {
+            "physical_network": "physnet",
+            "parent_name": "parent-id",
+            "tag": 200,
+        }
+        other = db_session.query(PortBinding).filter_by(host="other").one()
+        assert other.vif_type == portbindings.VIF_TYPE_UNBOUND
+        assert jsonutils.loads(other.profile) == {}
+
+        utils.clear_subports_trunk_binding(db_session, [port_id])
+
+        binding = db_session.query(PortBinding).filter_by(host="h").one()
+        assert binding.vif_type == portbindings.VIF_TYPE_UNBOUND
+        assert jsonutils.loads(binding.profile) == {"physical_network": "physnet"}
+
+    def test_subport_trunk_binding_writes_each_port_its_own_vlan(self, db_session):
+        for port_id in ("port-a", "port-b"):
+            db_session.add(Port(id=port_id, device_id="", device_owner=""))
+            db_session.add(
+                PortBinding(
+                    port_id=port_id,
+                    host="h",
+                    status=constants.ACTIVE,
+                    vif_type=portbindings.VIF_TYPE_UNBOUND,
+                    profile=None,
+                )
+            )
+        db_session.flush()
+
+        utils.set_subports_trunk_binding(
+            db_session,
+            "parent-id",
+            {"port-a": 200, "port-b": "300"},
+            portbindings.VIF_TYPE_OTHER,
+        )
+
+        tags = {
+            binding.port_id: jsonutils.loads(binding.profile)["tag"]
+            for binding in db_session.query(PortBinding)
+        }
+        assert tags == {"port-a": 200, "port-b": 300}
+
+    def test_subport_trunk_binding_without_an_active_binding_is_a_noop(
+        self, db_session, sample_port
+    ):
+        port_id = sample_port.id
+
+        utils.set_subports_trunk_binding(
+            db_session, "parent", {port_id: 200}, portbindings.VIF_TYPE_OTHER
+        )
+        utils.clear_subports_trunk_binding(db_session, [port_id])
+
+        assert db_session.query(PortBinding).count() == 0
+
     def test_clear_device_id_for_port(self, db_session, sample_port):
         id = sample_port.id
         utils.clear_device_id_for_port(id)
@@ -102,8 +301,10 @@ class TestPortFieldManipulation:
 
 
 class PortContext:
-    def __init__(self, current):
+    def __init__(self, current=None, vif_type=None, original_vif_type=None):
         self.current = current
+        self.vif_type = vif_type
+        self.original_vif_type = original_vif_type
 
 
 class TestIsRouterInterface:
@@ -125,6 +326,59 @@ class TestIsRouterInterface:
     def test_router_interface_false_device_owner_none(self):
         context = PortContext(current={"device_owner": None})
         assert not utils.is_router_interface(context)
+
+
+VIF_TYPES = [
+    portbindings.VIF_TYPE_UNBOUND,
+    portbindings.VIF_TYPE_OTHER,
+    portbindings.VIF_TYPE_BINDING_FAILED,
+    portbindings.VIF_TYPE_OVS,
+]
+
+VIF_TYPE_PAIRS = [(c, o) for c in VIF_TYPES for o in VIF_TYPES]
+
+UNBINDING_PAIR = (portbindings.VIF_TYPE_UNBOUND, portbindings.VIF_TYPE_OTHER)
+
+
+class TestVifTransitionPredicates:
+    def test_unbinding_only_for_other_to_unbound(self):
+        context = PortContext(
+            vif_type=UNBINDING_PAIR[0], original_vif_type=UNBINDING_PAIR[1]
+        )
+        assert utils.is_port_unbinding(context)
+
+    @pytest.mark.parametrize(
+        ("vif_type", "original_vif_type"),
+        [pair for pair in VIF_TYPE_PAIRS if pair != UNBINDING_PAIR],
+    )
+    def test_unbinding_is_false_for_every_other_combination(
+        self, vif_type, original_vif_type
+    ):
+        context = PortContext(vif_type=vif_type, original_vif_type=original_vif_type)
+        assert not utils.is_port_unbinding(context)
+
+    @pytest.mark.parametrize("original_vif_type", VIF_TYPES)
+    def test_bound_to_switchport_ignores_the_original_vif_type(self, original_vif_type):
+        context = PortContext(
+            vif_type=portbindings.VIF_TYPE_OTHER, original_vif_type=original_vif_type
+        )
+        assert utils.is_port_bound_to_switchport(context)
+
+    @pytest.mark.parametrize(
+        "vif_type", [v for v in VIF_TYPES if v != portbindings.VIF_TYPE_OTHER]
+    )
+    def test_bound_to_switchport_false_unless_vif_type_is_other(self, vif_type):
+        context = PortContext(vif_type=vif_type, original_vif_type=None)
+        assert not utils.is_port_bound_to_switchport(context)
+
+    @pytest.mark.parametrize(("vif_type", "original_vif_type"), VIF_TYPE_PAIRS)
+    def test_predicates_are_mutually_exclusive(self, vif_type, original_vif_type):
+        """Drivers branch on these with if/elif; no input should satisfy both."""
+        context = PortContext(vif_type=vif_type, original_vif_type=original_vif_type)
+        assert not (
+            utils.is_port_unbinding(context)
+            and utils.is_port_bound_to_switchport(context)
+        )
 
 
 class TestMergeOverlappedRanges:

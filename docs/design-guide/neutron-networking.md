@@ -13,7 +13,8 @@ To enable this we are using the following plugins/features of Neutron:
 - [networking-baremetal][networking-baremetal] to have Neutron aware of the physical
   networks of Ironic baremetal ports.
 - our custom mechanism drivers `understack` and `undersync` (both must be loaded,
-  with `baremetal` from [networking-baremetal][networking-baremetal] loaded between them)
+  in that order, with `baremetal` from
+  [networking-baremetal][networking-baremetal] loaded between them)
 - [ovn-router][ovn-admin] as the L3 router plugin
 - [trunk plugin][neutron-trunk] service plugin
 - [network segment range][neutron-network-segment-range] service plugin
@@ -399,29 +400,62 @@ The names and the IDs all match, along with the VLAN ID of the segment where the
 ## ML2 Mechanism Operations
 
 Our ML2 mechanism is split across two drivers that must both be present in
-`mechanism_drivers`, with the `baremetal` driver from
+`mechanism_drivers`, **in this order**, with the `baremetal` driver from
 [networking-baremetal][networking-baremetal] loaded between them:
 
-- `understack` — the primary driver responsible for allocating dynamic VLAN
-  segments on VXLAN networks (`bind_port()`), releasing them when ports are
-  removed (`delete_port_postcommit()`), and triggering switch configuration
-  updates (`update_port_postcommit()`)
+- `understack` — owns the Neutron-side bookkeeping: it allocates dynamic VLAN
+  segments on VXLAN networks (`bind_port()`), releases them when a port is
+  unbound or deleted (`update_port_postcommit()`, `delete_port_postcommit()`),
+  allocates segments for trunk subports, and handles router uplinks and SVI
+  validation. It never contacts Undersync.
 - `baremetal` — the [networking-baremetal][networking-baremetal] driver that
   makes Neutron aware of the physical networks of Ironic baremetal ports
-- `undersync` — handles level-1 binding by calling `set_binding()`
-  on the VLAN segment that `understack` allocated via `continue_binding()`;
-  without it port binding fails at level 1
+- `undersync` — completes level-1 binding by calling `set_binding()` on the VLAN
+  segment `understack` allocated via `continue_binding()`, and is the **sole
+  owner of the Undersync client**. It works out what changed and tells Undersync
+  which `physical_network` (vlan group) to reconcile.
 
 The binding flow is: `understack` handles the VXLAN segment at level 0 and
 calls `continue_binding()` with a dynamically allocated VLAN segment, then
 `undersync` finalises the binding at level 1 by calling
-`set_binding()` on that VLAN segment.
+`set_binding()` on that VLAN segment. Without `undersync` loaded, port binding
+fails at level 1.
 
 Together they are responsible for:
 
 - creating dynamic VLAN segments on VXLAN networks via port binding operations via `bind_port()`
 - deleting dynamic VLAN segments on VXLAN networks when ports are removed via `delete_port_postcommit()`
-- triggering the actual operation to update the leaf/spine devices to provide the connectivity via `update_port_postcommit()`
+- triggering the actual operation to update the leaf/spine devices to provide the connectivity via `update_port_postcommit()` on the `undersync` driver
+
+### Driver ordering is load-bearing
+
+`undersync` must be listed **after** `understack`, for two independent reasons.
+The `undersync` driver checks this when it initialises and refuses to start if
+the order is wrong, so a misconfigured `neutron-server` fails at startup rather
+than leaving stale VLANs on switches.
+
+1. **ML2 hooks.** `MechanismManager` invokes `*_postcommit` in the order the
+   drivers appear in `mechanism_drivers`. Understack's bookkeeping — releasing
+   the dynamic segment, cleaning the trunk — has to finish before Undersync is
+   told to reconcile. Undersync computes the desired switch state at the moment
+   it is called, so anything released afterwards stays configured on the switch
+   until the next sync of that vlan group.
+2. **Trunk and subport callbacks.** These are `neutron-lib` registry events, so
+   driver order does not apply; ordering comes from callback priority instead.
+   `undersync` subscribes above `PRIORITY_DEFAULT`, which the understack trunk
+   driver uses. It matters for `SUBPORTS AFTER_DELETE` and `TRUNK AFTER_DELETE`,
+   where understack tears down in the AFTER handler rather than in precommit.
+
+A distinct priority is also required because `neutron-lib` stores the
+`cancellable` flag per priority *group*, set by whichever subscriber creates the
+group first. Mechanism drivers initialise before the trunk service plugin loads,
+so sharing `PRIORITY_DEFAULT` would let `undersync`'s flag decide the trunk
+driver's cancellation behaviour too. The two `PRECOMMIT_DELETE` guards do stay
+at `PRIORITY_DEFAULT`: `neutron-lib` always raises for a failed precommit
+callback whatever the group's flag says, so sharing the group changes nothing
+there.
+
+Both drivers read the `[ml2_understack]` config group.
 
 ```mermaid
 sequenceDiagram
@@ -464,6 +498,49 @@ Neutron based on certain data provided to port creation and update API calls.
 
 - the port has a binding host
 - the port is either unbound or has previously failed to bind
+
+### Port Representations
+
+Neutron exposes a port in three different shapes and you will see all of them
+in the Neutron source and in our drivers:
+
+| Representation | How you get it | Notes |
+| -------------- | -------------- | ----- |
+| Dict | `core_plugin.get_port()`, `PortContext.current` | API-shaped. Binding fields appear flattened as `binding:vif_type`, `binding:vnic_type`, `binding:host_id`, etc. |
+| OVO | `neutron.objects.ports.Port.get_object()` | Typed versioned object. Bindings are in `port.bindings`, binding levels in `port.binding_levels`. |
+| SQLAlchemy model | `payload.metadata["port_db"]`, `ml2.db.get_port()` | ML2 internal. Bindings are in `port.port_bindings`. Don't go looking for these; use them when Neutron hands one to you. |
+
+Use the representation that matches where the port came from, and don't
+re-fetch a port just to change its shape:
+
+- If Neutron hands you a dict (`PortContext.current`) or a SQLAlchemy model
+  (for example `payload.metadata["port_db"]` in a registry callback), work with
+  that directly.
+- When we have only a port ID, as with a trunk's parent port, fetch the **OVO**
+  with `utils.fetch_port_object()`. It is typed, and it is what Neutron's own
+  newer code uses when it needs binding details. We don't use `get_port()` for
+  this.
+
+#### Selecting a binding
+
+A port can have several bindings (one `ACTIVE`, any number of `INACTIVE` ones
+during live migration), so never index with `port.bindings[0]`. Select the
+binding with `get_port_binding_by_status_and_host()` from
+`neutron_lib.plugins.utils`, then read `vif_type`, `vnic_type`, `profile` and
+`host` from the result. For an OVO port, `utils.active_port_binding()` wraps
+this and returns the `ACTIVE` binding, or `None` if there isn't one:
+
+```python
+binding = utils.active_port_binding(port)
+if binding and binding.vnic_type == portbindings.VNIC_BAREMETAL:
+    ...
+```
+
+For a SQLAlchemy model, call the neutron-lib helper directly with
+`port.port_bindings` (the model's attribute name) instead of `port.bindings`.
+The helper only subscripts each binding (`binding["status"]`,
+`binding["host"]`), so it works on either. Pass `raise_if_not_found=True` to get
+`PortBindingNotFound` instead of `None`.
 
 ### Router Interface Lifecycle
 

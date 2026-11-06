@@ -29,6 +29,13 @@ spec:
       valueFiles:
       - $understack/components/openstack-sync-operator/values.yaml
       - $deploy/{{ include "understack.deploy_path" $ }}/openstack-sync-operator/values.yaml
+      {{- with index $.Values.appLabels "understack.rackspace.com/site" }}
+      # Site name (Nautobot leaf Site) the operator runs for. The subnet-pool
+      # hook uses it as the default require.location.
+      parameters:
+      - name: env.UNDERSTACK_SITE
+        value: {{ . | quote }}
+      {{- end }}
   - ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

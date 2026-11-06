@@ -9,7 +9,6 @@ from neutron.db import segments_db
 from neutron.plugins.ml2 import db as ml2_db
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
-from oslo_config import cfg
 
 from neutron_understack.tests.scenarios.base import DEFAULT_PHYSNET
 from neutron_understack.tests.scenarios.base import UnderstackMl2ScenarioBase
@@ -101,7 +100,6 @@ class TestBaremetalBinding(UnderstackMl2ScenarioBase):
     def test_provisioning_network_port_binds(self):
         """A baremetal port on the provisioning network binds hierarchically."""
         net = self._make_vxlan_network()
-        cfg.CONF.set_override("provisioning_network", net["id"], group="ml2_understack")
         port = self._create_unbound_baremetal_port(net["id"])
 
         updated = self._vif_attach(port["id"])
@@ -118,7 +116,6 @@ class TestBaremetalBinding(UnderstackMl2ScenarioBase):
         go away returns the VLAN to the pool (as in BM-BIND-05).
         """
         net = self._make_vxlan_network()
-        cfg.CONF.set_override("provisioning_network", net["id"], group="ml2_understack")
         port = self._create_unbound_baremetal_port(net["id"])
         self._vif_attach(port["id"])
         vlan_segment_id = self._bottom_segment_id(port["id"])

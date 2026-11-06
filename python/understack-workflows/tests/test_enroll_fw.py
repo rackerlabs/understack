@@ -31,7 +31,7 @@ FW_FIELDS: dict[str, Any] = {
 
 def _node(
     *,
-    driver: str = "netdev",
+    driver: str = "panos",
     resource_class: str = "pa1410",
     provision_state: str = "active",
     driver_info: dict | None = None,
@@ -94,15 +94,19 @@ def _patch_paths(update_node_call) -> dict[str, Any]:
 
 def test_enroll_fw_hands_metadata_to_the_engine(mocker):
     _mock_client(mocker, node=None)  # not found -> new node -> engine enrolls
-    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+    engine = mocker.patch.object(
+        enroll_fw.netdev_reconciler, "enroll", return_value="node-123"
+    )
 
-    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
+    node_uuid = enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
 
+    assert node_uuid == "node-123"
     engine.assert_called_once_with(
         name="PA1410-026701008071",
         physical_network="f20-1-network",
         ports=BASE_ARGS["ports"],
         resource_class="pa1410",
+        driver="panos",
         external_cmdb_id=None,
         driver_info={
             "management_ip": "10.15.149.46",
@@ -111,7 +115,35 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
         },
         extra={"mate_serial": "026701010045"},
         properties={},
+        assign_roles=True,
+        traits={"CUSTOM_PRIMARY": False, "CUSTOM_SECONDARY": False},
     )
+
+
+@pytest.mark.parametrize(
+    ("ha_role", "traits"),
+    [
+        ("primary", {"CUSTOM_PRIMARY": True, "CUSTOM_SECONDARY": False}),
+        ("secondary", {"CUSTOM_PRIMARY": False, "CUSTOM_SECONDARY": True}),
+    ],
+)
+def test_enroll_fw_hands_the_ha_role_trait_to_the_engine(mocker, ha_role, traits):
+    _mock_client(mocker, node=None)
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, ha_role=ha_role)
+
+    assert engine.call_args.kwargs["traits"] == traits
+
+
+def test_enroll_fw_requires_a_mate_serial_with_an_ha_role(mocker):
+    client = mocker.patch.object(enroll_fw, "IronicClient")
+    fields = {**FW_FIELDS, "mate_serial": ""}
+
+    with pytest.raises(ValueError, match="--mate-serial with --ha-role"):
+        enroll_fw.enroll_fw(**BASE_ARGS, **fields, ha_role="primary")
+
+    client.assert_not_called()
 
 
 def test_enroll_fw_optional_fw_fields_can_be_omitted(mocker):
@@ -132,6 +164,27 @@ def test_enroll_fw_optional_fw_fields_can_be_omitted(mocker):
         "management_switch_port": "Ethernet1/24",
     }
     assert kwargs["extra"] == {}
+
+
+def test_enroll_fw_passes_explicit_legacy_driver_to_engine(mocker):
+    _mock_client(mocker, node=None)
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, driver="netdev")
+
+    assert engine.call_args.kwargs["driver"] == "netdev"
+
+
+@pytest.mark.parametrize("driver", ["", "   "])
+def test_enroll_fw_rejects_blank_driver_before_ironic_calls(mocker, driver):
+    client = mocker.patch.object(enroll_fw, "IronicClient")
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    with pytest.raises(ValueError, match="non-empty --driver"):
+        enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, driver=driver)
+
+    client.assert_not_called()
+    engine.assert_not_called()
 
 
 def test_existing_non_active_node_delegates_to_engine(mocker):
@@ -197,8 +250,9 @@ def test_active_node_updates_metadata_when_ports_match(mocker):
     client = _mock_client(mocker, node=_node(), node_ports=[_actual_port()])
     engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
 
-    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
+    node_uuid = enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
 
+    assert node_uuid == "node-uuid"
     engine.assert_not_called()
     client.update_node.assert_called_once()
     paths = _patch_paths(client.update_node.call_args)
@@ -268,16 +322,33 @@ def test_active_node_rejects_missing_port(mocker):
     client.update_node.assert_not_called()
 
 
-def test_active_node_rejects_non_netdev_driver(mocker):
+@pytest.mark.parametrize("driver", ["ipmi", "netdev"])
+def test_active_node_rejects_different_driver(mocker, driver):
     client = _mock_client(
-        mocker, node=_node(driver="ipmi"), node_ports=[_actual_port()]
+        mocker, node=_node(driver=driver), node_ports=[_actual_port()]
     )
     mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
 
-    with pytest.raises(RuntimeError, match="non-netdev"):
+    with pytest.raises(RuntimeError, match="refusing to enroll it as 'panos'"):
         enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
 
     client.update_node.assert_not_called()
+
+
+def test_active_legacy_node_updates_metadata_with_explicit_matching_driver(mocker):
+    client = _mock_client(
+        mocker, node=_node(driver="netdev"), node_ports=[_actual_port()]
+    )
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, driver="netdev")
+
+    engine.assert_not_called()
+    client.update_node.assert_called_once()
+    paths = _patch_paths(client.update_node.call_args)
+    assert paths["/driver_info/management_ip"] == "10.15.149.46"
+    assert "/driver" not in paths
+    client.set_node_provision_state.assert_not_called()
 
 
 def test_active_node_rejects_resource_class_change(mocker):
@@ -292,7 +363,97 @@ def test_active_node_rejects_resource_class_change(mocker):
     client.update_node.assert_not_called()
 
 
+def test_active_node_with_the_same_ha_role_gets_metadata_updates(mocker):
+    client = _mock_client(mocker, node=_node(), node_ports=[_actual_port()])
+    client.get_node_traits.return_value = ["CUSTOM_PRIMARY", "CUSTOM_OTHER"]
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, ha_role="primary")
+
+    client.update_node.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("current", "ha_role"),
+    [(["CUSTOM_PRIMARY"], "secondary"), ([], "primary"), (["CUSTOM_PRIMARY"], "")],
+    ids=["primary-to-secondary", "add-role", "drop-role"],
+)
+def test_active_node_rejects_an_ha_role_change(mocker, current, ha_role):
+    client = _mock_client(mocker, node=_node(), node_ports=[_actual_port()])
+    client.get_node_traits.return_value = current
+
+    with pytest.raises(RuntimeError, match="HA traits"):
+        enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, ha_role=ha_role)
+
+    client.update_node.assert_not_called()
+
+
 # --- argument parsing -------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("driver_args", "expected"), [([], "panos"), (["--driver", "netdev"], "netdev")]
+)
+def test_main_passes_default_or_explicit_driver(mocker, driver_args, expected):
+    engine = mocker.patch.object(enroll_fw, "enroll_fw")
+    mocker.patch.object(enroll_fw.helpers, "setup_logger")
+    mocker.patch(
+        "sys.argv",
+        [
+            "enroll-fw",
+            "--name",
+            "fw1",
+            "--physical-network",
+            "net",
+            "--ports",
+            "[]",
+            "--resource-class",
+            "pa1410",
+            "--management-switch",
+            "switch1",
+            "--management-switch-port",
+            "eth1",
+            *driver_args,
+        ],
+    )
+
+    enroll_fw.main()
+
+    assert engine.call_args.kwargs["driver"] == expected
+
+
+def test_main_emits_node_uuid_only_after_success(mocker, tmp_path):
+    output = tmp_path / "node-uuid"
+    mocker.patch.object(enroll_fw.helpers, "setup_logger")
+    mocker.patch(
+        "sys.argv",
+        [
+            "enroll-fw",
+            "--name",
+            "fw1",
+            "--physical-network",
+            "net",
+            "--ports",
+            "[]",
+            "--resource-class",
+            "pa1410",
+            "--management-switch",
+            "switch1",
+            "--management-switch-port",
+            "eth1",
+            "--node-uuid-output",
+            str(output),
+        ],
+    )
+    engine = mocker.patch.object(enroll_fw, "enroll_fw", return_value="node-123")
+
+    enroll_fw.main()
+
+    assert output.read_text() == "node-123\n"
+    output.unlink()
+    engine.side_effect = RuntimeError("enrollment failed")
+    with pytest.raises(RuntimeError, match="enrollment failed"):
+        enroll_fw.main()
+    assert not output.exists()
 
 
 def test_argument_parser_requires_resource_class():
@@ -324,5 +485,162 @@ def test_argument_parser_requires_management_switch_and_port():
                 "[]",
                 "--resource-class",
                 "pa1410",
+            ]
+        )
+
+
+def test_active_node_with_port_roles_still_gets_metadata_updates(mocker):
+    # The request carries no roles here, so an "outside" port is not drift.
+    labelled = _actual_port()
+    labelled.category = "outside"
+    client = _mock_client(mocker, node=_node(), node_ports=[labelled])
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
+
+    engine.assert_not_called()
+    client.update_port.assert_not_called()
+    client.update_node.assert_called_once()  # metadata only
+
+
+# --- enrollment without ports (inspection labels them) ----------------------
+
+
+def _enroll_without_ports(mocker, categories, physnet=None):
+    """Mock a new node whose inspection leaves ports with these categories."""
+    client = _mock_client(
+        mocker,
+        node_ports=[
+            SimpleNamespace(
+                uuid=f"port-{i}",
+                name=f"fw:ethernet1/{i}",
+                category=c,
+                physical_network=physnet,
+            )
+            for i, c in enumerate(categories, start=1)
+        ],
+    )
+    mocker.patch.object(
+        enroll_fw.netdev_reconciler,
+        "find_or_create_netdev_node",
+        return_value=(_node(provision_state="enroll"), True),
+    )
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+    transition = mocker.patch.object(enroll_fw.ironic_node, "transition")
+    return client, engine, transition
+
+
+def _steps(transition):
+    return [call.kwargs["target_state"] for call in transition.call_args_list]
+
+
+def _physnet_updates(client):
+    return {call.args[0]: call.args[1] for call in client.update_port.call_args_list}
+
+
+def test_enroll_without_ports_inspects_before_providing(mocker):
+    client, engine, transition = _enroll_without_ports(
+        mocker, ["outside", "inside", None]
+    )
+
+    node_uuid = enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
+
+    assert node_uuid == "node-uuid"
+    engine.assert_not_called()
+    assert _steps(transition) == ["manage", "inspect", "provide"]
+    # Only the role ports get the physical network.
+    patch = [{"op": "add", "path": "/physical_network", "value": "f20-1-network"}]
+    assert _physnet_updates(client) == {"port-1": patch, "port-2": patch}
+
+
+def test_enroll_without_ports_keeps_a_matching_physical_network(mocker):
+    client, _engine, transition = _enroll_without_ports(
+        mocker, ["outside", "inside"], physnet="f20-1-network"
+    )
+
+    enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
+
+    client.update_port.assert_not_called()
+    assert _steps(transition) == ["manage", "inspect", "provide"]
+
+
+def test_enroll_without_ports_is_not_provided_without_both_roles(mocker):
+    client, _engine, transition = _enroll_without_ports(mocker, ["outside", None])
+
+    with pytest.raises(RuntimeError, match="an outside and an inside port"):
+        enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
+
+    assert _steps(transition) == ["manage", "inspect"]
+    client.update_port.assert_not_called()
+
+
+def test_enroll_without_ports_marks_a_secondary_before_providing(mocker):
+    client, _engine, transition = _enroll_without_ports(mocker, ["outside", "inside"])
+    calls = mocker.Mock()
+    calls.attach_mock(client.add_node_trait, "add_node_trait")
+    calls.attach_mock(transition, "transition")
+
+    enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS, ha_role="secondary")
+
+    client.add_node_trait.assert_called_once_with("node-uuid", "CUSTOM_SECONDARY")
+    steps = [kwargs.get("target_state", name) for name, _, kwargs in calls.mock_calls]
+    assert steps == ["manage", "add_node_trait", "inspect", "provide"]
+
+
+def test_active_node_without_ports_updates_metadata_only(mocker):
+    client = _mock_client(mocker, node=_node())
+
+    enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
+
+    client.list_ports.assert_not_called()  # nothing to compare
+    client.update_node.assert_called_once()
+
+
+@pytest.mark.parametrize("ports", [BASE_ARGS["ports"], []], ids=["ports", "no-ports"])
+def test_enroll_fw_requires_a_physical_network(mocker, ports):
+    client = _mock_client(mocker)
+
+    with pytest.raises(ValueError, match="--physical-network"):
+        enroll_fw.enroll_fw(
+            **{**BASE_ARGS, "physical_network": " ", "ports": ports}, **FW_FIELDS
+        )
+
+    client.get_node.assert_not_called()
+
+
+def test_argument_parser_requires_physical_network():
+    parser = enroll_fw.argument_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "--name",
+                "fw1",
+                "--resource-class",
+                "pa1410",
+                "--management-switch",
+                "switch1",
+                "--management-switch-port",
+                "eth1",
+            ]
+        )
+
+
+def test_argument_parser_rejects_an_unknown_ha_role():
+    parser = enroll_fw.argument_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "--name",
+                "fw1",
+                "--physical-network",
+                "net",
+                "--resource-class",
+                "pa1410",
+                "--management-switch",
+                "switch1",
+                "--management-switch-port",
+                "eth1",
+                "--ha-role",
+                "standby",
             ]
         )

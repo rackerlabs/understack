@@ -183,11 +183,13 @@ def _matching_status(
     sync_status: str = "Synced",
     message: str = "ok",
     generation: int | None = 1,
+    reason: str | None = None,
 ) -> dict:
+    default_reason = "Reconciled" if sync_status == "Synced" else "ReconcileError"
     condition = {
         "type": "Ready",
         "status": "True" if sync_status == "Synced" else "False",
-        "reason": "Reconciled" if sync_status == "Synced" else "ReconcileError",
+        "reason": reason or default_reason,
         "message": message,
         "lastTransitionTime": "2026-08-19T06:20:21Z",
     }
@@ -248,11 +250,85 @@ def test_status_is_current_detects_real_status_differences(
     assert not hc._status_is_current(current, sync_status, message, generation)
 
 
+def test_status_is_current_matches_when_the_reason_matches():
+    current = _matching_status(sync_status="Failed", reason="NautobotPrefixMissing")
+
+    assert hc._status_is_current(
+        current, "Failed", "ok", 1, None, "NautobotPrefixMissing"
+    )
+
+
+def test_status_is_current_detects_a_changed_reason():
+    """A new reason must not be skipped as a no-op because the message matches."""
+    current = _matching_status(sync_status="Failed", reason="ReconcileError")
+
+    assert not hc._status_is_current(
+        current, "Failed", "ok", 1, None, "NautobotPrefixMissing"
+    )
+
+
+def test_status_is_current_detects_reason_cleared():
+    """Clearing a reason is also a real change, not a no-op."""
+    current = _matching_status(sync_status="Failed", reason="NautobotPrefixMissing")
+
+    assert not hc._status_is_current(current, "Failed", "ok", 1, None, None)
+
+
 def test_status_is_current_rejects_a_stale_condition_generation():
     current = _matching_status(generation=2)
     current["conditions"][0]["observedGeneration"] = 1
 
     assert not hc._status_is_current(current, "Synced", "ok", 2)
+
+
+# ---------------------------------------------------------------------------
+# _status_is_current: extra_status (plugin-supplied structured status)
+# ---------------------------------------------------------------------------
+
+
+def test_status_is_current_ignores_extra_status_when_not_given():
+    """A plugin with no extra_status compares only the framework's own fields."""
+    current = _matching_status()
+    assert hc._status_is_current(current, "Synced", "ok", 1)
+    assert hc._status_is_current(current, "Synced", "ok", 1, None)
+    assert hc._status_is_current(current, "Synced", "ok", 1, {})
+
+
+def test_status_is_current_true_when_extra_status_already_matches():
+    current = {**_matching_status(), "prefixes": [{"id": "a", "cidr": "10.0.0.0/8"}]}
+
+    assert hc._status_is_current(
+        current, "Synced", "ok", 1, {"prefixes": [{"id": "a", "cidr": "10.0.0.0/8"}]}
+    )
+
+
+def test_status_is_current_false_when_extra_status_value_differs():
+    current = {**_matching_status(), "prefixes": [{"id": "a", "cidr": "10.0.0.0/8"}]}
+
+    assert not hc._status_is_current(
+        current, "Synced", "ok", 1, {"prefixes": [{"id": "b", "cidr": "10.0.0.0/8"}]}
+    )
+
+
+def test_status_is_current_false_when_extra_status_key_is_missing():
+    """A CRD/plugin upgrade that adds a new status field must force a repatch.
+
+    A CR whose status predates the field looks like it lacks 'prefixes'
+    entirely; that must count as a mismatch, not as "nothing to compare."
+    """
+    current = _matching_status()
+    assert "prefixes" not in current
+
+    assert not hc._status_is_current(
+        current, "Synced", "ok", 1, {"prefixes": [{"id": "a"}]}
+    )
+
+
+def test_status_is_current_true_when_extra_status_value_is_empty_list():
+    """An explicit empty list is a real value and must compare, not short-circuit."""
+    current = {**_matching_status(), "prefixes": []}
+
+    assert hc._status_is_current(current, "Synced", "ok", 1, {"prefixes": []})
 
 
 # ---------------------------------------------------------------------------
@@ -664,6 +740,26 @@ def test_patch_resource_status_condition_goes_false_on_failure():
     assert condition["reason"] == "ReconcileError"
 
 
+def test_patch_resource_status_uses_the_given_reason_on_failure():
+    """A caller-supplied reason overrides the generic ReconcileError."""
+    condition = _written_condition(
+        sync_status="Failed", message="boom", reason="NautobotPrefixMissing"
+    )
+
+    assert condition["status"] == "False"
+    assert condition["reason"] == "NautobotPrefixMissing"
+
+
+def test_patch_resource_status_ignores_reason_when_synced():
+    """A synced CR always reports Reconciled; there is nothing to disambiguate."""
+    condition = _written_condition(
+        sync_status="Synced", message="all good", reason="NautobotPrefixMissing"
+    )
+
+    assert condition["status"] == "True"
+    assert condition["reason"] == "Reconciled"
+
+
 def test_patch_resource_status_omits_condition_generation_when_absent():
     assert "observedGeneration" not in _written_condition(generation=None)
 
@@ -709,6 +805,75 @@ def test_patch_resource_status_restamps_a_condition_missing_a_transition_time():
 def test_patch_resource_status_skips_when_current_status_matches():
     call = _patch(generation=1, message="ok", current_status=_matching_status())
     assert not call.called
+
+
+# ---------------------------------------------------------------------------
+# patch_resource_status: extra_status (plugin-supplied structured status)
+# ---------------------------------------------------------------------------
+
+
+def test_patch_resource_status_omits_extra_fields_when_not_given():
+    """A plugin with no extra_status patches only the framework's own fields."""
+    status = _patch().call_args.kwargs["body"]["status"]
+    assert set(status.keys()) == {
+        "syncStatus",
+        "lastSyncTime",
+        "message",
+        "conditions",
+        "observedGeneration",
+    }
+
+
+def test_patch_resource_status_merges_extra_status_into_the_body():
+    status = _patch(
+        extra_status={"prefixes": [{"id": "a", "cidr": "10.0.0.0/8"}]}
+    ).call_args.kwargs["body"]["status"]
+
+    assert status["prefixes"] == [{"id": "a", "cidr": "10.0.0.0/8"}]
+    # The framework's own fields are still written alongside it, unchanged.
+    assert status["syncStatus"] == "Synced"
+    assert [c["type"] for c in status["conditions"]] == ["Ready"]
+
+
+def test_patch_resource_status_skips_when_extra_status_also_matches():
+    current = {**_matching_status(), "prefixes": [{"id": "a"}]}
+
+    call = _patch(
+        generation=1,
+        message="ok",
+        current_status=current,
+        extra_status={"prefixes": [{"id": "a"}]},
+    )
+
+    assert not call.called
+
+
+def test_patch_resource_status_patches_when_extra_status_differs():
+    current = {**_matching_status(), "prefixes": [{"id": "a"}]}
+
+    status = _patch(
+        generation=1,
+        message="ok",
+        current_status=current,
+        extra_status={"prefixes": [{"id": "b"}]},
+    ).call_args.kwargs["body"]["status"]
+
+    assert status["prefixes"] == [{"id": "b"}]
+
+
+def test_patch_resource_status_patches_when_extra_status_key_is_new():
+    """A CR whose stored status predates the extra field gets backfilled once."""
+    current = _matching_status()
+    assert "prefixes" not in current
+
+    status = _patch(
+        generation=1,
+        message="ok",
+        current_status=current,
+        extra_status={"prefixes": []},
+    ).call_args.kwargs["body"]["status"]
+
+    assert status["prefixes"] == []
 
 
 def test_patch_resource_status_skips_without_a_namespace(caplog):

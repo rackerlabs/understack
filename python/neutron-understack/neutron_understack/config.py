@@ -6,22 +6,9 @@ _OPT_GRP_ML2_UNDERSTACK = "ml2_understack"
 _OPT_GRP_IRONIC = "ironic"
 _OPT_GRP_L3_SVC_CISCO_ASA = "l3_service_cisco_asa"
 _OPT_GRP_UNDERSTACK_VNI = "understack_vni"
+_OPT_GRP_NETDEV_RECONCILE = "netdev_router_reconcile"
 
 _mech_understack_opts = [
-    cfg.StrOpt(
-        "nb_url",
-        help="Nautobot URL",
-        required=False,
-    ),
-    cfg.StrOpt(
-        "nb_token",
-        help="Nautobot API token",
-        required=False,
-    ),
-    cfg.StrOpt(
-        "ucvni_group",
-        help="hack",
-    ),
     cfg.StrOpt(
         "undersync_url",
         help="Undersync URL",
@@ -30,41 +17,10 @@ _mech_understack_opts = [
         "undersync_dry_run", default=True, help="Call Undersync with dry-run mode"
     ),
     cfg.StrOpt(
-        "provisioning_network",
-        help="provisioning_network ID as configured in ironic.conf",
-        default="change_me",
-    ),
-    cfg.StrOpt(
-        "shared_nautobot_namespace_name",
-        default="Global",
-        help=(
-            "Nautobot namespace name that will house all external prefixes, i.e "
-            "prefixes that need to be routable outside of a tenant environment."
-        ),
-    ),
-    # TODO:: this can very likely be deprecated now
-    cfg.StrOpt(
-        "network_node_switchport_uuid",
-        help=(
-            "Nautobot UUID of the network node's switchport interface, that "
-            "is used to trunk all vlans used by a neutron router."
-        ),
-    ),
-    cfg.StrOpt(
         "network_node_switchport_physnet",
         help=(
             "Name of the physnet configured on a network node's"
             "baremetal port that provides connectivity to OVN."
-        ),
-    ),
-    cfg.BoolOpt(
-        "enforce_unique_vlans_in_fabric",
-        default=True,
-        help=(
-            "When enabled, Neutron performs an extra check during the creation of a"
-            "new VLAN network. This check ensures that the VLAN ID being assigned is"
-            "not already in use within a fabric. The verification is handled by "
-            "Nautobot."
         ),
     ),
     cfg.ListOpt(
@@ -114,6 +70,30 @@ _understack_vni_opts = [
 ]
 
 
+_netdev_reconcile_opts = [
+    cfg.BoolOpt(
+        "enabled",
+        default=True,
+        help=(
+            "Run the periodic netdev-router reconciler in the OVN maintenance "
+            "worker. It releases panos Ironic nodes whose instance_uuid names "
+            "a router that no longer exists. Set to false to stop it from "
+            "changing any node state; set dry_run to inspect what it would do "
+            "without changing anything."
+        ),
+    ),
+    cfg.BoolOpt(
+        "dry_run",
+        default=False,
+        help=(
+            "Log the netdev nodes the reconciler would release without "
+            "releasing them. Use this to confirm the candidate set in a new "
+            "region before letting it act."
+        ),
+    ),
+]
+
+
 def list_understack_opts():
     return [
         (_OPT_GRP_ML2_UNDERSTACK, _mech_understack_opts),
@@ -145,6 +125,12 @@ def list_understack_vni_opts():
     ]
 
 
+def list_netdev_reconcile_opts():
+    return [
+        (_OPT_GRP_NETDEV_RECONCILE, _netdev_reconcile_opts),
+    ]
+
+
 def register_ml2_understack_opts(config):
     config.register_opts(_mech_understack_opts, _OPT_GRP_ML2_UNDERSTACK)
 
@@ -161,6 +147,10 @@ def register_l3_svc_cisco_asa_opts(config):
 
 def register_understack_vni_opts(config):
     config.register_opts(_understack_vni_opts, _OPT_GRP_UNDERSTACK_VNI)
+
+
+def register_netdev_reconcile_opts(config):
+    config.register_opts(_netdev_reconcile_opts, _OPT_GRP_NETDEV_RECONCILE)
 
 
 def get_session(group: str) -> ks_session.Session:

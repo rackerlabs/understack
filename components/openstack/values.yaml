@@ -27,8 +27,9 @@ mariadb:
       resources:
         requests:
           storage: 10Gi
-  # optional, defaults to operator's image
-  # image: docker-registry1.mariadb.com/library/mariadb:11.4.4
+  # -- MariaDB server image. Pinned so the version never depends on the
+  # operator's own default; sites may override it.
+  image: mariadb:11.4.10@sha256:3b4dfcc32247eb07adbebec0793afae2a8eafa6860ec523ee56af4d3dec42f7f
 
   # -- galera settings
   galera:
@@ -58,6 +59,8 @@ mariadb:
 
 # -- OpenStack RabbitMQ instance settings
 rabbitmq:
+  # -- image to use
+  image: rabbitmq:4.2.9-management@sha256:7ce498399b07a9594a3d23e5a7920edf233edb888e82503c35357c23cefc2e61
   # -- storage settings
   persistence: {}
   # -- resource settings

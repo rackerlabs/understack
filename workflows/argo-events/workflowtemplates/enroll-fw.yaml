@@ -8,11 +8,25 @@ metadata:
       Defined in `workflows/argo-events/workflowtemplates/enroll-fw.yaml`.
       Reuses enroll-netdev for the node/port lifecycle and additionally records
       firewall management details in driver_info and the HA mate serial in extra.
+      Defaults to the panos hardware type. Without ports, it inspects the
+      firewall to discover and label them, and only then makes it available.
+
+      The workflow reads site-specific configuration from the
+      `enroll-fw-config` ConfigMap. After enrollment, it runs the templates
+      listed in `post_enroll_workflows`.
 kind: WorkflowTemplate
 spec:
+  # Labels make runs filterable in the Argo UI (`argo list -l`) and give
+  # alerts a stable key. Per-target labels are added at submission time.
+  workflowMetadata:
+    labels:
+      understack.rackspace.com/workflow-kind: enroll
+      understack.rackspace.com/device-type: fw
   serviceAccountName: workflow
   entrypoint: main
   volumes:
+    - name: enrollment-result
+      emptyDir: {}
     - name: baremetal-manage
       secret:
         secretName: baremetal-manage
@@ -22,10 +36,17 @@ spec:
   arguments:
     parameters:
       - name: name
+      # VLAN group in Nautobot, e.g. f20-3-network.
       - name: physical_network
-      # JSON array of ports (same format as enroll-netdev).
+      # JSON array of ports (same format as enroll-netdev). Leave it as [] to
+      # let inspection discover and label the ports.
       - name: ports
+        value: "[]"
       - name: external_cmdb_id
+        value: ""
+      - name: rack
+        value: ""
+      - name: position
         value: ""
       - name: resource_class
       # Firewall management/identity metadata. management_* land in the node's
@@ -37,25 +58,69 @@ spec:
       - name: management_switch_port
       - name: mate_serial
         value: ""
+      # primary or secondary in an HA pair (needs mate_serial); "" if not HA.
+      - name: ha_role
+        value: ""
       # Device identity, read by the Nautobot device sync. serial -> extra;
       # vendor/model -> properties. 'switch' in ports must be the switch FQDN.
       - name: serial
         value: ""
       - name: vendor
         value: "Palo Alto"
+      - name: driver
+        value: "panos"
       - name: model
         value: ""
   templates:
     - name: main
+      inputs:
+        parameters:
+          - name: post_enroll_workflows
+            valueFrom:
+              configMapKeyRef:
+                name: enroll-fw-config
+                key: post_enroll_workflows
+              default: "[]"
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              parameter: "{{steps.enroll-fw.outputs.parameters.node_uuid}}"
       steps:
         - - name: enroll-fw
             template: enroll-fw
+        - - name: post-enroll
+            templateRef:
+              name: "{{item}}"
+              template: run
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-fw.outputs.parameters.node_uuid}}"
+            withParam: "{{inputs.parameters.post_enroll_workflows}}"
+        - - name: set-node-extra
+            template: set-node-extra
+            when: >-
+              "{{workflow.parameters.external_cmdb_id}}" != "" ||
+              "{{workflow.parameters.rack}}" != "" ||
+              "{{workflow.parameters.position}}" != ""
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-fw.outputs.parameters.node_uuid}}"
     - name: enroll-fw
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              path: /run/enrollment/node-uuid
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - enroll-fw
         args:
+          - --node-uuid-output
+          - /run/enrollment/node-uuid
           - --name
           - "{{workflow.parameters.name}}"
           - --physical-network
@@ -66,6 +131,8 @@ spec:
           - "{{workflow.parameters.external_cmdb_id}}"
           - --resource-class
           - "{{workflow.parameters.resource_class}}"
+          - --driver
+          - "{{workflow.parameters.driver}}"
           - --management-ip
           - "{{workflow.parameters.management_ip}}"
           - --management-switch
@@ -74,6 +141,8 @@ spec:
           - "{{workflow.parameters.management_switch_port}}"
           - --mate-serial
           - "{{workflow.parameters.mate_serial}}"
+          - --ha-role
+          - "{{workflow.parameters.ha_role}}"
           - --serial
           - "{{workflow.parameters.serial}}"
           - --vendor
@@ -81,6 +150,8 @@ spec:
           - --model
           - "{{workflow.parameters.model}}"
         volumeMounts:
+          - mountPath: /run/enrollment
+            name: enrollment-result
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
@@ -96,3 +167,34 @@ spec:
             value: "{{workflow.uid}}"
           - name: OS_CLOUD
             value: understack
+    - name: set-node-extra
+      inputs:
+        parameters:
+          - name: node_uuid
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
+        command:
+          - sh
+          - -c
+          - |
+            set -eu
+            set -- baremetal node set
+            [ -n "${EXTERNAL_CMDB_ID}" ] && set -- "$@" --extra "external_cmdb_id=${EXTERNAL_CMDB_ID}"
+            [ -n "${RACK}" ] && set -- "$@" --extra "rack=${RACK}"
+            [ -n "${POSITION}" ] && set -- "$@" --extra "position=${POSITION}"
+            exec openstack "$@" "${NODE_UUID}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+          - name: NODE_UUID
+            value: "{{inputs.parameters.node_uuid}}"
+          - name: EXTERNAL_CMDB_ID
+            value: "{{workflow.parameters.external_cmdb_id}}"
+          - name: RACK
+            value: "{{workflow.parameters.rack}}"
+          - name: POSITION
+            value: "{{workflow.parameters.position}}"
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true

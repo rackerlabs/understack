@@ -13,6 +13,7 @@ dynamic = ["version"]
 dependencies = [
     "kubernetes>=32.0.0",
     "openstacksdk>=4.18.0",
+    "pynautobot>=3,<4",
     "python-ironicclient>=6.2.0",
     "python-openstackclient>=10.2.1",
 ]

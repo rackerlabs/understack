@@ -11,6 +11,18 @@ from ironicclient.common.utils import args_array_to_patch
 
 logger = logging.getLogger(__name__)
 
+# The node trait for each HA role. Router selection in neutron-understack
+# (ironic.py) skips CUSTOM_SECONDARY; change both together.
+HA_ROLE_TRAITS = {"primary": "CUSTOM_PRIMARY", "secondary": "CUSTOM_SECONDARY"}
+
+
+def ha_role_traits(ha_role: str) -> dict[str, bool]:
+    """Map each HA trait to whether the node should have it.
+
+    No role (a firewall outside an HA pair) means neither trait.
+    """
+    return {trait: role == ha_role for role, trait in HA_ROLE_TRAITS.items()}
+
 
 def firewall_metadata(
     *,

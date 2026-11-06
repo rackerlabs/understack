@@ -3,7 +3,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - ironic-mariadb-db.yaml
   - ironic-rabbitmq-queue.yaml
   - dnsmasq-pvc.yaml
   - dnsmasq-ss.yaml
@@ -11,6 +10,23 @@ resources:
     # less than ideal addition but necessary so that we can have the ironic.conf.d loading
     # working due to the way the chart hardcodes the config-file parameter which then
     # takes precedence over the directory
+  # OIDC cert refresh -- fetches dex TLS cert into ironic-oidc-https-cert ConfigMap
+  - oidc-cert-rbac.yaml
+  - cronjob-oidc-cert-refresh.yaml
   # Alerting
   - pr-clean-failed-servers.yaml
   - pr-resource-availability.yaml
+
+configMapGenerator:
+  - name: ironic-trait-based-networking
+    files:
+      - trait_based_networking.yaml
+    options:
+      # The conductor's Helm values also reference this ConfigMap by name.
+      disableNameSuffixHash: true
+  - name: ironic-oidc-cert-fetch
+    files:
+      - refresh-oidc-cert.py
+    options:
+      # The conductor's Helm values also reference this ConfigMap.
+      disableNameSuffixHash: true

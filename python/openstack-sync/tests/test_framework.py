@@ -20,6 +20,7 @@ from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import CredentialKey
 from openstack_sync.hooks.framework import HookConfig
 from openstack_sync.hooks.framework import PruneRequest
+from openstack_sync.hooks.framework import ReconcileResult
 from openstack_sync.hooks.framework import SyncPlan
 from openstack_sync.hooks.framework import SyncPlugin
 from openstack_sync.hooks.framework import SyncResource
@@ -45,6 +46,7 @@ FRAMEWORK_PUBLIC_NAMES = [
     "FINALIZER",
     "HookConfig",
     "PruneRequest",
+    "ReconcileResult",
     "SyncPlan",
     "SyncPlugin",
     "SyncResource",
@@ -126,11 +128,13 @@ class StubPlugin(SyncPlugin):
         config: HookConfig,
         *,
         fail_for: tuple[str, ...] = (),
+        fail_with_reason: dict[str, str] | None = None,
         notes_for: dict[str, list[str]] | None = None,
         prune_raises: bool = False,
     ) -> None:
         super().__init__(config)
         self.fail_for = set(fail_for)
+        self.fail_with_reason = fail_with_reason or {}
         self.notes_for = notes_for or {}
         self.prune_raises = prune_raises
         self.reconciled: list[str] = []
@@ -146,12 +150,17 @@ class StubPlugin(SyncPlugin):
         self.caches.append(cache)
         return cache
 
-    def reconcile(self, conn: Any, spec: dict[str, Any], cache: Any) -> list[str]:
+    def reconcile(self, conn: Any, spec: dict[str, Any], cache: Any) -> ReconcileResult:
         name = spec["name"]
         self.reconciled.append(name)
         if name in self.fail_for:
             raise RuntimeError(f"reconcile failed for {name}")
-        return list(self.notes_for.get(name, []))
+        if name in self.fail_with_reason:
+            raise ConfigError(
+                f"reconcile failed for {name}",
+                reason=self.fail_with_reason[name],
+            )
+        return ReconcileResult(notes=list(self.notes_for.get(name, [])))
 
     def prune(
         self,
@@ -180,9 +189,9 @@ class NoPrunePlugin(SyncPlugin):
     def wait_for_api(self, conn: Any) -> None:
         self.waits += 1
 
-    def reconcile(self, conn: Any, spec: dict[str, Any], cache: Any) -> list[str]:
+    def reconcile(self, conn: Any, spec: dict[str, Any], cache: Any) -> ReconcileResult:
         self.reconciled.append(spec["name"])
-        return []
+        return ReconcileResult()
 
 
 class AlwaysPrunePlugin(StubPlugin):
@@ -1459,6 +1468,58 @@ def test_run_sync_continues_after_one_failure():
     _drive(plugin, _inputs([_resource("a"), _resource("b")]))
 
     assert plugin.reconciled == ["a", "b"]
+
+
+def test_run_sync_reports_a_configerror_reason_on_the_failed_status():
+    """A ConfigError naming a reason has it passed to patch_status, not lost."""
+    plugin = StubPlugin(
+        make_hook_config(), fail_with_reason={"a": "NautobotPrefixMissing"}
+    )
+
+    _, patch_status, _ = _drive(plugin, _inputs([_resource("a")]))
+
+    kwargs = patch_status.call_args.kwargs
+    assert kwargs["sync_status"] == "Failed"
+    assert kwargs["reason"] == "NautobotPrefixMissing"
+
+
+def test_run_sync_reports_no_reason_for_a_plain_failure():
+    """A plain failure reports no reason, so the generic default applies."""
+    plugin = StubPlugin(make_hook_config(), fail_for=("a",))
+
+    _, patch_status, _ = _drive(plugin, _inputs([_resource("a")]))
+
+    kwargs = patch_status.call_args.kwargs
+    assert kwargs["sync_status"] == "Failed"
+    assert kwargs.get("reason") is None
+
+
+def test_run_sync_ignores_a_reason_attribute_on_a_non_configerror():
+    """Only ConfigError's reason is trusted.
+
+    other exceptions with a `reason` attribute
+    (e.g. urllib3/Kubernetes errors carrying an HTTP reason phrase
+    like "Bad Request") must not leak it into the condition.
+    """
+
+    class _LooksLikeConfigError(RuntimeError):
+        def __init__(self, message: str) -> None:
+            super().__init__(message)
+            self.reason = "Bad Request"
+
+    class ImpostorPlugin(StubPlugin):
+        def reconcile(self, conn, spec, cache):
+            if spec["name"] == "a":
+                raise _LooksLikeConfigError("boom")
+            return super().reconcile(conn, spec, cache)
+
+    plugin = ImpostorPlugin(make_hook_config())
+
+    _, patch_status, _ = _drive(plugin, _inputs([_resource("a")]))
+
+    kwargs = patch_status.call_args.kwargs
+    assert kwargs["sync_status"] == "Failed"
+    assert kwargs.get("reason") is None
 
 
 def test_run_sync_marks_whole_group_failed_when_connection_fails():

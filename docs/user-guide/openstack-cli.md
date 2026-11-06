@@ -14,6 +14,16 @@ to already have Python on your system.
     brew install openstackclient
     ```
 
+=== "pipx"
+
+    [pipx](https://pipx.pypa.io/) installs and runs end-user Python applications in isolated
+    environments and allows for easy upgrades and clean uninstalls.
+
+    ``` bash
+    pipx install python-openstackclient
+    pipx inject python-openstackclient python-ironicclient keyring 'keystoneauth1>=5.17.0'
+    ```
+
 === "pip"
 
     ``` bash

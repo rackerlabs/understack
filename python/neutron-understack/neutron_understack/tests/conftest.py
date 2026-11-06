@@ -2,7 +2,6 @@ import copy
 import json
 import random
 import uuid
-from unittest.mock import MagicMock
 
 import pytest
 from neutron.db.models.segment import NetworkSegment
@@ -26,12 +25,13 @@ from neutron_lib.callbacks.events import DBEventPayload
 from oslo_config import fixture as config_fixture
 
 from neutron_understack import config as understack_config
-from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.tests.helpers import Ml2PluginNoInit
 from neutron_understack.tests.helpers import extend_network_dict
 from neutron_understack.tests.helpers import extend_port_dict_with_trunk
-from neutron_understack.trunk import UnderStackTrunkDriver
-from neutron_understack.undersync import Undersync
+from neutron_understack.trunk import UnderstackTrunkDriver
+from neutron_understack.understack_mech import UnderstackDriver
+from neutron_understack.undersync_client import Undersync
+from neutron_understack.undersync_mech import UndersyncDriver
 
 
 @pytest.fixture
@@ -280,14 +280,34 @@ def port_context(network_context, port_dict, port_binding, ml2_plugin) -> PortCo
 
 @pytest.fixture
 def understack_driver(oslo_config) -> UnderstackDriver:
-    driver = UnderstackDriver()
-    driver.undersync = MagicMock(spec_set=Undersync)
-    return driver
+    """The understack driver, which must never reach out to Undersync.
+
+    No ``undersync`` attribute is injected on purpose, so a reintroduced
+    ``self.undersync.sync(...)`` fails loudly instead of passing against a mock.
+    """
+    return UnderstackDriver()
 
 
 @pytest.fixture
-def understack_trunk_driver(understack_driver) -> UnderStackTrunkDriver:
-    return UnderStackTrunkDriver.create(understack_driver)
+def understack_trunk_driver() -> UnderstackTrunkDriver:
+    return UnderstackTrunkDriver.create()
+
+
+@pytest.fixture
+def undersync_client(mocker) -> Undersync:
+    return mocker.MagicMock(spec_set=Undersync)
+
+
+@pytest.fixture
+def undersync_driver(oslo_config, undersync_client) -> UndersyncDriver:
+    """The undersync driver with its client injected.
+
+    ``initialize()`` is deliberately not called: it builds a real ``Undersync``
+    without needing config, so a stray ``sync()`` would issue real HTTP.
+    """
+    driver = UndersyncDriver()
+    driver.undersync = undersync_client
+    return driver
 
 
 @pytest.fixture
@@ -341,15 +361,7 @@ def oslo_config():
 
 
 @pytest.fixture
-def _ml2_understack_conf(oslo_config, ucvni_group_id) -> None:
-    oslo_config.config(
-        ucvni_group=str(ucvni_group_id),
-        group="ml2_understack",
-    )
-    oslo_config.config(
-        network_node_switchport_uuid="a27f7260-a7c5-4f0c-ac70-6258b026d368",
-        group="ml2_understack",
-    )
+def _ml2_understack_conf(oslo_config) -> None:
     oslo_config.config(
         undersync_dry_run=False,
         group="ml2_understack",

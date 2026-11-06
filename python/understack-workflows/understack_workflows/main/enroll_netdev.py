@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 
 from understack_workflows import helpers
 from understack_workflows.netdev_reconciler import DEFAULT_RESOURCE_CLASS
@@ -24,7 +25,7 @@ def main() -> None:
     helpers.setup_logger()
     args = argument_parser().parse_args()
 
-    enroll(
+    node_uuid = enroll(
         name=args.name,
         physical_network=args.physical_network,
         ports=parse_ports_arg(args.ports),
@@ -32,11 +33,18 @@ def main() -> None:
         resource_class=args.resource_class,
     )
 
+    if args.node_uuid_output:
+        Path(args.node_uuid_output).write_text(node_uuid + "\n")
+
 
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__),
         description="Run the netdev enroll workflow",
+    )
+    parser.add_argument(
+        "--node-uuid-output",
+        help="Write node UUID to this file after successful enrollment",
     )
     parser.add_argument("--name", required=True, help="Ironic node name")
     parser.add_argument(

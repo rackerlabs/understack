@@ -1,6 +1,6 @@
 ---
 kustomize_paths:
-- operators/cnpg-system
+- components/cnpg-system
 deploy_overrides:
   helm:
     mode: none

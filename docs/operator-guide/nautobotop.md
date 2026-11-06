@@ -46,7 +46,8 @@ flowchart
 ### Installation
 
 ```bash
-helm install nautobotop oci://ghcr.io/rackerlabs/charts/nautobotop:0.0.1 -n nautobotop --create-namespace
+helm install nautobotop charts/nautobotop -n nautobotop --create-namespace \
+  --set image.tag=<tag>
 ```
 
 ### Basic Configuration
@@ -750,7 +751,9 @@ During a sync the operator will create or update objects in Nautobot and remove 
 
 ## UnderStack Integration
 
-The nautobotop component is defined at `apps/global/nautobotop.yaml` and deployed through ArgoCD.
+The nautobotop component is defined by `charts/argocd-understack/templates/application-nautobotop.yaml`
+and deployed through ArgoCD. The chart lives in `charts/nautobotop/` and is released with the
+repository-wide `vX.Y.Z` tag; the image follows `understack_ref` when it is a release tag and is `latest` otherwise. Pin it in `$DEPLOY_NAME/nautobotop/values.yaml` with `image.tag`.
 
 You can customize the deployment per environment:
 

@@ -46,6 +46,7 @@ class Bmc:
         self._base_path: str | None = None
         self._system_path: str | None = None
         self._manager_path: str | None = None
+        self._manager_attributes_path: str | None = None
 
     @property
     def base_path(self) -> str:
@@ -64,6 +65,14 @@ class Bmc:
         """Read Manager path from BMC."""
         self._manager_path = self._manager_path or self.get_manager_path()
         return self._manager_path
+
+    @property
+    def manager_attributes_path(self) -> str:
+        """Read the vendor-supported Manager attributes path from the BMC."""
+        self._manager_attributes_path = (
+            self._manager_attributes_path or self.get_manager_attributes_path()
+        )
+        return self._manager_attributes_path
 
     def __str__(self):
         """Stringify without password being printed."""
@@ -87,6 +96,29 @@ class Bmc:
         """Get Manager Path."""
         _result = self.redfish_request("/redfish/v1/Managers/")
         return _result["Members"][0]["@odata.id"].rstrip("/")
+
+    def get_manager_attributes_path(self) -> str:
+        """Get the Manager attributes path advertised by the BMC.
+
+        iDRAC10 exposes Manager attributes through the DellAttributes OEM
+        resource. Older iDRAC9 versions use the Manager's Attributes child.
+        """
+        manager_path = self.manager_path
+        manager = self.redfish_request(manager_path)
+        dell_attributes = (
+            manager.get("Links", {})
+            .get("Oem", {})
+            .get("Dell", {})
+            .get("DellAttributes", [])
+        )
+        manager_id = manager_path.rsplit("/", maxsplit=1)[-1]
+
+        for resource in dell_attributes:
+            path = resource.get("@odata.id")
+            if path and path.rstrip("/").rsplit("/", maxsplit=1)[-1] == manager_id:
+                return path.rstrip("/")
+
+        return f"{manager_path}/Attributes"
 
     def get_manufacturer(self) -> str:
         """Read and return Manufacturer."""

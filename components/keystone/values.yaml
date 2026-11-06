@@ -31,6 +31,18 @@ dependencies:
         - keystone-fernet-setup
 
 pod:
+  etcSources:
+    keystone_api:
+      - secret:
+          name: keystone-db-conn
+    keystone_db_sync:
+      - secret:
+          name: keystone-db-conn
+    # credential_rotate runs credential_migrate, which re-encrypts rows in the
+    # database
+    keystone_credential_rotate:
+      - secret:
+          name: keystone-db-conn
   resources:
     enabled: true
     api:
@@ -174,6 +186,11 @@ pod:
 
 conf:
   keystone:
+    database:
+      # The MariaDB operator writes the connection string into the
+      # keystone-db-conn secret, which is projected into the config directory
+      # above, so the chart must not generate one from the DB password.
+      connection: null
     auth:
       methods: password,token,openid,mapped,application_credential
     openid:
@@ -339,7 +356,19 @@ endpoints:
         default: 5556
     path: ''
 
+# The chart declares the Database, User, Grant and Connection resources instead
+# of the db-init job. The password is read from the keystone-db-password secret
+# in the deploy repo rather than rendered from Helm values.
+mariadb_db:
+  api_group: k8s.mariadb.com
+  # the MariaDB resource is named mariadb, while clients connect through the
+  # mariadb-primary service set in endpoints.oslo_db.hosts
+  mariadb_ref: mariadb
+  password_secret:
+    create: false
+
 manifests:
+  mariadb_db: true
   job_credential_cleanup: false
   job_db_init: false
   job_rabbit_init: false

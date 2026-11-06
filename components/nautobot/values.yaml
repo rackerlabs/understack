@@ -49,8 +49,9 @@ nautobot:
       cpu: "1000m"
       memory: "1536M"
     limits:
-      cpu: "2000m"
-      memory: "8704M"
+      # no CPU limit, null removes the one set by the chart
+      cpu: null
+      memory: "34816M"
 
   livenessProbe:
     periodSeconds: 120
@@ -69,6 +70,13 @@ celery:
   extraEnvVarsSecret:
     - nautobot-django
     - nautobot-custom-env
+  resources:
+    requests:
+      cpu: "400m"
+      memory: "1G"
+    limits:
+      cpu: null
+      memory: "16384M"
   livenessProbe:
     initialDelaySeconds: 60
     periodSeconds: 120

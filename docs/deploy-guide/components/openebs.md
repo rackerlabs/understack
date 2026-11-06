@@ -2,7 +2,7 @@
 charts:
 - openebs
 kustomize_paths:
-- operators/openebs
+- components/openebs
 deploy_overrides:
   helm:
     mode: values

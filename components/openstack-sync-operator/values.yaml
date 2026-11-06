@@ -30,7 +30,9 @@ rbac:
 plugins:
   openstackPlaceholder: false
   neutronRouterFlavors: false
+  neutronSubnetPools: false
   ironicRunbooks: false
+  neutronSegmentRanges: false
 
 pluginData:
   openstackPlaceholder:
@@ -57,6 +59,17 @@ pluginData:
         # operator-managed OpenStack flavor. Enable this before removing the CR.
         PRUNE: false
 
+  neutronSubnetPools:
+    hook:
+      path: /hooks/subnet_pools.py
+      crd: crds/neutron.understack.rackspace.net_neutronsubnetpools.yaml
+      envPrefix: NEUTRON_SUBNET_POOL
+      env:
+        SYNC_CRONTAB: "0 * * * *"
+        READY_RETRIES: 30
+        READY_DELAY: 10
+        PRUNE: false
+
   ironicRunbooks:
     hook:
       path: /hooks/ironic_runbooks.py
@@ -70,4 +83,20 @@ pluginData:
         READY_DELAY: 10
         # When true, removing an IronicRunbook CR also deletes its
         # operator-owned Ironic runbook. Enable this before removing the CR.
+        PRUNE: false
+
+  neutronSegmentRanges:
+    hook:
+      path: /hooks/segment_ranges.py
+      crd: crds/neutron.understack.rackspace.net_neutronsegmentranges.yaml
+      envPrefix: NEUTRON_SEGMENT_RANGE
+      env:
+        SYNC_CRONTAB: "0 * * * *"
+        # Neutron readiness wait before a segment range reconcile fails.
+        # Total wait is READY_RETRIES * READY_DELAY seconds.
+        READY_RETRIES: 30
+        READY_DELAY: 10
+        # When true, removing a NeutronSegmentRange CR also deletes its
+        # operator-managed OpenStack segment range. Enable this before
+        # removing the CR.
         PRUNE: false

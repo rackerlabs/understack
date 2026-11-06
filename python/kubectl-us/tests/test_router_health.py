@@ -199,6 +199,79 @@ def test_audit_reports_corrupt_native_gateway_lsp(monkeypatch):
     assert "FAIL  gateway gw-1: exclude-lb-vips-from-garp option" in result.output
 
 
+def nat_state(*, dgp):
+    conn, tables = native_state(healthy=True)
+    tables["Logical_Router"][0]["nat"] = ["nat-uuid", "snat-uuid"]
+    if dgp:
+        tables["Logical_Router_Port"][0]["ha_chassis_group"] = "hcg-uuid"
+    tables["Logical_Router_Port"][0]["_uuid"] = "lrp-uuid"
+    tables["NAT"] = [
+        {
+            "_uuid": "nat-uuid",
+            "type": "dnat_and_snat",
+            "external_ip": "203.0.113.10",
+            "gateway_port": "lrp-uuid",
+        },
+        {"_uuid": "snat-uuid", "type": "snat", "external_ip": "203.0.113.1"},
+    ]
+    return conn, tables
+
+
+def test_audit_fails_nat_gateway_port_that_is_not_a_dgp(monkeypatch):
+    conn, tables = nat_state(dgp=False)
+    patch_environment(monkeypatch, conn, tables)
+
+    result = runner.invoke(make_app(), ["router", "audit", "native-router"])
+
+    assert result.exit_code == 1
+    assert "FAIL  NAT dnat_and_snat 203.0.113.10: gateway_port" in result.output
+    assert "lrp-gw-1 is not a distributed gateway port" in result.output
+    assert "ovn-nbctl" not in result.output
+    assert "NAT snat" not in result.output
+
+
+def test_repair_clears_nat_gateway_port_that_is_not_a_dgp(monkeypatch):
+    conn, tables = nat_state(dgp=False)
+    patch_environment(monkeypatch, conn, tables)
+    calls = []
+
+    def apply_repair(ctx, args):
+        calls.append(args)
+        tables["NAT"][0].pop("gateway_port")
+
+    monkeypatch.setattr(router_health.ovn, "nbctl_raw", apply_repair)
+
+    dry_run = runner.invoke(make_app(), ["router", "repair", "native-router"])
+    assert dry_run.exit_code == 0
+    assert "NAT dnat_and_snat 203.0.113.10" in dry_run.output
+    assert "Dry run only" in dry_run.output
+    assert calls == []
+
+    result = runner.invoke(make_app(), ["router", "repair", "native-router", "--apply"])
+
+    assert result.exit_code == 0
+    assert "1 NAT repair(s); verification passed." in result.output
+    assert calls == [["--", "clear", "NAT", "nat-uuid", "gateway_port"]]
+
+
+def test_repair_leaves_nat_gateway_port_that_is_a_dgp(monkeypatch):
+    conn, tables = nat_state(dgp=True)
+    patch_environment(monkeypatch, conn, tables)
+
+    result = runner.invoke(make_app(), ["router", "repair", "native-router"])
+
+    assert "NAT dnat_and_snat" not in result.output
+
+
+def test_audit_accepts_nat_gateway_port_that_is_a_dgp(monkeypatch):
+    conn, tables = nat_state(dgp=True)
+    patch_environment(monkeypatch, conn, tables)
+
+    result = runner.invoke(make_app(), ["router", "audit", "native-router"])
+
+    assert "PASS  NAT dnat_and_snat 203.0.113.10: gateway_port" in result.output
+
+
 def test_audit_reports_missing_peer_lsp_without_crashing(monkeypatch):
     conn, tables = native_state(healthy=True)
     tables["Logical_Switch_Port"] = []
@@ -577,8 +650,8 @@ def test_repair_applies_one_transaction_and_verifies(monkeypatch):
 
     assert result.exit_code == 0
     assert (
-        "Applied 1 LSP repair(s) and 0 HA chassis group repair(s); "
-        "verification passed." in result.output
+        "Applied 1 LSP repair(s), 0 HA chassis group repair(s) and "
+        "0 NAT repair(s); verification passed." in result.output
     )
     assert len(calls) == 1
     command = calls[0]
@@ -640,8 +713,8 @@ def test_repair_repopulates_per_network_ha_chassis_group(monkeypatch):
     assert "remove non-live members: stale-ha-uuid" in result.output
     assert "repopulate with live chassis: live-chassis" in result.output
     assert (
-        "Applied 0 LSP repair(s) and 1 HA chassis group repair(s); "
-        "verification passed." in result.output
+        "Applied 0 LSP repair(s), 1 HA chassis group repair(s) and "
+        "0 NAT repair(s); verification passed." in result.output
     )
     assert len(calls) == 1
     command = calls[0]
@@ -809,8 +882,8 @@ def test_unavailable_ha_target_does_not_block_lsp_repair(monkeypatch):
     assert "REFUSED HA chassis group repair" in result.output
     assert "options:chassis=dead-chassis is not live" in result.output
     assert (
-        "Applied 1 LSP repair(s) and 0 HA chassis group repair(s); "
-        "verification passed." in result.output
+        "Applied 1 LSP repair(s), 0 HA chassis group repair(s) and "
+        "0 NAT repair(s); verification passed." in result.output
     )
     assert "Some repair domains remain refused" in result.output
     assert len(calls) == 1

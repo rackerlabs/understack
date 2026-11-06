@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: delete-server
+  annotations:
+    workflows.argoproj.io/title: Delete server inventory
+    workflows.argoproj.io/description: |
+      Run configured cleanup hooks, then remove the server from Nautobot.
+      All hooks must succeed before removal.
+      Hooks: delete-server-config.pre_delete_workflows; [] skips cleanup.
+      The ConfigMap requires workflows.argoproj.io/configmap-type: Parameter.
+spec:
+  workflowMetadata:
+    labels:
+      understack.rackspace.com/workflow-kind: delete
+      understack.rackspace.com/device-type: server
+  entrypoint: main
+  serviceAccountName: workflow
+  # Bound lock waiting, all hooks, and inventory deletion in the submitted workflow.
+  activeDeadlineSeconds: 3600
+  arguments:
+    parameters:
+      - name: event-json
+        description: "Ironic node deletion event JSON."
+      - name: node_uuid
+        description: "Ironic node UUID to delete."
+      # Omitted: use site configuration. Explicit []: skip pre-deletion hooks.
+      - name: pre_delete_workflows
+        description: "JSON list of cleanup workflows. Omit to use site config; [] skips hooks."
+        valueFrom:
+          configMapKeyRef:
+            name: delete-server-config
+            key: pre_delete_workflows
+          default: "[]"
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: event-json
+          - name: node_uuid
+          - name: pre_delete_workflows
+            value: "{{workflow.parameters.pre_delete_workflows}}"
+      # Share registration's per-node lock through inventory deletion.
+      # Hooks must not acquire this same lock again.
+      synchronization:
+        mutexes:
+          - name: "server-node-{{inputs.parameters.node_uuid}}"
+      steps:
+        - - name: pre-delete
+            templateRef:
+              name: "{{item}}"
+              template: run
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{inputs.parameters.node_uuid}}"
+            withParam: "{{inputs.parameters.pre_delete_workflows}}"
+        - - name: delete-nautobot
+            templateRef:
+              name: openstack-oslo-event
+              template: main
+            arguments:
+              parameters:
+                - name: event-json
+                  value: "{{inputs.parameters.event-json}}"

@@ -1,6 +1,6 @@
 ---
 kustomize_paths:
-- operators/mariadb-operator
+- components/mariadb-operator
 deploy_overrides:
   helm:
     mode: none

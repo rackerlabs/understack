@@ -11,7 +11,7 @@ To add an application, you must perform the following steps.
 1. Determine how its deployed. For example as a set of manifests or via [Helm][helm].
 
 1. Create a directory that matches the namespace that you want to
-   deploy to in either `components/` or `operators/`. Populating it with a
+   deploy to in `components/`. Populating it with a
    `kustomization.yaml` or a `values.yaml` or both depending on the proper
    deployment.
 

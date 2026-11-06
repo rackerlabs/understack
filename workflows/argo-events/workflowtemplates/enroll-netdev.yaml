@@ -6,11 +6,23 @@ metadata:
     workflows.argoproj.io/title: Enroll a network device in Ironic
     workflows.argoproj.io/description: |
       Defined in `workflows/argo-events/workflowtemplates/enroll-netdev.yaml`
+
+      The workflow reads site-specific configuration from the
+      `enroll-netdev-config` ConfigMap. After enrollment, it runs the templates
+      listed in `post_enroll_workflows`.
 kind: WorkflowTemplate
 spec:
+  # Labels make runs filterable in the Argo UI (`argo list -l`) and give
+  # alerts a stable key. Per-target labels are added at submission time.
+  workflowMetadata:
+    labels:
+      understack.rackspace.com/workflow-kind: enroll
+      understack.rackspace.com/device-type: netdev
   serviceAccountName: workflow
   entrypoint: main
   volumes:
+    - name: enrollment-result
+      emptyDir: {}
     - name: baremetal-manage
       secret:
         secretName: baremetal-manage
@@ -28,19 +40,62 @@ spec:
       - name: ports
       - name: external_cmdb_id
         value: ""
+      - name: rack
+        value: ""
+      - name: position
+        value: ""
       - name: resource_class
         value: generic
   templates:
     - name: main
+      inputs:
+        parameters:
+          - name: post_enroll_workflows
+            valueFrom:
+              configMapKeyRef:
+                name: enroll-netdev-config
+                key: post_enroll_workflows
+              default: "[]"
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              parameter: "{{steps.enroll-netdev.outputs.parameters.node_uuid}}"
       steps:
         - - name: enroll-netdev
             template: enroll-netdev
+        - - name: post-enroll
+            templateRef:
+              name: "{{item}}"
+              template: run
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-netdev.outputs.parameters.node_uuid}}"
+            withParam: "{{inputs.parameters.post_enroll_workflows}}"
+        - - name: set-node-extra
+            template: set-node-extra
+            when: >-
+              "{{workflow.parameters.external_cmdb_id}}" != "" ||
+              "{{workflow.parameters.rack}}" != "" ||
+              "{{workflow.parameters.position}}" != ""
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-netdev.outputs.parameters.node_uuid}}"
     - name: enroll-netdev
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              path: /run/enrollment/node-uuid
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - enroll-netdev
         args:
+          - --node-uuid-output
+          - /run/enrollment/node-uuid
           - --name
           - "{{workflow.parameters.name}}"
           - --physical-network
@@ -52,6 +107,8 @@ spec:
           - --resource-class
           - "{{workflow.parameters.resource_class}}"
         volumeMounts:
+          - mountPath: /run/enrollment
+            name: enrollment-result
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
@@ -67,3 +124,34 @@ spec:
             value: "{{workflow.uid}}"
           - name: OS_CLOUD
             value: understack
+    - name: set-node-extra
+      inputs:
+        parameters:
+          - name: node_uuid
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
+        command:
+          - sh
+          - -c
+          - |
+            set -eu
+            set -- baremetal node set
+            [ -n "${EXTERNAL_CMDB_ID}" ] && set -- "$@" --extra "external_cmdb_id=${EXTERNAL_CMDB_ID}"
+            [ -n "${RACK}" ] && set -- "$@" --extra "rack=${RACK}"
+            [ -n "${POSITION}" ] && set -- "$@" --extra "position=${POSITION}"
+            exec openstack "$@" "${NODE_UUID}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+          - name: NODE_UUID
+            value: "{{inputs.parameters.node_uuid}}"
+          - name: EXTERNAL_CMDB_ID
+            value: "{{workflow.parameters.external_cmdb_id}}"
+          - name: RACK
+            value: "{{workflow.parameters.rack}}"
+          - name: POSITION
+            value: "{{workflow.parameters.position}}"
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true

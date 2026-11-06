@@ -9,6 +9,8 @@ scenarios can run without a real OVN database.
 import contextlib
 from unittest import mock
 
+from neutron_understack.ironic import NodeReleaseResult
+
 
 class FakeNbIdl:
     """Minimal OVN Northbound IDL: records localnet LSP create/delete."""
@@ -84,4 +86,4 @@ class FakeIronicClient:
         if node is not None:
             self._available = True
             self.released.append(router_id)
-        return node
+        return NodeReleaseResult(node=node, released=node is not None)

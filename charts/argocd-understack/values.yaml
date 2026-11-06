@@ -127,12 +127,6 @@ global:
     # @default -- false
     enabled: false
 
-  # -- Alerts management (karma)
-  karma:
-    # -- Enable/disable deploying kube-prometheus-stack
-    # @default -- false
-    enabled: false
-
   # -- Monitoring via kube-prometheus-stack
   monitoring:
     # -- Enable/disable deploying kube-prometheus-stack
@@ -165,9 +159,6 @@ global:
     # -- Enable/disable deploying Nautobot Operator
     # @default -- false
     enabled: false
-    # -- Chart version for Nautobot Operator
-    # @default -- 0.0.3
-    chartVersion: 0.0.3
 
   # -- OpenEBS
   openebs:
@@ -359,7 +350,7 @@ site:
     wave: 1
     # -- Chart version for Keystone
     # renovate: datasource=helm depName=keystone registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.19+55794356b
+    chartVersion: 2026.2.3+b5078da51
 
   # -- Glance (Image Service)
   glance:
@@ -371,7 +362,7 @@ site:
     wave: 2
     # -- Chart version for Glance
     # renovate: datasource=helm depName=glance registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.5+bad57716b
+    chartVersion: 2026.2.3+b5078da51
 
   # -- Cinder (Block Storage Service)
   cinder:
@@ -383,7 +374,7 @@ site:
     wave: 2
     # -- Chart version for Cinder
     # renovate: datasource=helm depName=cinder registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.1.3+abd55b4a7
+    chartVersion: 2026.2.15+87bd2f7d3
 
   # -- Ironic (Bare Metal Service)
   ironic:
@@ -395,7 +386,7 @@ site:
     wave: 2
     # -- Chart version for Ironic
     # renovate: datasource=helm depName=ironic registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.10+a659ab8a2
+    chartVersion: 2026.2.18+87bd2f7d3
 
   # -- Neutron (Networking Service)
   neutron:
@@ -407,7 +398,7 @@ site:
     wave: 2
     # -- Chart version for Neutron
     # renovate: datasource=helm depName=neutron registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.41+7c81bea7c
+    chartVersion: 2026.2.1+b90c3a6ab
 
   # -- Placement (Placement Service)
   placement:
@@ -419,7 +410,7 @@ site:
     wave: 2
     # -- Chart version for Placement
     # renovate: datasource=helm depName=placement registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.18+6cec8010b
+    chartVersion: 2026.2.3+b5078da51
 
   # -- Nova (Compute Service)
   nova:
@@ -431,7 +422,7 @@ site:
     wave: 3
     # -- Chart version for Nova
     # renovate: datasource=helm depName=nova registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.8+a2a343968
+    chartVersion: 2026.1.88+f5785cd98
 
   # -- Octavia (Load Balancer Service)
   octavia:
@@ -443,7 +434,7 @@ site:
     wave: 3
     # -- Chart version for Octavia
     # renovate: datasource=helm depName=octavia registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.8+01c93d867
+    chartVersion: 2026.2.17+87bd2f7d3
 
   # -- Horizon (Dashboard)
   horizon:
@@ -455,7 +446,7 @@ site:
     wave: 4
     # -- Chart version for Horizon
     # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.4+01c93d867
+    chartVersion: 2026.2.10+f4a3524ce
 
   # -- Skyline (Dashboard)
   skyline:
@@ -467,7 +458,7 @@ site:
     wave: 4
     # -- Chart version for Skyline
     # renovate: datasource=helm depName=skyline registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.5+01c93d867
+    chartVersion: 2026.2.9+0028e05c0
 
   # -- Open vSwitch (Networking)
   openvswitch:
@@ -485,7 +476,7 @@ site:
     enabled: false
     # -- Chart version for OVN
     # renovate: datasource=helm depName=ovn registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: "2026.1.7+49874be15"
+    chartVersion: "2026.1.47+07a418eb6"
 
   # -- Chrony NTP service configuration
   chrony:
@@ -507,12 +498,6 @@ site:
     # -- Enable/disable deploying site-specific ESO configs from the deploy repo
     # @default -- false
     installConfigs: false
-
-  # -- Alerts management (karma)
-  karma:
-    # -- Enable/disable deploying kube-prometheus-stack
-    # @default -- false
-    enabled: false
 
   # -- MariaDB Operator
   mariadb_operator:
@@ -583,6 +568,17 @@ site:
   # -- Site-specific workflows and event handlers
   site_workflows:
     # -- Enable/disable deploying site workflows
+    # @default -- false
+    enabled: false
+
+  # -- Out-of-band monitoring WorkflowTemplates. Deploys the site's
+  #    `<cluster>/obm-monitoring` Kustomize overlay from the deployment
+  #    repository into the existing `argo-events` namespace. The overlay and its
+  #    application code/images live in the deployment repository; this chart only
+  #    renders the ArgoCD Application pointer. A site opts in by setting this to
+  #    true in its deploy.yaml.
+  obm_monitoring:
+    # -- Enable/disable deploying OBM monitoring WorkflowTemplates
     # @default -- false
     enabled: false
 

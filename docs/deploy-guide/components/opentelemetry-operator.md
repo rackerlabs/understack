@@ -2,7 +2,7 @@
 charts:
 - opentelemetry-operator
 kustomize_paths:
-- operators/opentelemetry-operator
+- components/opentelemetry-operator
 deploy_overrides:
   helm:
     mode: values

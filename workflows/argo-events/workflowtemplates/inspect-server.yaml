@@ -8,6 +8,12 @@ metadata:
       Defined in `workflows/argo-events/workflowtemplates/inspect-server.yaml`
 kind: WorkflowTemplate
 spec:
+  # Labels make runs filterable in the Argo UI (`argo list -l`) and give
+  # alerts a stable key. Per-target labels are added at submission time.
+  workflowMetadata:
+    labels:
+      understack.rackspace.com/workflow-kind: inspect
+      understack.rackspace.com/device-type: server
   serviceAccountName: workflow
   entrypoint: inspect-server
   volumes:
@@ -214,7 +220,7 @@ spec:
           - name: operation
           - name: node_id
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
         command:
           - openstack
         args:
@@ -238,7 +244,7 @@ spec:
           - name: value
           - name: obj_id
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
         command:
           - openstack
         args:
@@ -261,7 +267,7 @@ spec:
           - name: object_ref
           - name: param
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
         command:
           - openstack
         args:

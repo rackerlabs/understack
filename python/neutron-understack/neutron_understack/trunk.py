@@ -3,6 +3,7 @@ from neutron.objects.ports import Port
 from neutron.objects.trunk import SubPort
 from neutron.services.trunk.drivers import base as trunk_base
 from neutron.services.trunk.models import Trunk
+from neutron_lib import constants as p_const
 from neutron_lib import exceptions as exc
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
@@ -30,35 +31,89 @@ class SubportSegmentationIDError(exc.NeutronException):
 
 
 def _missing_physnet_msg(port_id: str) -> str:
-    """Explain that a parent port cannot be configured without a physnet.
-
-    physical_network names the VLAN group that undersync configures, so
-    without it there is no switch to push the trunk's subport VLANs to.
-    """
+    """physical_network names the segment range a subport allocates from."""
     return (
         "physical_network is required in the binding_profile for baremetal port "
         f"trunk configuration, but port {port_id} does not have one."
     )
 
 
-class UnderStackTrunkDriver(trunk_base.DriverBase):
-    def __init__(
-        self,
-        name,
-        interfaces,
-        segmentation_types,
-        agent_type=None,
-        can_trunk_bound_port=False,
-    ):
-        super().__init__(
-            name,
-            interfaces,
-            segmentation_types,
-            agent_type=agent_type,
-            can_trunk_bound_port=can_trunk_bound_port,
-        )
-        self.undersync = self.plugin_driver.undersync
+def subport_vif_type(status: str) -> str:
+    """A subport is bound to the switchport, via its parent, while the trunk is up."""
+    if status == trunk_consts.TRUNK_ACTIVE_STATUS:
+        return portbindings.VIF_TYPE_OTHER
+    return portbindings.VIF_TYPE_UNBOUND
 
+
+def subport_port_status(status: str) -> str:
+    """A subport's port status follows its trunk's."""
+    if status == trunk_consts.TRUNK_ACTIVE_STATUS:
+        return p_const.PORT_STATUS_ACTIVE
+    return p_const.PORT_STATUS_DOWN
+
+
+def claim_subports(
+    parent_port_id: str, subports: list[SubPort | dict], status: str
+) -> None:
+    """Claim the supplied subports and write the binding Nova reads from them."""
+    if not subports:
+        return
+    port_status = subport_port_status(status)
+    vif_type = subport_vif_type(status)
+    # One transaction for every subport, so a failure leaves none of them
+    # half-written.
+    with utils.get_admin_session() as session:
+        claimed = set(
+            utils.update_port_fields_if_owner(
+                session,
+                [subport["port_id"] for subport in subports],
+                {
+                    "device_owner": trunk_consts.TRUNK_SUBPORT_OWNER,
+                    "status": port_status,
+                },
+                trunk_consts.TRUNK_SUBPORT_OWNER,
+            )
+        )
+        if claimed:
+            utils.set_subports_trunk_binding(
+                session,
+                parent_port_id,
+                {
+                    subport["port_id"]: subport["segmentation_id"]
+                    for subport in subports
+                    if subport["port_id"] in claimed
+                },
+                vif_type,
+            )
+
+
+def trunk_state_is_current(context, trunk: Trunk, status: str) -> bool:
+    """Whether the trunk and all its subports already have the state for status.
+
+    Takes a trunk freshly read, as its status is compared as it stands.
+    """
+    if trunk.status != status:
+        return False
+    if not trunk.sub_ports:
+        return True
+    return utils.subports_in_state(
+        context,
+        trunk.port_id,
+        {sub["port_id"]: sub["segmentation_id"] for sub in trunk.sub_ports},
+        trunk_consts.TRUNK_SUBPORT_OWNER,
+        subport_port_status(status),
+        subport_vif_type(status),
+    )
+
+
+def update_trunk_state(trunk: Trunk, subports: list[SubPort], status: str) -> None:
+    """Claim the supplied subports and record their trunk's state."""
+    claim_subports(trunk.port_id, subports, status)
+    LOG.debug("setting trunk %s status to %s", trunk.id, status)
+    trunk.update(status=status)
+
+
+class UnderstackTrunkDriver(trunk_base.DriverBase):
     @property
     def is_loaded(self):
         try:
@@ -67,8 +122,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             return False
 
     @classmethod
-    def create(cls, plugin_driver):
-        cls.plugin_driver = plugin_driver
+    def create(cls):
         return cls(
             "understack",
             SUPPORTED_INTERFACES,
@@ -94,12 +148,6 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             cancellable=True,
         )
         registry.subscribe(
-            self.subports_deleted_precommit,
-            resources.SUBPORTS,
-            events.PRECOMMIT_DELETE,
-            cancellable=True,
-        )
-        registry.subscribe(
             self.subports_deleted,
             resources.SUBPORTS,
             events.AFTER_DELETE,
@@ -112,9 +160,9 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             cancellable=True,
         )
         registry.subscribe(
-            self.trunk_deleted_precommit,
+            self.trunk_created_post,
             resources.TRUNK,
-            events.PRECOMMIT_DELETE,
+            events.AFTER_CREATE,
             cancellable=True,
         )
         registry.subscribe(
@@ -123,6 +171,31 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             events.AFTER_DELETE,
             cancellable=True,
         )
+
+    @staticmethod
+    def _prepare_trunk_state(trunk: Trunk, subports: list[SubPort]) -> None:
+        """Claim subports DOWN until fabric reconciliation is requested."""
+        parent_port = utils.fetch_port_object(trunk.port_id)
+        if not utils.is_port_baremetal(parent_port):
+            return
+        update_trunk_state(trunk, subports, trunk_consts.TRUNK_DOWN_STATUS)
+
+    @staticmethod
+    def _release_subports(subports: list[SubPort]) -> None:
+        """Return ports that are leaving the trunk to an unowned DOWN state."""
+        # Written straight to the port row, as ml2/ovn did: update_port_status()
+        # would re-enter the mechanism drivers, and a revision bump would send
+        # ovn's maintenance worker chasing an LSP that has not changed.
+        with utils.get_admin_session() as session:
+            released = utils.update_port_fields_if_owner(
+                session,
+                [subport["port_id"] for subport in subports],
+                {"device_owner": "", "status": p_const.PORT_STATUS_DOWN},
+                trunk_consts.TRUNK_SUBPORT_OWNER,
+                include_unowned=False,
+            )
+            if released:
+                utils.clear_subports_trunk_binding(session, released)
 
     def _handle_tenant_vlan_id_and_switchport_config(
         self, subports: list[SubPort], trunk: Trunk
@@ -172,7 +245,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         )
 
     def _handle_segment_allocation(
-        self, subports: list[SubPort], vlan_group_name: str, binding_host: str
+        self, subports: list[SubPort], physnet: str, binding_host: str
     ) -> set:
         allowed_vlan_ids = set()
         for subport in subports:
@@ -181,11 +254,11 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             )
             current_segment = utils.network_segment_by_physnet(
                 network_id=subport_network_id,
-                physnet=vlan_group_name,
+                physnet=physnet,
             )
             network_segment = current_segment or utils.allocate_dynamic_segment(
                 network_id=subport_network_id,
-                physnet=vlan_group_name,
+                physnet=physnet,
             )
             allowed_vlan_ids.add(int(network_segment["segmentation_id"]))
 
@@ -200,54 +273,30 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
     def _add_subports_networks_to_parent_port_switchport(
         self, parent_port: Port, subports: list[SubPort]
     ) -> None:
-        binding_profile = parent_port.bindings[0].profile
-        binding_host = parent_port.bindings[0].host
+        parent_binding = utils.active_port_binding(parent_port)
+        binding_profile = parent_binding.profile
+        binding_host = parent_binding.host
 
-        vlan_group_name = binding_profile.get("physical_network")
-        if not vlan_group_name:
+        physnet = binding_profile.get("physical_network")
+        if not physnet:
             # Reached from the PRECOMMIT_CREATE handlers, so raising here aborts
             # the transaction and surfaces the error to the API caller.
             raise exc.BadRequest(
                 resource="port", msg=_missing_physnet_msg(parent_port.id)
             )
 
-        self._handle_segment_allocation(subports, vlan_group_name, binding_host)
+        self._handle_segment_allocation(subports, physnet, binding_host)
 
-    def clean_trunk(
-        self, trunk_details: dict, binding_profile: dict, host: str
-    ) -> None:
-        subports = trunk_details.get("sub_ports", [])
-        self._handle_subports_removal(
-            binding_profile=binding_profile,
-            binding_host=host,
-            subports=subports,
-            invoke_undersync=False,
-        )
+    def clean_trunk(self, trunk_details: dict, host: str) -> None:
+        self._handle_segment_deallocation(trunk_details.get("sub_ports", []), host)
 
     def _clean_parent_port_switchport_config(
-        self, trunk: Trunk, subports: list[SubPort]
+        self, parent_port: Port, subports: list[SubPort]
     ) -> None:
-        parent_port_obj = utils.fetch_port_object(trunk.port_id)
-        if not utils.parent_port_is_bound(parent_port_obj):
+        if not utils.parent_port_is_bound(parent_port):
             return
-        binding_profile = parent_port_obj.bindings[0].profile
-        binding_host = parent_port_obj.bindings[0].host
-
-        vlan_group_name = binding_profile.get("physical_network")
-        if not vlan_group_name:
-            # This runs postcommit: the subports are already gone from the DB,
-            # so raising cannot roll anything back. The PRECOMMIT_DELETE
-            # handlers reject this case while it is still abortable; getting
-            # here means the binding profile changed underneath us. Log it and
-            # still release the segments -- otherwise their VLANs leak -- but
-            # skip the undersync call, since there is no vlan group to sync.
-            LOG.error(_missing_physnet_msg(parent_port_obj.id))
-        self._handle_subports_removal(
-            binding_profile=binding_profile,
-            binding_host=binding_host,
-            subports=subports,
-            vlan_group_name=vlan_group_name,
-        )
+        parent_binding = utils.active_port_binding(parent_port)
+        self._handle_segment_deallocation(subports, parent_binding.host)
 
     def _delete_unused_segment(self, segment_id: str) -> NetworkSegment:
         network_segment = utils.network_segment_by_id(segment_id)
@@ -266,62 +315,22 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
                 binding_level.delete()
                 self._delete_unused_segment(binding_level.segment_id)
 
-    def _handle_subports_removal(
-        self,
-        binding_profile: dict,
-        binding_host: str,
-        subports: list[SubPort],
-        invoke_undersync: bool = True,
-        vlan_group_name: str | None = None,
-    ) -> None:
-        self._handle_segment_deallocation(subports, binding_host)
-        if invoke_undersync and vlan_group_name:
-            self.undersync.sync(vlan_group_name)
-
     def subports_added(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = payload.metadata["subports"]
         self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
 
     def subports_added_post(self, resource, event, trunk_plugin, payload):
-        trunk = payload.states[0]
-        parent_port = utils.fetch_port_object(trunk.port_id)
-
-        if utils.parent_port_is_bound(parent_port):
-            binding_profile = parent_port.bindings[0].profile
-            vlan_group_name = binding_profile.get("physical_network")
-            if not vlan_group_name:
-                # subports_added validates the same parent port on
-                # PRECOMMIT_CREATE, so normally we never get here. This runs
-                # postcommit, where raising cannot undo the subport creation,
-                # and there is no vlan group to sync.
-                LOG.error(_missing_physnet_msg(parent_port.id))
-                return
-            LOG.debug("subports_added_post found vlan_group_name=%s", vlan_group_name)
-            self.undersync.sync(vlan_group_name)
-
-    def _validate_parent_port_physnet(self, trunk: Trunk) -> None:
-        """Reject a teardown whose parent port has no physical_network.
-
-        The switchport teardown itself runs on AFTER_DELETE, where the rows are
-        already committed and an exception cannot roll them back, so the check
-        has to happen here while the transaction can still be aborted.
-        """
-        parent_port_obj = utils.fetch_port_object(trunk.port_id)
-        if not utils.parent_port_is_bound(parent_port_obj):
-            return
-        if not parent_port_obj.bindings[0].profile.get("physical_network"):
-            raise exc.BadRequest(
-                resource="port", msg=_missing_physnet_msg(parent_port_obj.id)
-            )
-
-    def subports_deleted_precommit(self, resource, event, trunk_plugin, payload):
-        self._validate_parent_port_physnet(payload.states[0])
+        self._prepare_trunk_state(payload.states[0], payload.metadata["subports"])
 
     def subports_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = payload.metadata["subports"]
-        self._clean_parent_port_switchport_config(trunk, subports)
+        parent_port = utils.fetch_port_object(trunk.port_id)
+        self._clean_parent_port_switchport_config(parent_port, subports)
+        if not utils.is_port_baremetal(parent_port):
+            return
+        self._release_subports(subports)
 
     def trunk_created(self, resource, event, trunk_plugin, payload):
         trunk = payload.latest_state
@@ -329,13 +338,16 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         if subports:
             self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
 
-    def trunk_deleted_precommit(self, resource, event, trunk_plugin, payload):
+    def trunk_created_post(self, resource, event, trunk_plugin, payload):
+        """Claim its subports DOWN until fabric reconciliation is requested."""
         trunk = payload.states[0]
-        if trunk.sub_ports:
-            self._validate_parent_port_physnet(trunk)
+        self._prepare_trunk_state(trunk, trunk.sub_ports)
 
     def trunk_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = trunk.sub_ports
         if subports:
-            self._clean_parent_port_switchport_config(trunk, subports)
+            parent_port = utils.fetch_port_object(trunk.port_id)
+            self._clean_parent_port_switchport_config(parent_port, subports)
+            if utils.is_port_baremetal(parent_port):
+                self._release_subports(subports)

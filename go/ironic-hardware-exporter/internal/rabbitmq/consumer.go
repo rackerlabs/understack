@@ -4,13 +4,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"log"
 	"net"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
 
+	"charm.land/log/v2"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/config"
 )
@@ -67,7 +67,7 @@ func buildTLSConfig(cfg config.RabbitMQConfig) (*tls.Config, error) {
 func New(cfg config.RabbitMQConfig) (*Consumer, error) {
 	rabbitURL := buildAMQPURL(cfg)
 
-	log.Printf("connecting to RabbitMQ at %s:%d vhost=%s tls=%v", cfg.Host, cfg.Port, cfg.VHost, cfg.TLSEnabled)
+	log.Info("connecting to RabbitMQ", "host", cfg.Host, "port", cfg.Port, "vhost", cfg.VHost, "tls", cfg.TLSEnabled)
 
 	var conn *amqp.Connection
 	var err error
@@ -89,7 +89,7 @@ func New(cfg config.RabbitMQConfig) (*Consumer, error) {
 	ch, err := conn.Channel()
 	if err != nil {
 		if closeErr := conn.Close(); closeErr != nil {
-			log.Printf("error closing connection after channel failure: %v", closeErr)
+			log.Error("error closing connection after channel failure", "error", closeErr)
 		}
 		return nil, fmt.Errorf("failed to open channel: %w", err)
 	}
@@ -101,7 +101,7 @@ func New(cfg config.RabbitMQConfig) (*Consumer, error) {
 		return nil, err
 	}
 
-	log.Printf("connected to RabbitMQ successfully")
+	log.Info("connected to RabbitMQ successfully")
 	return c, nil
 }
 
@@ -116,7 +116,7 @@ func (c *Consumer) setup() error {
 		return fmt.Errorf("failed to bind queue: %w", err)
 	}
 
-	log.Printf("queue %s bound to exchange %s", c.cfg.Queue, c.cfg.Exchange)
+	log.Info("queue bound to exchange", "queue", c.cfg.Queue, "exchange", c.cfg.Exchange)
 	return nil
 }
 
@@ -129,12 +129,12 @@ func (c *Consumer) Consume(handler func(body []byte)) error {
 	closeCh := make(chan *amqp.Error, 1)
 	c.channel.NotifyClose(closeCh)
 
-	log.Printf("waiting for messages from queue: %s", c.cfg.Queue)
+	log.Info("waiting for messages", "queue", c.cfg.Queue)
 
 	for d := range msgs {
 		handler(d.Body)
 		if err := d.Ack(false); err != nil {
-			log.Printf("failed to ack message: %v", err)
+			log.Error("failed to ack message", "error", err)
 		}
 	}
 	// silently exit and  returns a generic "connection lost" error
@@ -154,12 +154,12 @@ func (c *Consumer) IsReady() bool {
 func (c *Consumer) Close() {
 	if c.channel != nil {
 		if err := c.channel.Close(); err != nil {
-			log.Printf("error closing channel: %v", err)
+			log.Error("error closing channel", "error", err)
 		}
 	}
 	if c.conn != nil {
 		if err := c.conn.Close(); err != nil {
-			log.Printf("error closing connection: %v", err)
+			log.Error("error closing connection", "error", err)
 		}
 	}
 }

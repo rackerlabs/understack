@@ -27,7 +27,7 @@ from neutron_lib.plugins import directory
 from oslo_config import cfg
 
 from neutron_understack import config as understack_config
-from neutron_understack.undersync import Undersync
+from neutron_understack.undersync_client import Undersync
 
 #: Physnets the type manager knows about (the parent setUp configures physnet1/2
 #: with VLAN ranges), so ``allocate_dynamic_segment`` succeeds for the VLAN group
@@ -59,11 +59,6 @@ def _apply_understack_ml2_overrides():
         "undersync_url", "http://undersync.test", group="ml2_understack"
     )
     cfg.CONF.set_override("undersync_dry_run", False, group="ml2_understack")
-    cfg.CONF.set_override(
-        "provisioning_network",
-        "00000000-0000-0000-0000-000000000000",
-        group="ml2_understack",
-    )
 
 
 class _UnderstackMl2ScenarioMixin:
@@ -77,12 +72,12 @@ class _UnderstackMl2ScenarioMixin:
         _apply_understack_ml2_overrides()
         super().setUp()
         # Replace the real HTTP Undersync client with a mock -- the single
-        # genuine external edge on the binding path. The trunk driver captured
-        # its own reference at construction (trunk.py), so patch that too.
+        # genuine external edge on the binding path. The undersync mechanism
+        # driver owns the client and makes every sync() call.
         self.understack_driver = self._mech_driver("understack")
+        self.undersync_driver = self._mech_driver("undersync")
         self.undersync_mock = mock.MagicMock(spec_set=Undersync)
-        self.understack_driver.undersync = self.undersync_mock
-        self.understack_driver.trunk_driver.undersync = self.undersync_mock
+        self.undersync_driver.undersync = self.undersync_mock
 
     @staticmethod
     def _mech_driver(name):
@@ -114,12 +109,11 @@ class _UnderstackMl2ScenarioMixin:
             profile["physical_network"] = physnet
         return profile
 
-    def _bind_baremetal_port(self, net_id, physnet, host, fixed_ips=None):
-        """Create a baremetal port on the network and vif-attach it to physnet.
+    def _create_baremetal_port(self, net_id, fixed_ips=None):
+        """Create an unbound baremetal port on the network. Returns its id.
 
-        Returns the bound port's id. binding:host_id / binding:profile writes
-        require the service role under secure RBAC. Pass ``fixed_ips=[]`` to force
-        a port with no IP even on a subnetted network.
+        Pass ``fixed_ips=[]`` to force a port with no IP even on a subnetted
+        network.
         """
         create_kwargs = {portbindings.VNIC_TYPE: portbindings.VNIC_BAREMETAL}
         if fixed_ips is not None:
@@ -132,7 +126,14 @@ class _UnderstackMl2ScenarioMixin:
             **create_kwargs,
         )
         assert res.status_int == 201, res.body
-        port_id = self.deserialize(self.fmt, res)["port"]["id"]
+        return self.deserialize(self.fmt, res)["port"]["id"]
+
+    def _vif_attach_port(self, port_id, physnet, host):
+        """vif-attach a port to a switch, as Ironic does on deploy.
+
+        binding:host_id / binding:profile writes require the service role under
+        secure RBAC.
+        """
         data = {
             "port": {
                 portbindings.HOST_ID: host,
@@ -141,6 +142,14 @@ class _UnderstackMl2ScenarioMixin:
         }
         req = self.new_update_request("ports", data, port_id, as_service=True)
         assert req.get_response(self.api).status_int == 200
+
+    def _bind_baremetal_port(self, net_id, physnet, host, fixed_ips=None):
+        """Create a baremetal port on the network and vif-attach it to physnet.
+
+        Returns the bound port's id.
+        """
+        port_id = self._create_baremetal_port(net_id, fixed_ips=fixed_ips)
+        self._vif_attach_port(port_id, physnet, host)
         return port_id
 
     def _trunk_subports(self, trunk_id):

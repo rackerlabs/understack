@@ -44,3 +44,89 @@ Required or commonly required items:
 Optional additions:
 
 - `Additional integration Secrets`: Add more Secrets beside the API token if individual workflows need their own credentials or endpoints.
+
+## Enrollment Workflow Configuration
+
+Configure enrollment runbooks and post-enrollment templates through ConfigMaps
+in the `argo-events` namespace:
+
+| Workflow | ConfigMap |
+| --- | --- |
+| `enroll-server` | `enroll-server-config` |
+| `enroll-fw` | `enroll-fw-config` |
+| `enroll-netdev` | `enroll-netdev-config` |
+
+Configuration values are JSON arrays:
+
+| Key | Values | When it runs |
+| --- | --- | --- |
+| `post_inspection_runbooks` (`enroll-server` only) | Ironic runbook names or UUIDs | In list order after inspection and BIOS configuration, before RAID configuration, firmware updates, and making the node available. A failure stops enrollment. |
+| `post_enroll_workflows` | `WorkflowTemplate` names | In parallel after enrollment. A failure fails the post-enrollment step. |
+
+Create the ConfigMap in your deployment overlay. Replace the example names with
+your runbooks and workflow templates; keep the parameter-source label.
+
+```yaml title="configmap-enroll-server-config.yaml"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: enroll-server-config
+  namespace: argo-events
+  labels:
+    workflows.argoproj.io/configmap-type: Parameter
+data:
+  post_inspection_runbooks: |
+    [
+      "first-runbook",
+      "second-runbook"
+    ]
+  post_enroll_workflows: |
+    [
+      "notify-enrollment",
+      "configure-monitoring"
+    ]
+```
+
+Missing ConfigMaps or keys default to `[]`. Set a value to `[]` to disable it.
+For a single server enrollment, override either list with workflow parameters:
+
+```bash
+argo submit -n argo-events --from workflowtemplate/enroll-server \
+  -p ip_address=BMC_IP \
+  -p post_inspection_runbooks='["runbook"]' \
+  -p post_enroll_workflows='["configure-monitoring"]' --watch
+```
+
+Pass `[]` for either parameter to skip that stage for this server. Site defaults
+still apply when the corresponding parameter is omitted. Deploying monitoring
+templates does not require enabling them in the site's enrollment defaults.
+
+Each named `WorkflowTemplate` must be in the same namespace and expose a `run`
+template that accepts the enrolled server's `node_uuid`:
+
+{% raw %}
+
+```yaml title="workflowtemplate-notify-enrollment.yaml"
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: notify-enrollment
+  namespace: argo-events
+spec:
+  templates:
+    - name: run
+      inputs:
+        parameters:
+          - name: node_uuid
+      container:
+        image: example.com/notify-enrollment:1.0.0
+        args:
+          - "{{inputs.parameters.node_uuid}}"
+```
+
+{% endraw %}
+
+Only the referenced `run` template is imported by `templateRef`. Put required
+pod configuration on that template, or arrange for it on the parent enrollment
+workflow; settings elsewhere in the referenced `WorkflowTemplate` spec are not
+inherited. Hook pods use the service account of the parent workflow.

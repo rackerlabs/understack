@@ -9,7 +9,7 @@ For architectural details and schema information, see the
 
 ## Prerequisites
 
-* `understackctl` CLI tool installed
+* [`understackctl`](understackctl.md#installation) CLI tool installed
 * Access to your deployment repository
 * `UC_DEPLOY` environment variable set to your deployment repository path
 

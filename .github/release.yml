@@ -8,7 +8,7 @@ changelog:
     labels:
       # applied by .github/workflows/labeler.yaml when every changed file lives
       # under a CLI utility or image with its own tag namespace
-      # (understackctl/vX.Y.Z, ironic-ipxe/vX.Y.Z and friends), so those changes
+      # (dexop-vX.Y.Z, ironic-ipxe/vX.Y.Z and friends), so those changes
       # are announced by their own release instead. Can also be applied by hand
       # to keep any pull request out of the notes.
       - skip-changelog

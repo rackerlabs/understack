@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: bmc-configure-snmpv3-user
+  annotations:
+    workflows.argoproj.io/title: Configure the SNMPv3 user on a node BMC
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/workflowtemplate-bmc-configure-snmpv3-user.yaml`
+
+      Runs the SNMPv3 runbook through Ironic cleaning or servicing. Available
+      nodes temporarily disable automated cleaning and return to available.
+spec:
+  entrypoint: run
+  serviceAccountName: workflow
+  arguments:
+    parameters:
+      - name: node_uuid
+  templates:
+    - name: run
+      inputs:
+        parameters:
+          - name: node_uuid
+      synchronization:
+        mutexes:
+          - name: ironic-runbooks-{{inputs.parameters.node_uuid}}
+      volumes:
+        - name: openstack
+          secret:
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - configure-snmpv3-user
+        args:
+          - --node
+          - "{{inputs.parameters.node_uuid}}"
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - name: openstack
+            mountPath: /etc/openstack
+            readOnly: true

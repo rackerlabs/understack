@@ -31,6 +31,6 @@ jobs:
         with:
           # Remove the label again when a pull request grows beyond the
           # separately released subtree. Without this, adding a chart change to
-          # an understackctl pull request would leave it excluded from the
+          # a dexop pull request would leave it excluded from the
           # release notes.
           sync-labels: true

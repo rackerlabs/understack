@@ -1,6 +1,6 @@
 ---
 kustomize_paths:
-- operators/external-secrets
+- components/external-secrets
 deploy_overrides:
   helm:
     mode: none

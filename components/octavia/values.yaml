@@ -7,6 +7,9 @@ endpoints:
   oslo_db:
     hosts:
       default: mariadb-primary
+  oslo_db_persistence:
+    hosts:
+      default: mariadb-primary
   oslo_messaging:
     statefulset:
       replicas: 3
@@ -54,7 +57,12 @@ conf:
       driver: messagingv2
     oslo_messaging_rabbit:
       amqp_durable_queues: true
+      rabbit_quorum_queue: true
+      rabbit_transient_quorum_queue: true
+      use_queue_manager: true
 
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -66,102 +74,126 @@ dependencies:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
-    driver_agent:
-      jobs:
-        - octavia-db-sync
-        - octavia-ks-user
-        - octavia-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_db_persistence
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: network
     worker:
       jobs:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_db_persistence
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: network
+        - endpoint: internal
+          service: load_balancer
     housekeeping:
       jobs:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_db_persistence
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: network
+        - endpoint: internal
+          service: load_balancer
     health_manager:
       jobs:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_db_persistence
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: network
+        - endpoint: internal
+          service: load_balancer
     db_sync:
       jobs:
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
 
 pod:
-  mounts:
+  etcSources:
     octavia_db_sync:
-      octavia_db_sync:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
-    octavia_driver_agent:
-      octavia_driver_agent:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
+      - secret:
+          name: octavia-ks-etc
     octavia_api:
-      octavia_api:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
+      - secret:
+          name: octavia-ks-etc
+    octavia_worker:
+      - secret:
+          name: octavia-ks-etc
     octavia_housekeeping:
-      octavia_housekeeping:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
+      - secret:
+          name: octavia-ks-etc
     octavia_health_manager:
-      octavia_health_manager:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
+      - secret:
+          name: octavia-ks-etc
   resources:
     enabled: true
     api:
       requests:
         memory: "512Mi"
 
+# The chart declares the Database, User, Grant and Connection resources for both
+# the octavia and octavia_persistence databases instead of the db-init job. The
+# password is read from the octavia-db-password secret in the deploy repo
+# rather than rendered from Helm values.
+mariadb_db:
+  api_group: k8s.mariadb.com
+  # the MariaDB resource is named mariadb, while clients connect through the
+  # mariadb-primary service set in endpoints.oslo_db.hosts
+  mariadb_ref: mariadb
+  password_secret:
+    create: false
+
 manifests:
   job_db_init: false
+  mariadb_db: true
   job_rabbit_init: false
+  rabbitmq_topology: false
   pod_rally_test: false
-  secret_db: true
+  secret_db: false
+  secret_db_persistence: false
+  secret_rabbitmq: false
+  secret_registry: false
   service_ingress_api: false
   # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
   # Kubernetes section generation in OpenStack Helm, because we want those

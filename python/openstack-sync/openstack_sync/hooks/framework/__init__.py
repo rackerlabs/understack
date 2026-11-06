@@ -30,6 +30,7 @@ from openstack_sync.hooks.framework.contracts import CleanupPolicy
 from openstack_sync.hooks.framework.contracts import CredentialKey
 from openstack_sync.hooks.framework.contracts import HookConfig
 from openstack_sync.hooks.framework.contracts import PruneRequest
+from openstack_sync.hooks.framework.contracts import ReconcileResult
 from openstack_sync.hooks.framework.contracts import SyncPlan
 from openstack_sync.hooks.framework.contracts import SyncPlugin
 from openstack_sync.hooks.framework.contracts import SyncResource
@@ -51,6 +52,7 @@ __all__ = [
     "FINALIZER",
     "HookConfig",
     "PruneRequest",
+    "ReconcileResult",
     "SyncPlan",
     "SyncPlugin",
     "SyncResource",
@@ -75,7 +77,12 @@ __all__ = [
 
 
 def _patch_status(
-    plugin: SyncPlugin, resource: SyncResource, sync_status: str, message: str
+    plugin: SyncPlugin,
+    resource: SyncResource,
+    sync_status: str,
+    message: str,
+    extra_status: dict[str, Any] | None = None,
+    reason: str | None = None,
 ) -> None:
     patch_status(
         plugin.config,
@@ -83,6 +90,8 @@ def _patch_status(
         sync_status,
         message,
         patch_resource_status=patch_resource_status,
+        extra_status=extra_status,
+        reason=reason,
     )
 
 

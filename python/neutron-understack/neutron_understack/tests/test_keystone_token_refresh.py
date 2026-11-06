@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from neutron_understack.undersync import Undersync
+from neutron_understack.undersync_client import Undersync
 
 
 @pytest.fixture

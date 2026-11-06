@@ -131,7 +131,7 @@ class UnderstackVniPlugin(service_base.ServicePluginBase):
         return "Understack router VNI allocation plugin"
 
     def ovn_maintenance_periodics(self, ovn_client):
-        LOG.warning("NETDEV ovn_maintenance_periodics called")
+        LOG.info("Registering netdev-router maintenance periodics")
         return [
             understack_maintenance.NetdevRouterMaintenancePeriodics(self, ovn_client)
         ]

@@ -13,6 +13,7 @@ license = "MIT"
 dependencies = [
     "ironic>=35.1.0,<36",
     "pyyaml~=6.0",
+    "requests",
 ]
 
 # REMOVE ME: delete this once we move away from patching a venv or we upgrade to a newer ironic base version
@@ -25,19 +26,26 @@ update-baremetal-port = "ironic_understack.hooks.inspect_hook_update_baremetal_p
 port-bios-name = "ironic_understack.hooks.port_bios_name_hook:PortBiosNameHook"
 node-name-check = "ironic_understack.hooks.inspect_hook_node_name_check:InspectHookNodeNameCheck"
 chassis_model = "ironic_understack.hooks.inspect_hook_chassis_model:InspectHookChassisModel"
+pci-device-capabilities = "ironic_understack.hooks.inspect_hook_pci_device_capabilities:PciDeviceCapabilitiesHook"
 
 [project.entry-points."ironic.hardware.types"]
 netdev = "ironic_understack.drivers.netdev_hardware:NetdevHardware"
+panos = "ironic_understack.drivers.panos_hardware:PanosHardware"
 
 [project.entry-points."ironic.hardware.interfaces.inspect"]
 redfish-understack = "ironic_understack.drivers.redfish_inspect_understack:UnderstackRedfishInspect"
 idrac-redfish-understack = "ironic_understack.drivers.redfish_inspect_understack:UnderstackDracRedfishInspect"
+panos = "ironic_understack.drivers.panos_inspect:PanosInspect"
+
+[project.entry-points."ironic.hardware.interfaces.management"]
+panos = "ironic_understack.drivers.panos_management:PanosManagement"
 
 [project.entry-points."ironic.api.middleware"]
 portgroup-name-validation = "ironic_understack.middleware.portgroup_name_middleware:PortgroupNameValidationMiddleware"
 
 [dependency-groups]
 test = [
+    "fixtures>=4",
     "pytest>=9.0.1,<10",
     "pytest-cov>=7,<8",
     "pytest-github-actions-annotate-failures",

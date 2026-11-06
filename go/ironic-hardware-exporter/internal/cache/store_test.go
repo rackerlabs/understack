@@ -251,7 +251,7 @@ func TestConcurrentUpdateAndGetAll(t *testing.T) {
 	s := mustNew(t)
 	var wg sync.WaitGroup
 
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -279,7 +279,7 @@ func TestConcurrentUpdateAndUpdateNodeState(t *testing.T) {
 	s.Update(&parser.HardwareMessage{NodeUUID: "uuid-1", NodeName: "Dell-93GSW04"})
 
 	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

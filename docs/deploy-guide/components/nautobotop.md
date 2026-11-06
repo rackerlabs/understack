@@ -1,6 +1,6 @@
 ---
 charts:
-- nautobotop
+- charts/nautobotop
 deploy_overrides:
   helm:
     mode: values
@@ -16,6 +16,7 @@ Global Nautobot operator deployment driven from the deploy repo.
 
 - Cluster scope: global
 - Values key: `global.nautobotop`
+- Helm chart: `charts/nautobotop/`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-nautobotop.yaml`
 
 ## How ArgoCD Builds It

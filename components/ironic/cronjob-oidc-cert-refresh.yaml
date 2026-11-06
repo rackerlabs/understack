@@ -1,0 +1,51 @@
+---
+# Refreshes the ironic-oidc-https-cert ConfigMap with the current TLS
+# certificate presented by the dex endpoint.  Ironic reads this file on
+# every set_oidc_config step (oidc_https_certificate_file), so the new
+# cert reaches iDRAC on the next step run without a conductor restart.
+#
+# Schedule: 1st and 15th of each month (~14-day cadence).
+# Let's Encrypt certs are valid for 90 days and rotate at ~60 days,
+# so this gives a comfortable renewal margin.
+#
+# The dex host is derived from oidc_discovery_url in the
+# ironic-bmc-sso-oidc-ini secret (optional).  On sites without BMC SSO
+# OIDC the secret is absent, the job skips cleanly, and the ConfigMap
+# is never created.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ironic-oidc-cert-refresh
+spec:
+  schedule: "0 3 1,15 * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: ironic-oidc-cert-refresh
+          restartPolicy: OnFailure
+          containers:
+            - name: cert-refresh
+              # Includes Python 3 and kubectl for the shared refresh script.
+              image: ghcr.io/flant/shell-operator:v1.20.6
+              imagePullPolicy: IfNotPresent
+              command: [python3, /scripts/refresh-oidc-cert.py]
+              volumeMounts:
+                - name: ironic-bmc-sso-oidc-ini
+                  mountPath: /etc/ironic/ironic.conf.d
+                  readOnly: true
+                - name: ironic-oidc-cert-fetch
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: ironic-bmc-sso-oidc-ini
+              secret:
+                secretName: ironic-bmc-sso-oidc-ini
+                optional: true
+            - name: ironic-oidc-cert-fetch
+              configMap:
+                name: ironic-oidc-cert-fetch
+                defaultMode: 0555

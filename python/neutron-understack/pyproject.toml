@@ -38,9 +38,10 @@ ironic = "neutron_understack.config:list_ironic_opts"
 understack = "neutron_understack.config:list_understack_opts"
 cisco-asa = "neutron_understack.config:list_cisco_asa_opts"
 understack-vni = "neutron_understack.config:list_understack_vni_opts"
+netdev-router-reconcile = "neutron_understack.config:list_netdev_reconcile_opts"
 
 [project.entry-points."neutron.ml2.mechanism_drivers"]
-understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
+understack = "neutron_understack.understack_mech:UnderstackDriver"
 undersync = "neutron_understack.undersync_mech:UndersyncDriver"
 
 [project.entry-points."neutron.service_plugins"]
@@ -84,9 +85,10 @@ default-groups = ["test"]
 # containers/neutron/Dockerfile (NEUTRON_GIT_REF / NEUTRON_LIB_GIT_REF).
 [tool.uv.sources]
 # renovate: name=openstack/neutron repo=https://github.com/rackerlabs/neutron.git branch=understack/2026.1
-neutron = { git = "https://github.com/rackerlabs/neutron.git", rev = "b0678e56e9c5a7ec2f335c4271465fc1c3202e2a" }
+neutron = { git = "https://github.com/rackerlabs/neutron.git", rev = "94d6f825e6edfafa158a9e0492a32fce7ee23747" }
+
 # renovate: name=openstack/neutron-lib repo=https://github.com/rackerlabs/neutron-lib.git branch=understack/2026.1
-neutron-lib = { git = "https://github.com/rackerlabs/neutron-lib.git", rev = "6d0367183cc92656ba449acefd830cb4e11f2f5b" }
+neutron-lib = { git = "https://github.com/rackerlabs/neutron-lib.git", rev = "275d4c95657ed4c3028401b48c15204d8a965420" }
 
 [tool.pytest.ini_options]
 minversion = "6.0"

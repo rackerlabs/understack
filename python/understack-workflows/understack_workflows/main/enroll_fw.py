@@ -1,41 +1,50 @@
 import argparse
 import logging
 import os
+from pathlib import Path
 
 from ironicclient.common.apiclient import exceptions as ironic_exceptions
 
 from understack_workflows import firewall
 from understack_workflows import helpers
+from understack_workflows import ironic_node
 from understack_workflows import netdev_reconciler
 from understack_workflows.ironic.client import IronicClient
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_FIREWALL_DRIVER = "panos"
+
 
 def main() -> None:
     """Enroll a firewall, or update its metadata in place.
 
-    A firewall is a generic netdev node plus firewall metadata: management
-    access in the node's driver_info and the mate serial in extra.
+    Uses the Palo Alto hardware type by default, with management access in
+    the node's driver_info and the mate serial in extra.
 
     """
     helpers.setup_logger()
     args = argument_parser().parse_args()
 
-    enroll_fw(
+    node_uuid = enroll_fw(
         name=args.name,
         physical_network=args.physical_network,
         ports=netdev_reconciler.parse_ports_arg(args.ports),
         resource_class=args.resource_class,
+        driver=args.driver,
         external_cmdb_id=args.external_cmdb_id,
         management_ip=args.management_ip,
         management_switch=args.management_switch,
         management_switch_port=args.management_switch_port,
         mate_serial=args.mate_serial,
+        ha_role=args.ha_role,
         serial=args.serial,
         vendor=args.vendor,
         model=args.model,
     )
+
+    if args.node_uuid_output:
+        Path(args.node_uuid_output).write_text(node_uuid + "\n")
 
 
 def _require_specific_resource_class(resource_class: str | None) -> str:
@@ -78,15 +87,25 @@ def enroll_fw(
     physical_network: str,
     ports: list[dict],
     resource_class: str,
+    driver: str = DEFAULT_FIREWALL_DRIVER,
     external_cmdb_id: int | str | None = None,
     management_ip: str = "",
     management_switch: str = "",
     management_switch_port: str = "",
     mate_serial: str = "",
+    ha_role: str = "",
     serial: str = "",
     vendor: str = "",
     model: str = "",
-) -> None:
+) -> str:
+    driver = (driver or "").strip()
+    if not driver:
+        raise ValueError("enroll-fw requires a non-empty --driver")
+    if not (physical_network or "").strip():
+        raise ValueError("enroll-fw requires --physical-network")
+    if ha_role and not (mate_serial or "").strip():
+        raise ValueError("enroll-fw requires --mate-serial with --ha-role")
+    traits = firewall.ha_role_traits(ha_role)
     resource_class = _require_specific_resource_class(resource_class)
     management_switch, management_switch_port = _require_management_location(
         management_switch, management_switch_port
@@ -116,25 +135,44 @@ def enroll_fw(
             physical_network=physical_network,
             ports=ports,
             resource_class=resource_class,
+            driver=driver,
             external_cmdb_id=external_cmdb_id,
             driver_info=driver_info,
             extra=extra,
             properties=properties,
+            traits=traits,
         )
-        return
+        return node.uuid
+
+    if not ports:
+        return _enroll_by_inspection(
+            client=client,
+            name=name,
+            physical_network=physical_network,
+            resource_class=resource_class,
+            driver=driver,
+            external_cmdb_id=external_cmdb_id,
+            driver_info=driver_info,
+            extra=extra,
+            properties=properties,
+            traits=traits,
+        )
 
     # New or re-enrollable node: the engine writes the metadata inside the
     # enrollment lifecycle (at create, or patched before the node becomes
     # available), so the node is never allocatable in an under-described state.
-    netdev_reconciler.enroll(
+    return netdev_reconciler.enroll(
         name=name,
         physical_network=physical_network,
         ports=ports,
         resource_class=resource_class,
+        driver=driver,
         external_cmdb_id=external_cmdb_id,
         driver_info=driver_info,
         extra=extra,
         properties=properties,
+        assign_roles=True,
+        traits=traits,
     )
 
 
@@ -146,6 +184,87 @@ def _get_node_or_none(client: IronicClient, name: str):
         return None
 
 
+def _enroll_by_inspection(
+    *,
+    client: IronicClient,
+    name: str,
+    physical_network: str,
+    resource_class: str,
+    driver: str,
+    external_cmdb_id: int | str | None,
+    driver_info: dict,
+    extra: dict,
+    properties: dict,
+    traits: dict[str, bool],
+) -> str:
+    """Enroll a firewall without ports and let inspection find and label them.
+
+    Provided only once it has an outside and an inside port, which get the
+    given physical_network.
+    """
+    if external_cmdb_id not in (None, ""):
+        extra = {**extra, "external_cmdb_id": external_cmdb_id}
+    node, created = netdev_reconciler.find_or_create_netdev_node(
+        client=client,
+        name=name,
+        resource_class=resource_class,
+        driver=driver,
+        driver_info=driver_info,
+        extra=extra,
+        properties=properties,
+    )
+    if node.provision_state != "manageable":
+        ironic_node.transition(node, target_state="manage", expected_state="manageable")
+    if not created:
+        netdev_reconciler.update_node_metadata(
+            client=client,
+            node=node,
+            resource_class=resource_class,
+            driver_info=driver_info,
+            extra=extra,
+            properties=properties,
+        )
+    netdev_reconciler.update_node_traits(client=client, node=node, traits=traits)
+
+    logger.info("[node:%s] Inspecting to discover and label the ports", node.uuid)
+    ironic_node.transition(node, target_state="inspect", expected_state="manageable")
+    role_ports = [
+        port
+        for port in client.list_ports(node.uuid)
+        if getattr(port, "category", None) in netdev_reconciler.PORT_ROLES
+    ]
+    if not {port.category for port in role_ports}.issuperset(
+        netdev_reconciler.PORT_ROLES
+    ):
+        raise RuntimeError(
+            f"[node:{node.uuid}] Inspection did not give the node an outside and "
+            "an inside port; leaving it manageable"
+        )
+
+    for port in role_ports:
+        if port.physical_network != physical_network:
+            logger.info(
+                "[node:%s] Setting physical_network=%s on port %s (was %s)",
+                node.uuid,
+                physical_network,
+                port.name,
+                port.physical_network,
+            )
+            client.update_port(
+                port.uuid,
+                [
+                    {
+                        "op": "add",
+                        "path": "/physical_network",
+                        "value": physical_network,
+                    }
+                ],
+            )
+
+    ironic_node.transition(node, target_state="provide", expected_state="available")
+    return node.uuid
+
+
 def _update_active_firewall(
     *,
     client: IronicClient,
@@ -154,23 +273,25 @@ def _update_active_firewall(
     physical_network: str,
     ports: list[dict],
     resource_class: str,
+    driver: str,
     external_cmdb_id: int | str | None,
     driver_info: dict,
     extra: dict,
     properties: dict,
+    traits: dict[str, bool],
 ) -> None:
     """Update firewall metadata on an in-service (active) node, in place.
 
     An active firewall is carrying live traffic, so its base configuration must
     not change here. We re-validate the submitted ports and compare them
     read-only against the node's real ports.
-    If everything matches we patch only driver_info/extra.
+    If everything matches we patch only driver_info/extra/properties.
     """
     node_driver = getattr(node, "driver", None)
-    if node_driver != "netdev":
+    if node_driver != driver:
         raise RuntimeError(
             f"Node {name} ({node.uuid}) is active with driver {node_driver!r}; "
-            "refusing to modify a non-netdev node"
+            f"refusing to enroll it as {driver!r}"
         )
 
     node_resource_class = getattr(node, "resource_class", None)
@@ -181,14 +302,23 @@ def _update_active_firewall(
             f"{resource_class!r} on an in-service firewall"
         )
 
-    netdev_ports = netdev_reconciler.build_netdev_ports(ports)
-    _reject_structural_drift(
-        client=client,
-        node=node,
-        name=name,
-        physical_network=physical_network,
-        netdev_ports=netdev_ports,
-    )
+    current = set(client.get_node_traits(node.uuid)) & set(traits)
+    wanted = {trait for trait, on in traits.items() if on}
+    if current != wanted:
+        raise RuntimeError(
+            f"[node:{node.uuid}] Node is active with HA traits {sorted(current)}; "
+            f"refusing to change them to {sorted(wanted)} on an in-service firewall"
+        )
+
+    # Without ports there is nothing to compare: inspection owns them.
+    if ports:
+        _reject_structural_drift(
+            client=client,
+            node=node,
+            name=name,
+            physical_network=physical_network,
+            netdev_ports=netdev_reconciler.build_netdev_ports(ports),
+        )
 
     active_extra = dict(extra)
     if external_cmdb_id not in (None, ""):
@@ -227,6 +357,9 @@ def _reject_structural_drift(
             port=port,
             existing=ports_by_name.get(f"{name}:{port.label}"),
             ports_by_mac=ports_by_mac,
+            # This path assigns no roles, so a live firewall's outside/inside
+            # labels must not count as drift.
+            manage_category=False,
         )
         if plan is not None:
             raise RuntimeError(
@@ -243,27 +376,43 @@ def _reject_structural_drift(
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__),
-        description="Enroll a firewall (netdev node + firewall metadata)",
+        description="Enroll a firewall (defaults to the panos hardware type)",
+    )
+    parser.add_argument(
+        "--node-uuid-output",
+        help="Write node UUID to this file after successful enrollment",
     )
     parser.add_argument("--name", required=True, help="Ironic node name")
     parser.add_argument(
         "--physical-network",
         required=True,
-        help="Port physical_network",
+        help="Port physical_network, the VLAN group in Nautobot (e.g. f20-3-network)",
     )
     parser.add_argument(
         "--ports",
-        required=True,
+        default="[]",
         help="JSON array of ports (same format as enroll-netdev). 'switch' must "
         "be the switch FQDN (e.g. n11-22-1.dfw3.rackspace.net) so the Nautobot "
         "sync can resolve the cable. Optional per-port 'bios_name' (the device "
-        "interface name); defaults to the label.",
+        "interface name); defaults to the label. At least two ports: the "
+        "lowest-numbered interface becomes the router's outside NIC (gateway) "
+        "and the next one its inside NIC (subnets). Leave it out to have "
+        "inspection discover the ports over LLDP and label them.",
     )
     parser.add_argument(
         "--resource-class",
         required=True,
         help="Ironic resource class (required: use a purpose-made pool, not "
         "the generic default, or the router flavor may adopt wrong hardware)",
+    )
+    parser.add_argument(
+        "--driver",
+        default=DEFAULT_FIREWALL_DRIVER,
+        help=(
+            "Ironic hardware type to enroll the node as "
+            f"(default: {DEFAULT_FIREWALL_DRIVER}). Must match an existing "
+            "node's driver."
+        ),
     )
     parser.add_argument(
         "--external-cmdb-id",
@@ -293,6 +442,13 @@ def argument_parser():
         required=False,
         default="",
         help="HA mate serial number -> extra.mate_serial",
+    )
+    parser.add_argument(
+        "--ha-role",
+        choices=["", *firewall.HA_ROLE_TRAITS],
+        default="",
+        help="HA role, set as node trait CUSTOM_PRIMARY or CUSTOM_SECONDARY "
+        "(needs --mate-serial). Routers never get a secondary.",
     )
     parser.add_argument(
         "--serial",

@@ -1,0 +1,12 @@
+# Defaults: https://github.com/mariadb-operator/mariadb-operator/blob/main/deploy/charts/mariadb-operator/values.yaml
+
+metrics:
+  enabled: true
+
+config:
+  # stick with OpenStack's officially supported version
+  mariadbDefaultVersion: "11.4"
+  mariadbImageName: mariadb
+  mariadbImage:
+    repository: mariadb
+    tag: 11.4.10

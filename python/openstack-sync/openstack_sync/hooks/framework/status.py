@@ -18,8 +18,17 @@ def patch_status(
     message: str,
     *,
     patch_resource_status: Callable[..., None],
+    extra_status: dict[str, object] | None = None,
+    reason: str | None = None,
 ) -> None:
-    """Patch one CR status with the sync outcome."""
+    """Patch one CR status with the sync outcome.
+
+    ``extra_status`` and ``reason`` are passed straight through to
+    *patch_resource_status*; see
+    :class:`~openstack_sync.hooks.framework.contracts.ReconcileResult` for
+    what ``extra_status`` is for. A failed reconcile has none to report, so
+    that call site omits it.
+    """
     if not resource.name:
         LOG.error(
             "Unable to patch %s status; Kubernetes metadata.name is missing",
@@ -37,6 +46,8 @@ def patch_status(
         crd_kind=config.crd_kind,
         status_enabled=config.status_enabled,
         current_status=resource.current_status,
+        extra_status=extra_status,
+        reason=reason,
     )
 
 

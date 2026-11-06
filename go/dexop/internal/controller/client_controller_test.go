@@ -33,7 +33,10 @@ import (
 	dexmgr "github.com/rackerlabs/understack/go/dexop/dex"
 )
 
-const testDexHostAddr = "127.0.0.1:15557"
+const (
+	testDexHostAddr = "127.0.0.1:15557"
+	testNamespace   = "default"
+)
 
 var _ = Describe("Client Controller", func() {
 	const resourceName = "test-resource"
@@ -43,7 +46,7 @@ var _ = Describe("Client Controller", func() {
 	Context("When reconciling a resource", func() {
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default",
+			Namespace: testNamespace,
 		}
 		typesNamespacedSecretName := types.NamespacedName{Namespace: typeNamespacedName.Namespace, Name: secretName}
 		client := &dexv1alpha1.Client{}
@@ -57,7 +60,7 @@ var _ = Describe("Client Controller", func() {
 				resource := &dexv1alpha1.Client{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
-						Namespace: "default",
+						Namespace: testNamespace,
 					},
 					Spec: dexv1alpha1.ClientSpec{
 						Name:           "fred-client",
@@ -247,7 +250,7 @@ var _ = Describe("Client Controller", func() {
 	Context("pre-created Secret", func() {
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default",
+			Namespace: testNamespace,
 		}
 		dex, err := dexmgr.NewInsecureTestManager(testDexHostAddr)
 		Expect(err).NotTo(HaveOccurred())
@@ -257,7 +260,7 @@ var _ = Describe("Client Controller", func() {
 			resource := &dexv1alpha1.Client{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
-					Namespace: "default",
+					Namespace: testNamespace,
 				},
 				Spec: dexv1alpha1.ClientSpec{
 					Name:           "fred-client",
@@ -270,7 +273,7 @@ var _ = Describe("Client Controller", func() {
 
 			By("creating secret")
 			secret := &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: testSecretName, Namespace: "default"},
+				ObjectMeta: metav1.ObjectMeta{Name: testSecretName, Namespace: testNamespace},
 				Data:       map[string][]byte{"client-secret": []byte("abc")},
 			}
 			Expect(k8sClient.Create(ctx, secret)).To(Succeed())

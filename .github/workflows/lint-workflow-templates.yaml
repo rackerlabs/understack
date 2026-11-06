@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Kind cluster with Helm
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
         with:
           cluster_name: argo-lint-cluster
 
@@ -28,7 +28,7 @@ jobs:
 
       - name: Install Argo CLI
         run: |
-          curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.7.15/argo-linux-amd64.gz
+          curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v4.1.6/argo-linux-amd64.gz
           gunzip argo-linux-amd64.gz
           chmod +x argo-linux-amd64
           sudo mv argo-linux-amd64 /usr/local/bin/argo

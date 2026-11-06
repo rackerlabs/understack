@@ -1,0 +1,31 @@
+{{- if eq (include "understack.isEnabled" (list $.Values.site "obm_monitoring")) "true" }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-%s" $.Release.Name "obm-monitoring" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
+spec:
+  destination:
+    # argo-events is owned by the argo_events Application, so no CreateNamespace.
+    namespace: argo-events
+    server: {{ $.Values.cluster_server }}
+  project: understack
+  sources:
+  - path: {{ include "understack.deploy_path" $ }}/obm-monitoring
+    repoURL: {{ include "understack.deploy_url" $ }}
+    targetRevision: {{ include "understack.deploy_ref" $ }}
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    - ApplyOutOfSyncOnly=true
+{{- end }}

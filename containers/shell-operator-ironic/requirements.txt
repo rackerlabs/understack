@@ -1,4 +1,0 @@
-pip
-kubernetes
-python-openstackclient
-python-ironicclient

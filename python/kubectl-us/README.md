@@ -150,6 +150,32 @@ See the
 [operator guide](../../docs/operator-guide/kubectl-us.md#net-router-repair) for
 the complete safety contract.
 
+### `net trunk audit`
+
+```
+kubectl us net trunk audit                      # every baremetal trunk
+kubectl us net trunk audit <trunk-name-or-id>
+```
+
+Checks baremetal trunks after
+[LP #2167105](https://bugs.launchpad.net/neutron/+bug/2167105) stopped ml2/ovn
+managing them: each subport's binding profile must carry `parent_name` and `tag`
+matching the trunk (Nova reads them for `network_data.json`), its
+`binding:vif_type` must be `other` while the parent is bound (not a leftover
+`ovs`), and trunk and subport statuses must agree with the parent port's
+binding. The matching LSP columns ml2/ovn derives from the profile are expected
+and not audited. Only ports already owned by `trunk:subport` are audited; ports
+with semantic owners such as `network:router_interface` are skipped. Trunks
+whose parent port is not baremetal are also skipped, since ml2/ovn still owns
+them. Any failed check produces a nonzero exit status.
+
+The audit changes nothing: the CLI cannot write `binding:profile` or
+`vif_type`. When a subport's binding has drifted it prints the Ironic
+`reattach_networking` service step for the trunk's node, which makes
+neutron-understack rewrite the subports as the parent port rebinds. See the
+[operator guide](../../docs/operator-guide/kubectl-us.md#net-trunk-audit) for
+the complete contract.
+
 ### `backup local`
 
 ```

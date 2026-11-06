@@ -12,8 +12,8 @@ on:
       - "containers/dnsmasq/**"
       - "containers/ironic-nautobot-client/**"
       - "containers/ironic-vnc-container/**"
-      - "containers/shell-operator-ironic/**"
       - "containers/openstack-sync-operator/**"
+      - "go/nautobotop/**"
       - "containers/understack-tests/**"
       - "python/**"
       - ".github/workflows/containers.yaml"
@@ -44,12 +44,14 @@ jobs:
             context_path: "./containers/ironic-vnc-container/"
             prebuild_script: ./sync_from_upstream.sh
             prebuild_script_working_dir: containers/ironic-vnc-container/
-          - name: shell-operator-ironic
-            target: prod
           - name: openstack-sync-operator
             target: prod
           - name: nautobot
             target: prod
+          - name: nautobotop
+            target: ''
+            dockerfile_path: ./go/nautobotop/Dockerfile
+            context_path: "./go/nautobotop/"
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:

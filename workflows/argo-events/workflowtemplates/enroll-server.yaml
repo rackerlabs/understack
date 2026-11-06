@@ -6,11 +6,26 @@ metadata:
     workflows.argoproj.io/title: Perform server discovery and update Ironic
     workflows.argoproj.io/description: |
       Defined in `workflows/argo-events/workflowtemplates/enroll-server.yaml`
+
+      The workflow reads site-specific configuration from the
+      `enroll-server-config` ConfigMap. During enrollment, it runs
+      `post_inspection_runbooks` before providing the node. After enrollment,
+      it runs the templates listed in `post_enroll_workflows`.
+      Both lists can be overridden per enrollment; an explicit [] disables
+      the corresponding hooks. Post-enrollment workflows run concurrently.
 kind: WorkflowTemplate
 spec:
+  # Labels make runs filterable in the Argo UI (`argo list -l`) and give
+  # alerts a stable key. Per-target labels are added at submission time.
+  workflowMetadata:
+    labels:
+      understack.rackspace.com/workflow-kind: enroll
+      understack.rackspace.com/device-type: server
   serviceAccountName: workflow
   entrypoint: main
   volumes:
+    - name: enrollment-result
+      emptyDir: {}
     - name: bmc-master
       secret:
         secretName: bmc-master
@@ -23,6 +38,21 @@ spec:
   arguments:
     parameters:
       - name: ip_address
+      # JSON array of independent WorkflowTemplate names, executed concurrently.
+      # Each must expose a `run` template accepting `node_uuid`.
+      # Omitted: use site configuration. Explicit []: skip post-enrollment hooks.
+      - name: post_enroll_workflows
+        valueFrom:
+          configMapKeyRef:
+            name: enroll-server-config
+            key: post_enroll_workflows
+          default: "[]"
+      - name: post_inspection_runbooks
+        valueFrom:
+          configMapKeyRef:
+            name: enroll-server-config
+            key: post_inspection_runbooks
+          default: "[]"
       - name: firmware_update
         value: "false"
       - name: raid_configure
@@ -31,19 +61,69 @@ spec:
         value: calvin
       - name: external_cmdb_id
         value: ""
+      - name: rack
+        value: ""
+      - name: position
+        value: ""
   templates:
     - name: main
+      inputs:
+        parameters:
+          - name: post_inspection_runbooks
+            value: "{{workflow.parameters.post_inspection_runbooks}}"
+          - name: post_enroll_workflows
+            value: "{{workflow.parameters.post_enroll_workflows}}"
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              parameter: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
       steps:
         - - name: enroll-server
             template: enroll-server
+            arguments:
+              parameters:
+                - name: post_inspection_runbooks
+                  value: "{{inputs.parameters.post_inspection_runbooks}}"
+        - - name: set-node-extra
+            template: set-node-extra
+            when: >-
+              "{{workflow.parameters.external_cmdb_id}}" != "" ||
+              "{{workflow.parameters.rack}}" != "" ||
+              "{{workflow.parameters.position}}" != ""
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
+        - - name: post-enroll
+            templateRef:
+              name: "{{item}}"
+              template: run
+            arguments:
+              parameters:
+                - name: node_uuid
+                  value: "{{steps.enroll-server.outputs.parameters.node_uuid}}"
+            withParam: "{{inputs.parameters.post_enroll_workflows}}"
     - name: enroll-server
+      inputs:
+        parameters:
+          - name: post_inspection_runbooks
+      outputs:
+        parameters:
+          - name: node_uuid
+            valueFrom:
+              path: /run/enrollment/node-uuid
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - enroll-server
         args:
+          - --node-uuid-output
+          - /run/enrollment/node-uuid
           - --ip-address
           - "{{workflow.parameters.ip_address}}"
+          - --post-inspection-runbooks
+          - "{{inputs.parameters.post_inspection_runbooks}}"
           - --firmware-update
           - "{{workflow.parameters.firmware_update}}"
           - --raid-configure
@@ -53,6 +133,8 @@ spec:
           - --external-cmdb-id
           - "{{workflow.parameters.external_cmdb_id}}"
         volumeMounts:
+          - mountPath: /run/enrollment
+            name: enrollment-result
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
@@ -71,3 +153,34 @@ spec:
             value: "{{workflow.uid}}"
           - name: OS_CLOUD
             value: understack
+    - name: set-node-extra
+      inputs:
+        parameters:
+          - name: node_uuid
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
+        command:
+          - sh
+          - -c
+          - |
+            set -eu
+            set -- baremetal node set
+            [ -n "${EXTERNAL_CMDB_ID}" ] && set -- "$@" --extra "external_cmdb_id=${EXTERNAL_CMDB_ID}"
+            [ -n "${RACK}" ] && set -- "$@" --extra "rack=${RACK}"
+            [ -n "${POSITION}" ] && set -- "$@" --extra "position=${POSITION}"
+            exec openstack "$@" "${NODE_UUID}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+          - name: NODE_UUID
+            value: "{{inputs.parameters.node_uuid}}"
+          - name: EXTERNAL_CMDB_ID
+            value: "{{workflow.parameters.external_cmdb_id}}"
+          - name: RACK
+            value: "{{workflow.parameters.rack}}"
+          - name: POSITION
+            value: "{{workflow.parameters.position}}"
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true

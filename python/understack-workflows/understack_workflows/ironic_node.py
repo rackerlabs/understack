@@ -37,6 +37,38 @@ ENROLLABLE_STATES = {"clean failed", "inspect failed", "enroll", "manageable"}
 
 logger = logging.getLogger(__name__)
 
+# Substrings of patch/update paths whose values must never be logged.
+_SENSITIVE_PATH_FRAGMENTS = ("password", "secret", "token")
+_REDACTED = "***REDACTED***"
+
+
+def _is_sensitive(path: str) -> bool:
+    path = path.lower()
+    return any(fragment in path for fragment in _SENSITIVE_PATH_FRAGMENTS)
+
+
+def _redact_patches(patches: Sequence[dict]) -> list[dict]:
+    """Return a copy of JSON-patch operations with sensitive values redacted."""
+    redacted = []
+    for patch_op in patches:
+        if isinstance(patch_op, dict) and _is_sensitive(str(patch_op.get("path", ""))):
+            redacted.append({**patch_op, "value": _REDACTED})
+        else:
+            redacted.append(patch_op)
+    return redacted
+
+
+def _redact_updates(updates: Sequence[str]) -> list[str]:
+    """Return a copy of "path=value" update strings with sensitive values redacted."""
+    redacted = []
+    for update in updates:
+        path, sep, _ = str(update).partition("=")
+        if sep and _is_sensitive(path):
+            redacted.append(f"{path}={_REDACTED}")
+        else:
+            redacted.append(update)
+    return redacted
+
 
 def create_or_update(
     bmc: Bmc,
@@ -127,7 +159,11 @@ def update_ironic_node(
         updates.append(f"extra/external_cmdb_id={external_cmdb_id}")
 
     patches = args_array_to_patch("add", updates)
-    logger.info("Updating Ironic node %s patches=%s", ironic_node.uuid, patches)
+    logger.info(
+        "Updating Ironic node %s patches=%s",
+        ironic_node.uuid,
+        _redact_patches(patches),
+    )
 
     client.update_node(ironic_node.uuid, patches)
     logger.debug("Ironic node %s Updated.", ironic_node.uuid)
@@ -213,7 +249,7 @@ def transition(
 def patch(node: Node, updates: Sequence[str]) -> None:
     if not updates:
         return
-    logger.info("%s updating node %s", node.uuid, list(updates))
+    logger.info("%s updating node %s", node.uuid, _redact_updates(updates))
     IronicClient().update_node(node.uuid, args_array_to_patch("add", list(updates)))
 
 
@@ -301,6 +337,35 @@ def inspect(node: Node, inspect_interface: str = "agent"):
         patch(node, [f"inspect_interface={inspect_interface}"])
 
     transition(node, target_state="inspect", expected_state="manageable")
+
+
+def run_post_inspection_runbook(node: Node, name_or_id: str) -> None:
+    """Run a selected runbook while the inspected node is manageable.
+
+    Require at least one matching runbook trait before starting cleaning.
+    Let the runbook determine whether cleaning needs an agent ramdisk.
+    """
+    client = IronicClient()
+    runbook = client.get_runbook(name_or_id)
+    traits = client.get_node_traits(node.uuid)
+    runbook_traits = getattr(runbook, "traits", None)
+    if runbook_traits is None:
+        raise ValueError(
+            f"[node:{node.uuid}] Runbook {name_or_id!r} has no traits metadata; "
+            "Ironic API 1.112 or newer is required"
+        )
+    if not set(traits).intersection(runbook_traits):
+        raise ValueError(
+            f"[node:{node.uuid}] Runbook {name_or_id!r} requires at least one "
+            f"matching node trait from {sorted(runbook_traits)}"
+        )
+    logger.info("[node:%s] Running post-inspection runbook %s", node.uuid, name_or_id)
+    transition(
+        node,
+        target_state="clean",
+        expected_state="manageable",
+        runbook=runbook.uuid,
+    )
 
 
 def apply_firmware_updates(node: Node) -> None:

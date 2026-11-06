@@ -85,13 +85,13 @@ enablement defaults, validation, and troubleshooting notes.
 | [external-secrets](./external-secrets.md) | global, site |
 | [global-workflows](./global-workflows.md) | global |
 | [ingress-nginx](./ingress-nginx.md) | global, site |
-| [karma](./karma.md) | global, site |
 | [mariadb-operator](./mariadb-operator.md) | site |
 | [monitoring](./monitoring.md) | global, site |
 | [nautobot](./nautobot.md) | global |
 | [nautobot-api-tokens](./nautobot-api-tokens.md) | global |
 | [nautobot-job-queues](./nautobot-job-queues.md) | global |
 | [nautobotop](./nautobotop.md) | global |
+| [obm-monitoring](./obm-monitoring.md) | site |
 | [openebs](./openebs.md) | global, site |
 | [openstack](./openstack.md) | site |
 | [openstack-exporter](./openstack-exporter.md) | site |

@@ -22,7 +22,7 @@ conductor:
     # it is only necessary because the above pxe is disabled, its init
     # creates this path
     - name: create-tftpboot
-      image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+      image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
       imagePullPolicy: IfNotPresent
       command: [bash]
       args:
@@ -31,6 +31,22 @@ conductor:
       volumeMounts:
         - name: pod-data
           mountPath: /var/lib/openstack-helm
+    # Bootstraps ironic-oidc-https-cert ConfigMap with the current dex TLS cert
+    # so that oidc_https_certificate_file is populated before the first
+    # set_oidc_config step.  Kept fresh by ironic-oidc-cert-refresh CronJob.
+    # No-op on sites without BMC SSO OIDC: exits 0 when bmc-sso-oidc.conf
+    # is absent (ironic-bmc-sso-oidc-ini secret is optional).
+    - name: bmc-sso-cert-init
+      image: ghcr.io/flant/shell-operator:v1.20.6
+      imagePullPolicy: IfNotPresent
+      command: [python3, /scripts/refresh-oidc-cert.py]
+      volumeMounts:
+        - name: ironic-etc-snippets
+          mountPath: /etc/ironic/ironic.conf.d
+          readOnly: true
+        - name: ironic-oidc-cert-fetch
+          mountPath: /scripts
+          readOnly: true
 
 labels:
   conductor:
@@ -50,9 +66,14 @@ conf:
     # allow node lessee to get console
     "baremetal:node:get_console": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s)"
   ironic:
+    database:
+      # The MariaDB operator writes the connection string into the
+      # ironic-db-conn secret, which is projected into the config directory
+      # below, so the chart must not generate one from the DB password.
+      connection: null
     DEFAULT:
       # hardware types we have enabled in ironic
-      enabled_hardware_types: redfish,idrac,netdev,manual-management
+      enabled_hardware_types: redfish,idrac,netdev,panos,manual-management
       # enabled interfaces for the above hardware types, each hardware type must
       # have at least one enabled interface that it reports it supports
       enabled_bios_interfaces: redfish,idrac-redfish,no-bios
@@ -61,13 +82,15 @@ conf:
       enabled_console_interfaces: redfish-graphical,no-console
       enabled_deploy_interfaces: direct,ramdisk,noop
       enabled_firmware_interfaces: redfish,no-firmware
-      enabled_inspect_interfaces: redfish,idrac-redfish,agent,no-inspect
-      enabled_management_interfaces: redfish,idrac-redfish,noop
+      enabled_inspect_interfaces: redfish,idrac-redfish,agent,panos,no-inspect
+      enabled_management_interfaces: redfish,idrac-redfish,panos,noop
       enabled_network_interfaces: neutron,noop
       # remove fake once there is a noop that the ManualManagement uses, which netdev is derived from
       enabled_power_interfaces: redfish,idrac-redfish,fake
       enabled_raid_interfaces: redfish,idrac-redfish,agent,no-raid
       enabled_vendor_interfaces: redfish,idrac-redfish,no-vendor
+      # default bonding mode for portgroups (LACP)
+      default_portgroup_mode: 802.3ad
       # the service account belongs to the service project but our nodes
       # will live in the infra domain in the baremetal project so the
       # service account needs to have permissions outside of just the
@@ -88,6 +111,11 @@ conf:
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#nodes-go-into-maintenance-mode
       sync_power_state_interval: 300
       sync_power_state_workers: 20
+      # Trait Based Networking (TBN): dynamically portgroup category=network
+      # ports at vif_attach time. See trait_based_networking.yaml for the
+      # trait definitions.
+      enable_trait_based_networking: true
+      trait_based_networking_config_file: /etc/ironic/trait-based-networking/trait_based_networking.yaml
     agent:
       # (nicholas.kuechler) tuning for idrac hardware type
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#timeout-when-powering-off
@@ -108,8 +136,10 @@ conf:
       keep_ports: "present"
     redfish:
       # Redfish inspection hooks run after inspecting out-of-band using the BMC:
-      inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class,chassis_model"
+      inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class,chassis_model,pci-device-capabilities"
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
+      post_boot_retry_attempts: 6
+      post_boot_retry_delay: 30
     sensor_data:
       send_sensor_data: true
       enable_for_undeployed_nodes: true
@@ -178,6 +208,8 @@ network:
   # by OpenStack Helm
   use_external_ingress_controller: true
 
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -209,6 +241,11 @@ dependencies:
         - ironic-db-sync
         - ironic-ks-user
         - ironic-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
     # (nicholas.kuechler) The upstream helm values have ironic-db-init
     # as a dependency for db_sync, but we have job_db_init false so
     # ironic-db-init never gets created, and this dependency won't pass.
@@ -216,12 +253,32 @@ dependencies:
     # https://opendev.org/openstack/openstack-helm/src/branch/master/ironic/values.yaml#L310-L312
     db_sync:
       jobs:
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
+
+# The chart declares the Database, User, Grant and Connection resources instead
+# of the db-init job. The password is read from the ironic-db-password secret
+# in the deploy repo rather than rendered from Helm values.
+mariadb_db:
+  api_group: k8s.mariadb.com
+  # the MariaDB resource is named mariadb, while clients connect through the
+  # mariadb-primary service set in endpoints.oslo_db.hosts
+  mariadb_ref: mariadb
+  password_secret:
+    create: false
 
 manifests:
   job_db_init: false
   job_db_drop: false
+  mariadb_db: true
   job_manage_cleaning_network: false
   job_rabbit_init: false
+  rabbitmq_topology: false
   secret_db: false
   secret_rabbitmq: false
   secret_registry: false
@@ -246,12 +303,30 @@ pod:
     ironic_api:
       - secret:
           name: ironic-ks-etc
+      - secret:
+          name: ironic-db-conn
     ironic_conductor:
       - secret:
           name: ironic-ks-etc
+      - secret:
+          name: ironic-db-conn
+      - secret:
+          name: network-device-credentials-ini
+          optional: true
+      - secret:
+          name: ironic-bmc-sso-oidc-ini
+          optional: true
+      - secret:
+          name: ironic-snmpv3-master
+          optional: true
     ironic_novncproxy:
       - secret:
           name: ironic-ks-etc
+      - secret:
+          name: ironic-db-conn
+    ironic_db_sync:
+      - secret:
+          name: ironic-db-conn
   mounts:
     ironic_conductor:
       ironic_conductor:
@@ -264,6 +339,13 @@ pod:
             mountPath: /var/lib/understack/device-types
           - name: ironic-inspection-rules
             mountPath: /etc/ironic/inspection-rules/
+            readOnly: true
+          - name: ironic-trait-based-networking
+            mountPath: /etc/ironic/trait-based-networking/
+            readOnly: true
+          # dex TLS cert for oidc_https_certificate_file
+          - name: ironic-oidc-https-cert
+            mountPath: /etc/ironic/oidc-https-cert
             readOnly: true
         volumes:
           - name: dnsmasq-ironic
@@ -279,6 +361,21 @@ pod:
             configMap:
               name: ironic-inspection-rules
               optional: true
+          - name: ironic-trait-based-networking
+            configMap:
+              name: ironic-trait-based-networking
+          # dex TLS cert for oidc_https_certificate_file; written by
+          # bmc-sso-cert-init and kept fresh by ironic-oidc-cert-refresh.
+          # optional: empty on sites without BMC SSO OIDC.
+          - name: ironic-oidc-https-cert
+            configMap:
+              name: ironic-oidc-https-cert
+              optional: true
+          # Shared refresh script used by bmc-sso-cert-init.
+          - name: ironic-oidc-cert-fetch
+            configMap:
+              name: ironic-oidc-cert-fetch
+              defaultMode: 365
   replicas:
     api: 4
     conductor: 1
@@ -296,14 +393,12 @@ pod:
         cpu: "100m"
       limits:
         memory: "2048Mi"
-        cpu: "500m"
     conductor:
       requests:
         memory: "1024Mi"
         cpu: "100m"
       limits:
-        memory: "2048Mi"
-        cpu: "8000m"
+        memory: "16384Mi"
   affinity:
     anti:
       type:
