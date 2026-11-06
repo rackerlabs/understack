@@ -44,6 +44,12 @@ spec:
               src:
                 dataKey: body
                 dependencyName: oslo-event-type
+            # labels make it easy to find workflows for an object, e.g.
+            #   kubectl -n argo-events get workflows -l node=<uuid>
+            - dest: metadata.labels.event-type
+              src:
+                dataKey: body.event_type
+                dependencyName: oslo-event-type
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1

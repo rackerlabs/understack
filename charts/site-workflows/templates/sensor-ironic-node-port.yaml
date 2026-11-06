@@ -54,6 +54,20 @@ spec:
               src:
                 dataKey: body
                 dependencyName: ironic-dep
+            # labels make it easy to find workflows for an object, e.g.
+            #   kubectl -n argo-events get workflows -l node=<uuid>
+            - dest: metadata.labels.node
+              src:
+                dataKey: body.payload.ironic_object\.data.node_uuid
+                dependencyName: ironic-dep
+            - dest: metadata.labels.port
+              src:
+                dataKey: body.payload.ironic_object\.data.uuid
+                dependencyName: ironic-dep
+            - dest: metadata.labels.event-type
+              src:
+                dataKey: body.event_type
+                dependencyName: ironic-dep
           source:
             # create a workflow in argo-events prefixed with ironic-node-update-
             resource:

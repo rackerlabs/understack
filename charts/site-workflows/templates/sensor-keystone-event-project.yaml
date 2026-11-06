@@ -62,6 +62,16 @@ spec:
               src:
                 dataKey: payload.target.id
                 dependencyName: keystone-msg
+            # labels make it easy to find workflows for an object, e.g.
+            #   kubectl -n argo-events get workflows -l node=<uuid>
+            - dest: metadata.labels.project
+              src:
+                dataKey: payload.target.id
+                dependencyName: keystone-msg
+            - dest: metadata.labels.event-type
+              src:
+                dataKey: event_type
+                dependencyName: keystone-msg
           source:
             # create a workflow in argo-events prefixed with keystone-event-project-
             resource:

@@ -48,6 +48,20 @@ spec:
               src:
                 dataKey: body.payload.ironic_object\.data.physical_network
                 dependencyName: ironic-port-delete
+            # labels make it easy to find workflows for an object, e.g.
+            #   kubectl -n argo-events get workflows -l node=<uuid>
+            - dest: metadata.labels.node
+              src:
+                dataKey: body.payload.ironic_object\.data.node_uuid
+                dependencyName: ironic-port-delete
+            - dest: metadata.labels.port
+              src:
+                dataKey: body.payload.ironic_object\.data.uuid
+                dependencyName: ironic-port-delete
+            - dest: metadata.labels.event-type
+              src:
+                dataKey: body.event_type
+                dependencyName: ironic-port-delete
           source:
             # create a workflow in argo-events prefixed with ironic-port-delete-
             resource:
