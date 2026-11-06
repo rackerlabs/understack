@@ -19,6 +19,7 @@ def task():
     task.node.driver_info = {"management_ip": "192.0.2.10"}
     task.node.properties = {}
     task.node.extra = {}
+    task.node.traits = []  # Ensure traits is iterable for HA logic
     return task
 
 
@@ -28,6 +29,10 @@ def client(mocker):
     client.login.return_value = "standard"
     client.system_info.return_value = dict(SYSTEM)
     mocker.patch.object(panos_api, "PanosClient", return_value=client)
+    # Mock HA-related functions to prevent timeouts in basic tests
+    mocker.patch.object(panos_inspect, "_discover_and_update_ports")
+    mocker.patch.object(panos_inspect, "_validate_firewall_readiness")
+    mocker.patch.object(panos_inspect, "_handle_ha_configuration")
     return client
 
 
