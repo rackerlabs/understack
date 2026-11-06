@@ -74,6 +74,16 @@ spec:
                 dependencyName: network-segment-range-msg
                 dataKey: payload.network_segment_range.maximum
 
+            # labels make it easy to find workflows for an object, e.g.
+            #   kubectl -n argo-events get workflows -l node=<uuid>
+            - dest: metadata.labels.segment-range
+              src:
+                dataKey: payload.network_segment_range.id
+                dependencyName: network-segment-range-msg
+            - dest: metadata.labels.event-type
+              src:
+                dataKey: event_type
+                dependencyName: network-segment-range-msg
           source:
             # create a workflow in argo-events prefixed with neutron-event-network-segment-range-
             resource:
