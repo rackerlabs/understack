@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/charmbracelet/log"
@@ -9,6 +10,7 @@ import (
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/dcim"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/helpers"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/models"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/syncerr"
 	"github.com/samber/lo"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -40,30 +42,71 @@ func (s *RackGroupSync) SyncAll(ctx context.Context, data map[string]string) err
 		rackGroups.RackGroup = append(rackGroups.RackGroup, yml...)
 	}
 
-	for _, l := range rackGroups.RackGroup {
-		if err := s.syncRackGroupRecursive(ctx, l, nil); err != nil {
+	return s.applyRackGroups(ctx, rackGroups, s.syncSingleRackGroup, s.deleteObsoleteRackGroup)
+}
+
+// applyRackGroups contains the orchestration for a parsed rack group tree:
+// apply each root and its children (isolating per-item data errors), prune
+// obsolete groups, and report any data failures. syncOne and prune are
+// parameters so the orchestration can be exercised in tests without a live
+// Nautobot.
+func (s *RackGroupSync) applyRackGroups(
+	ctx context.Context,
+	rackGroups models.RackGroups,
+	syncOne func(context.Context, models.RackGroup, *string) (*string, error),
+	prune func(context.Context, models.RackGroups),
+) error {
+	var failures []ItemFailure
+	for _, rg := range rackGroups.RackGroup {
+		nodeFailures, err := s.syncRackGroupTreeNode(ctx, rg, nil, syncOne)
+		if err != nil {
+			// Infrastructure error: stop immediately; prune does not run.
 			return err
 		}
+		failures = append(failures, nodeFailures...)
 	}
-	s.deleteObsoleteRackGroup(ctx, rackGroups)
+
+	// Prune obsolete rack groups after the apply loop.
+	prune(ctx, rackGroups)
+
+	if len(failures) > 0 {
+		for _, f := range failures {
+			s.client.AddReport("rackGroupDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "rackGroup", Failures: failures}
+	}
 
 	return nil
 }
 
-// syncRackGroupRecursive processes a rackGroups and all its children recursively
-func (s *RackGroupSync) syncRackGroupRecursive(ctx context.Context, rackGroup models.RackGroup, parentID *string) error {
-	currentID, err := s.syncSingleRackGroup(ctx, rackGroup, parentID)
+// syncRackGroupTreeNode syncs one rack group node and then recurses into its
+// children. If the node itself fails with a data error its entire subtree is
+// skipped (child IDs depend on the parent being present) and the failure is
+// collected. An infrastructure error propagates immediately.
+func (s *RackGroupSync) syncRackGroupTreeNode(
+	ctx context.Context,
+	rackGroup models.RackGroup,
+	parentID *string,
+	syncOne func(context.Context, models.RackGroup, *string) (*string, error),
+) ([]ItemFailure, error) {
+	currentID, err := syncOne(ctx, rackGroup, parentID)
 	if err != nil {
-		return err
-	}
-
-	for _, child := range rackGroup.Children {
-		if err := s.syncRackGroupRecursive(ctx, child, currentID); err != nil {
-			return err
+		var de *syncerr.DataError
+		if errors.As(err, &de) {
+			return []ItemFailure{{Item: de.Item, Err: err}}, nil
 		}
+		return nil, err
 	}
 
-	return nil
+	var failures []ItemFailure
+	for _, child := range rackGroup.Children {
+		childFailures, err := s.syncRackGroupTreeNode(ctx, child, currentID, syncOne)
+		if err != nil {
+			return failures, err
+		}
+		failures = append(failures, childFailures...)
+	}
+	return failures, nil
 }
 
 // syncSingleRackGroup handles the create/update logic for a single location

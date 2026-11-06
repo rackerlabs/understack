@@ -10,6 +10,7 @@ import (
 	adminsvc "github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/admin"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 	adminmodels "github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/models/admin"
+	syncp "github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/sync"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -44,12 +45,38 @@ func (s *PermissionGroupSync) SyncAll(ctx context.Context, data map[string]strin
 		return nil
 	}
 
-	groupNameToID := make(map[string]int32)
+	return s.applyPermissionGroups(ctx, allPermissions, s.syncSinglePermission)
+}
 
-	for _, perm := range allPermissions {
-		if err := s.syncSinglePermission(ctx, perm, groupNameToID); err != nil {
-			return err
+// applyPermissionGroups contains the orchestration for a parsed set of
+// permissions: apply each one (isolating per-item data errors) and report any
+// data failures. syncOne is a parameter so the orchestration can be exercised
+// in tests without a live Nautobot.
+//
+// Unlike most sync plugins, there is no deleteObsolete step for permissions:
+// permissions not in the YAML are left in place.
+func (s *PermissionGroupSync) applyPermissionGroups(
+	ctx context.Context,
+	permissions []adminmodels.Permission,
+	syncOne func(context.Context, adminmodels.Permission, map[string]int32) error,
+) error {
+	// The group-name-to-ID cache is shared across all permissions so that
+	// group lookups within a single SyncAll call are not repeated.
+	groupNameToID := make(map[string]int32)
+	wrapper := func(ctx context.Context, perm adminmodels.Permission) error {
+		return syncOne(ctx, perm, groupNameToID)
+	}
+
+	result, err := syncp.SyncItems(ctx, permissions, wrapper)
+	if err != nil {
+		return err
+	}
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("permissionGroupDataError", f.Err.Error())
 		}
+		return &syncp.PartialSyncError{Resource: "permissionGroup", Failures: result.DataFailures}
 	}
 
 	return nil

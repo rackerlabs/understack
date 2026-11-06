@@ -54,12 +54,28 @@ func (s *VlanSync) SyncAll(ctx context.Context, data map[string]string) error {
 		vlans.Vlan = append(vlans.Vlan, yml...)
 	}
 
-	for _, vlan := range vlans.Vlan {
-		if err := s.syncSingleVlan(ctx, vlan); err != nil {
-			return err
-		}
+	return s.applyVlans(ctx, vlans, s.syncSingleVlan, s.deleteObsoleteVlans)
+}
+
+func (s *VlanSync) applyVlans(
+	ctx context.Context,
+	vlans models.Vlans,
+	syncOne func(context.Context, models.Vlan) error,
+	prune func(context.Context, models.Vlans),
+) error {
+	result, err := syncItems(ctx, vlans.Vlan, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteVlans(ctx, vlans)
+
+	prune(ctx, vlans)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("vlanDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "vlan", Failures: result.DataFailures}
+	}
 
 	return nil
 }

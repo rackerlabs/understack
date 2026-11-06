@@ -44,12 +44,28 @@ func (s *RackSync) SyncAll(ctx context.Context, data map[string]string) error {
 		racks.Rack = append(racks.Rack, yml...)
 	}
 
-	for _, rack := range racks.Rack {
-		if err := s.syncSingleRack(ctx, rack); err != nil {
-			return err
-		}
+	return s.applyRacks(ctx, racks, s.syncSingleRack, s.deleteObsoleteRacks)
+}
+
+func (s *RackSync) applyRacks(
+	ctx context.Context,
+	racks models.Racks,
+	syncOne func(context.Context, models.Rack) error,
+	prune func(context.Context, models.Racks),
+) error {
+	result, err := syncItems(ctx, racks.Rack, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteRacks(ctx, racks)
+
+	prune(ctx, racks)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("rackDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "rack", Failures: result.DataFailures}
+	}
 
 	return nil
 }

@@ -38,12 +38,34 @@ func (s *ClusterGroupSync) SyncAll(ctx context.Context, data map[string]string) 
 		clusterGroups.ClusterGroup = append(clusterGroups.ClusterGroup, yml...)
 	}
 
-	for _, cg := range clusterGroups.ClusterGroup {
-		if err := s.syncSingleClusterGroup(ctx, cg); err != nil {
-			return err
-		}
+	return s.applyClusterGroups(ctx, clusterGroups, s.syncSingleClusterGroup, s.deleteObsoleteClusterGroups)
+}
+
+// applyClusterGroups contains the orchestration for a parsed set of cluster groups:
+// apply each one (isolating per-item data errors), prune obsolete cluster groups,
+// and report any data failures. syncOne and prune are parameters so the
+// orchestration can be exercised in tests without a live Nautobot.
+func (s *ClusterGroupSync) applyClusterGroups(
+	ctx context.Context,
+	clusterGroups models.ClusterGroups,
+	syncOne func(context.Context, models.ClusterGroup) error,
+	prune func(context.Context, models.ClusterGroups),
+) error {
+	// Apply every cluster group, isolating per-item data errors so one bad
+	// group does not block the rest. Infrastructure errors still abort.
+	result, err := syncItems(ctx, clusterGroups.ClusterGroup, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteClusterGroups(ctx, clusterGroups)
+
+	prune(ctx, clusterGroups)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("clusterGroupDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "clusterGroup", Failures: result.DataFailures}
+	}
 
 	return nil
 }

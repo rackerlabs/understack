@@ -37,12 +37,29 @@ func (s *RoleSync) SyncAll(ctx context.Context, data map[string]string) error {
 		roles.Role = append(roles.Role, yml...)
 	}
 
-	for _, role := range roles.Role {
-		if err := s.syncSingleRole(ctx, role); err != nil {
-			return err
-		}
+	return s.applyRoles(ctx, roles, s.syncSingleRole, s.deleteObsoleteRoles)
+}
+
+func (s *RoleSync) applyRoles(
+	ctx context.Context,
+	roles models.Roles,
+	syncOne func(context.Context, models.Role) error,
+	prune func(context.Context, models.Roles),
+) error {
+	result, err := syncItems(ctx, roles.Role, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteRoles(ctx, roles)
+
+	prune(ctx, roles)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("roleDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "role", Failures: result.DataFailures}
+	}
+
 	return nil
 }
 

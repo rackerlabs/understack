@@ -218,24 +218,62 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		log.Info("released cache and idle connections after reconcile")
 	}()
 
-	// Sync resources that need updating (in topologically sorted order)
+	// Sync resources that need updating (in topologically sorted order).
+	//
+	// A per-item data failure (one object Nautobot rejected, e.g. a 400) must
+	// not block the other resource types, so a *sync.PartialSyncError is logged
+	// and recorded but the loop continues. The resource's SyncHash is only
+	// advanced when it synced cleanly, so a type with failures is retried next
+	// pass. An infrastructure error (auth, 5xx, transport) still aborts the
+	// reconcile so controller-runtime backs off.
+	totalItemFailures := 0
 	for _, res := range orderedResources {
-		if dataMap, ok := resourcesToSync[res.name]; ok {
-			if err := res.syncFunc(ctx, nautobotClient, dataMap); err != nil {
-				log.Error(err, "failed to sync resource", "resource", res.name)
-				return ctrl.Result{}, err
-			}
-			nautobotCR.SetSyncHash(res.name, computeHash(dataMap))
+		dataMap, ok := resourcesToSync[res.name]
+		if !ok {
+			continue
 		}
+
+		err := res.syncFunc(ctx, nautobotClient, dataMap)
+		if partial, isPartial := sync.IsPartial(err); isPartial {
+			log.Error(err, "resource synced with item failures", "resource", res.name, "failures", len(partial.Failures))
+			nautobotCR.SetSyncItemFailures(res.name, len(partial.Failures))
+			setSyncItemFailuresGauge(nautobotCR.Name, res.name, len(partial.Failures))
+			totalItemFailures += len(partial.Failures)
+			// Do not advance SyncHash: retry this resource next reconcile.
+			continue
+		}
+		if err != nil {
+			// Infrastructure error: persist what we have, then abort so backoff
+			// and the reconcile-error metric kick in.
+			log.Error(err, "failed to sync resource", "resource", res.name)
+			nautobotCR.Status.Ready = false
+			nautobotCR.Status.NautobotStatusReport = nautobotClient.Report
+			nautobotCR.Status.Message = fmt.Sprintf("sync aborted on resource %q: %v", res.name, err)
+			if statusErr := r.Status().Update(ctx, &nautobotCR); statusErr != nil {
+				log.Error(statusErr, "failed to update status after sync error")
+			}
+			return ctrl.Result{}, err
+		}
+
+		// Clean sync for this resource type.
+		nautobotCR.SetSyncHash(res.name, computeHash(dataMap))
+		nautobotCR.SetSyncItemFailures(res.name, 0)
+		setSyncItemFailuresGauge(nautobotCR.Name, res.name, 0)
 	}
 
-	// Update status
+	// Update status. This runs on both a fully clean reconcile and a partial
+	// one (some items failed), so operators and Alertmanager can see what
+	// failed via Status rather than only in the operator log.
 	nautobotCR.Status.LastSyncedAt = metav1.Now()
 	nautobotCR.Status.Ready = true
 	nautobotCR.Status.NautobotStatusReport = nautobotClient.Report
-	if len(nautobotClient.Report) > 0 {
+	switch {
+	case totalItemFailures > 0:
+		nautobotCR.Status.Message = fmt.Sprintf("sync completed with %d item failure(s) across %d resource(s)",
+			totalItemFailures, len(nautobotCR.Status.SyncItemFailures))
+	case len(nautobotClient.Report) > 0:
 		nautobotCR.Status.Message = "sync completed with some errors"
-	} else {
+	default:
 		nautobotCR.Status.Message = "Sync Successful"
 	}
 	if err := r.Status().Update(ctx, &nautobotCR); err != nil {
@@ -243,7 +281,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	log.Info("sync completed successfully")
+	log.Info("sync completed", "itemFailures", totalItemFailures)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 

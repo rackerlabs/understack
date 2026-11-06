@@ -41,68 +41,106 @@ func NewDeviceTypeSync(nautobotClient *client.NautobotClient) *DeviceTypeSync {
 func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) error {
 	var deviceTypes models.DeviceTypes
 	for _, f := range data {
-
 		var yml models.DeviceType
-
 		if err := yaml.Unmarshal([]byte(f), &yml); err != nil {
 			s.client.AddReport("yamlFailed", err.Error())
 			return err
 		}
 		deviceTypes.DeviceTypes = append(deviceTypes.DeviceTypes, yml)
-
-		manufacturer := s.manufacturerSvc.GetByName(context.Background(), yml.Manufacturer)
-		if manufacturer.Id == nil {
-			cm, err := s.manufacturerSvc.Create(context.Background(), nb.ManufacturerRequest{
-				Name:        yml.Manufacturer,
-				Description: nb.PtrString(yml.Manufacturer),
-			})
-			if err != nil || cm == nil {
-				return fmt.Errorf("failed to create manufacturer %s: %w", yml.Manufacturer, err)
-			}
-			manufacturer = *cm
-		}
-
-		deviceType := s.deviceTypeSvc.GetByID(ctx, yml.ID)
-		deviceTypeRequest := nb.WritableDeviceTypeRequest{
-			Id:           optionalID(yml.ID),
-			Model:        yml.Model,
-			PartNumber:   nb.PtrString(yml.PartNumber),
-			UHeight:      nb.PtrInt32(int32(yml.UHeight)),
-			IsFullDepth:  nb.PtrBool(yml.IsFullDepth),
-			Comments:     nb.PtrString(yml.Comments),
-			Manufacturer: helpers.BuildApprovalWorkflowStageResponseApprovalWorkflowStage(*manufacturer.Id),
-		}
-
-		if deviceType.Id == nil {
-			createdDt, err := s.deviceTypeSvc.Create(context.Background(), deviceTypeRequest)
-			if err != nil || createdDt == nil {
-				return fmt.Errorf("failed to create device type %s: %w", yml.Model, err)
-			}
-			deviceType = *createdDt
-		} else if !helpers.CompareJSONFields(deviceType, deviceTypeRequest) {
-			updatedDt, err := s.deviceTypeSvc.Update(ctx, *deviceType.Id, deviceTypeRequest)
-			if err != nil || updatedDt == nil {
-				return fmt.Errorf("failed to update device type %s: %w", yml.Model, err)
-			}
-			deviceType = *updatedDt
-		} else {
-			log.Info("device type unchanged, skipping update", "model", yml.Model)
-		}
-
-		if deviceType.Id == nil {
-			s.client.AddReport("syncDeviceTypes", "device type has no ID, skipping template sync", "model", yml.Model)
-			continue
-		}
-
-		s.syncInterfaceTemplates(ctx, yml, deviceType)
-		s.syncConsolePortTemplates(ctx, yml, deviceType)
-		s.syncPowerPortTemplates(ctx, yml, deviceType)
-		s.syncModuleBayTemplates(ctx, yml, deviceType)
 	}
 
+	return s.applyDeviceTypes(ctx, deviceTypes, s.syncSingleDeviceType, s.deleteObsoleteDeviceTypes)
+}
+
+// applyDeviceTypes contains the orchestration for a parsed set of device types:
+// apply each one (isolating per-item data errors), prune obsolete device types,
+// and report any data failures. syncOne and prune are parameters so the
+// orchestration can be exercised in tests without a live Nautobot.
+func (s *DeviceTypeSync) applyDeviceTypes(
+	ctx context.Context,
+	deviceTypes models.DeviceTypes,
+	syncOne func(context.Context, models.DeviceType) error,
+	prune func(context.Context, models.DeviceTypes),
+) error {
+	result, err := syncItems(ctx, deviceTypes.DeviceTypes, syncOne)
+	if err != nil {
+		return err
+	}
+
+	prune(ctx, deviceTypes)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("deviceTypeDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "deviceType", Failures: result.DataFailures}
+	}
+
+	log.Info("SyncAllDevice Completed")
+	return nil
+}
+
+// syncSingleDeviceType handles the create/update and template-sync logic for
+// one device type. Manufacturer creation uses context.Background() to match
+// the original behaviour (manufacturer sync is a side-effect, not the
+// primary concern of the enclosing reconcile context).
+func (s *DeviceTypeSync) syncSingleDeviceType(ctx context.Context, yml models.DeviceType) error {
+	manufacturer := s.manufacturerSvc.GetByName(context.Background(), yml.Manufacturer)
+	if manufacturer.Id == nil {
+		cm, err := s.manufacturerSvc.Create(context.Background(), nb.ManufacturerRequest{
+			Name:        yml.Manufacturer,
+			Description: nb.PtrString(yml.Manufacturer),
+		})
+		if err != nil || cm == nil {
+			return fmt.Errorf("failed to create manufacturer %s: %w", yml.Manufacturer, err)
+		}
+		manufacturer = *cm
+	}
+
+	deviceType := s.deviceTypeSvc.GetByID(ctx, yml.ID)
+	deviceTypeRequest := nb.WritableDeviceTypeRequest{
+		Id:           optionalID(yml.ID),
+		Model:        yml.Model,
+		PartNumber:   nb.PtrString(yml.PartNumber),
+		UHeight:      nb.PtrInt32(int32(yml.UHeight)),
+		IsFullDepth:  nb.PtrBool(yml.IsFullDepth),
+		Comments:     nb.PtrString(yml.Comments),
+		Manufacturer: helpers.BuildApprovalWorkflowStageResponseApprovalWorkflowStage(*manufacturer.Id),
+	}
+
+	if deviceType.Id == nil {
+		createdDt, err := s.deviceTypeSvc.Create(context.Background(), deviceTypeRequest)
+		if err != nil || createdDt == nil {
+			return fmt.Errorf("failed to create device type %s: %w", yml.Model, err)
+		}
+		deviceType = *createdDt
+	} else if !helpers.CompareJSONFields(deviceType, deviceTypeRequest) {
+		updatedDt, err := s.deviceTypeSvc.Update(ctx, *deviceType.Id, deviceTypeRequest)
+		if err != nil || updatedDt == nil {
+			return fmt.Errorf("failed to update device type %s: %w", yml.Model, err)
+		}
+		deviceType = *updatedDt
+	} else {
+		log.Info("device type unchanged, skipping update", "model", yml.Model)
+	}
+
+	if deviceType.Id == nil {
+		s.client.AddReport("syncDeviceTypes", "device type has no ID, skipping template sync", "model", yml.Model)
+		return nil
+	}
+
+	s.syncInterfaceTemplates(ctx, yml, deviceType)
+	s.syncConsolePortTemplates(ctx, yml, deviceType)
+	s.syncPowerPortTemplates(ctx, yml, deviceType)
+	s.syncModuleBayTemplates(ctx, yml, deviceType)
+	return nil
+}
+
+// deleteObsoleteDeviceTypes removes device types not present in the desired set.
+func (s *DeviceTypeSync) deleteObsoleteDeviceTypes(ctx context.Context, deviceTypes models.DeviceTypes) {
 	desiredDeviceTypes := make(map[string]models.DeviceType)
-	for _, deviceType := range deviceTypes.DeviceTypes {
-		desiredDeviceTypes[deviceType.Model] = deviceType
+	for _, dt := range deviceTypes.DeviceTypes {
+		desiredDeviceTypes[dt.Model] = dt
 	}
 
 	existingDeviceTypes := s.deviceTypeSvc.ListAll(ctx)
@@ -116,9 +154,6 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 			_ = s.deviceTypeSvc.Destroy(ctx, *obsoleteDeviceType.Id)
 		}
 	}
-
-	log.Info("SyncAllDevice Completed")
-	return nil
 }
 
 func (s *DeviceTypeSync) syncPowerPortTemplates(ctx context.Context, yml models.DeviceType, deviceType nb.DeviceType) {

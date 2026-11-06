@@ -274,20 +274,136 @@ custom metrics. Alertmanager needs a number to watch.
 - `promtool`/lint passes on the rule.
 - Alert fires on a failure that sticks around and clears when the data is fixed.
 
-### 8. Apply per-item handling to the rest of the sync services
+### 8. Apply per-item handling to the remaining flat sync services
 
-**Labels:** `area/nautobotop`, `kind/enhancement`, `good-first-issue`
 **Depends on:** #3, #4
 
-**Background.** #3 shows the pattern on vlan groups; the same stop-on-first-error loop is
-in the other 17 services.
+**Background.** #3 shows the pattern on vlan groups. The tasks below apply the same
+`syncItems` helper to every remaining flat-list `SyncAll`. Each one is self-contained
+and can be picked up independently. See `vlanGroup.go` / `vlanGroup_test.go` as the
+reference implementation.
 
-**Scope.** Apply the #2 helper + #1 sorting to each remaining `SyncAll`: `cluster`,
-`clusterGroup`, `clusterType`, `device`, `devicetype`, `location`, `locationtype`,
-`namespace`, `prefix`, `rack`, `rackGroup`, `rir`, `role`, `tenant`, `tenantGroup`,
-`vlan`, and `admin/permissionGroup`. Can be split into smaller PRs by dependency tier.
+**Acceptance criteria (all tasks below).**
+- Carries on past per-item data errors (Nautobot 4xx); stops on infra errors.
+- `deleteObsolete*` still runs after the apply loop even when some items failed.
+- Per-item failures are reported via `client.AddReport` and returned as `PartialSyncError`.
+- A one-bad-item test covers the happy path and the single-failure case.
 
-**Acceptance criteria.**
-- Every sync service carries on past per-item data errors and stops only on infra errors,
-  like vlanGroup.
-- Each updated service has a one-bad-item test.
+---
+
+#### 8a. `cluster` — `internal/nautobot/sync/cluster.go`
+
+- [x] Wrap loop in `applyClusters(ctx, clusters, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8b. `clusterGroup` — `internal/nautobot/sync/clusterGroup.go`
+
+- [x] Wrap loop in `applyClusterGroups(ctx, clusterGroups, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8c. `clusterType` — `internal/nautobot/sync/clusterType.go`
+
+- [x] Wrap loop in `applyClusterTypes(ctx, clusterTypes, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8d. `device` — `internal/nautobot/sync/device.go`
+
+- [x] Wrap loop in `applyDevices(ctx, devices, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8e. `devicetype` — `internal/nautobot/sync/devicetype.go`
+
+- [x] Wrap loop in `applyDeviceTypes(ctx, deviceTypes, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8f. `namespace` — `internal/nautobot/sync/namespace.go`
+
+- [x] Wrap loop in `applyNamespaces(ctx, namespaces, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8g. `prefix` — `internal/nautobot/sync/prefix.go`
+
+- [x] Wrap loop in `applyPrefixes(ctx, prefixes, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8h. `rack` — `internal/nautobot/sync/rack.go`
+
+- [x] Wrap loop in `applyRacks(ctx, racks, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8i. `rir` — `internal/nautobot/sync/rir.go`
+
+- [x] Wrap loop in `applyRirs(ctx, rirs, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8j. `role` — `internal/nautobot/sync/role.go`
+
+- [x] Wrap loop in `applyRoles(ctx, roles, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8k. `tenant` — `internal/nautobot/sync/tenant.go`
+
+- [x] Wrap loop in `applyTenants(ctx, tenants, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8l. `tenantGroup` — `internal/nautobot/sync/tenantGroup.go`
+
+- [x] Wrap loop in `applyTenantGroups(ctx, tenantGroups, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8m. `vlan` — `internal/nautobot/sync/vlan.go`
+
+- [x] Wrap loop in `applyVlans(ctx, vlans, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+#### 8n. `admin/permissionGroup` — `internal/nautobot/sync/admin/permissionGroup.go`
+
+- [x] Wrap loop in `applyPermissionGroups(ctx, perms, syncOne, prune)`.
+- [x] Replace manual for-loop with `syncItems`.
+- [x] Add unit test.
+
+---
+
+### 9. Apply per-item handling to the recursive sync services
+
+**Depends on:** #3, #4
+
+**Background.** Three services sync tree-shaped data (parent → children) via recursion.
+The `syncItems` helper works on flat slices; these need a small adaptation to collect
+failures across recursive calls without breaking the parent-before-child ordering.
+
+**Acceptance criteria (all tasks below).**
+- Same as §8: carries on past data errors, stops on infra errors, prune still runs,
+  per-item failures reported, one-bad-item test.
+- Parent nodes that succeed are applied even when a child fails.
+
+#### 9a. `location` — `internal/nautobot/sync/location.go`
+
+- [x] Collect errors from `syncLocationRecursive` calls instead of returning on first.
+- [x] Propagate `PartialSyncError` up through `SyncAll`.
+- [x] Add unit test covering a failing child location with a succeeding sibling.
+
+#### 9b. `locationtype` — `internal/nautobot/sync/locationtype.go`
+
+- [x] Collect errors from `syncLocationTypeRecursive` calls instead of returning on first.
+- [x] Propagate `PartialSyncError` up through `SyncAll`.
+- [x] Add unit test.
+
+#### 9c. `rackGroup` — `internal/nautobot/sync/rackGroup.go`
+
+- [x] Collect errors from `syncRackGroupRecursive` calls instead of returning on first.
+- [x] Propagate `PartialSyncError` up through `SyncAll`.
+- [x] Add unit test.
