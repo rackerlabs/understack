@@ -25,11 +25,11 @@ _mech_understack_opts = [
     ),
     cfg.ListOpt(
         "default_tenant_vlan_id_range",
-        default=[1, 3799],
+        default=[2, 3871],
         item_type=cfg.types.Integer(min=1, max=4094),
         help=(
-            "List of 2 comma separated integers, that represents a VLAN range, that"
-            "will be used for mapped VLANs on the switches."
+            "Two comma-separated integers defining the inclusive VLAN range used "
+            "for mapped VLANs on switches and accepted for tenant trunk subports."
         ),
     ),
 ]

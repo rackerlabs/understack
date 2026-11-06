@@ -12,6 +12,8 @@ from neutron_lib.plugins.ml2 import api
 from neutron_understack import trunk
 from neutron_understack import understack_mech
 
+MECH_UTILS = "neutron_understack.understack_mech.utils"
+
 
 def _port_update_context(original, current):
     return SimpleNamespace(
@@ -169,9 +171,6 @@ class TestUpdatePortPostCommit:
         understack_driver.update_port_postcommit(port_context)
 
         cleanup.assert_not_called()
-
-
-MECH_UTILS = "neutron_understack.understack_mech.utils"
 
 
 class TestDeletePortPostCommit:
@@ -338,6 +337,125 @@ class TestBindPort:
             next_segments_to_bind=[vlan_network_segment],
         )
 
+    def test_releases_allocated_segment_when_trunk_check_fails(
+        self,
+        mocker,
+        port_context,
+        understack_driver,
+        understack_trunk_driver,
+        vlan_network_segment,
+    ):
+        """A native VLAN that collides with a subport must not leak its segment."""
+        port_context.current["trunk_details"] = {"trunk_id": "trunk-a"}
+        mocker.patch.object(
+            port_context, "allocate_dynamic_segment", return_value=vlan_network_segment
+        )
+        mocker.patch(f"{MECH_UTILS}.ports_bound_to_segment", return_value=[])
+        understack_driver.trunk_driver = understack_trunk_driver
+        mocker.patch.object(
+            understack_driver.trunk_driver,
+            "configure_trunk",
+            side_effect=trunk.SubportSegmentationIDError(
+                seg_id=vlan_network_segment[api.SEGMENTATION_ID],
+                subport_id="subport-a",
+                physical_network=vlan_network_segment[api.PHYSICAL_NETWORK],
+            ),
+        )
+        release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
+        port_context._prepare_to_bind(port_context.network.network_segments)
+
+        with pytest.raises(trunk.SubportSegmentationIDError):
+            understack_driver._bind_port_segment(
+                port_context,
+                next(
+                    s
+                    for s in port_context.network.network_segments
+                    if s[api.NETWORK_TYPE] == "vxlan"
+                ),
+            )
+
+        release.assert_called_once_with(vlan_network_segment[api.ID])
+
+    def test_keeps_allocated_segment_when_other_ports_are_bound(
+        self,
+        mocker,
+        port_context,
+        understack_driver,
+        understack_trunk_driver,
+        vlan_network_segment,
+    ):
+        """allocate_dynamic_segment can return a segment another port is using."""
+        port_context.current["trunk_details"] = {"trunk_id": "trunk-a"}
+        mocker.patch.object(
+            port_context, "allocate_dynamic_segment", return_value=vlan_network_segment
+        )
+        mocker.patch(
+            f"{MECH_UTILS}.ports_bound_to_segment", return_value=["other-port"]
+        )
+        understack_driver.trunk_driver = understack_trunk_driver
+        mocker.patch.object(
+            understack_driver.trunk_driver,
+            "configure_trunk",
+            side_effect=trunk.SubportSegmentationIDError(
+                seg_id=vlan_network_segment[api.SEGMENTATION_ID],
+                subport_id="subport-a",
+                physical_network=vlan_network_segment[api.PHYSICAL_NETWORK],
+            ),
+        )
+        release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
+        port_context._prepare_to_bind(port_context.network.network_segments)
+
+        with pytest.raises(trunk.SubportSegmentationIDError):
+            understack_driver._bind_port_segment(
+                port_context,
+                next(
+                    s
+                    for s in port_context.network.network_segments
+                    if s[api.NETWORK_TYPE] == "vxlan"
+                ),
+            )
+
+        release.assert_not_called()
+
+    def test_keeps_reused_segment_when_trunk_check_fails(
+        self,
+        mocker,
+        port_context,
+        understack_driver,
+        understack_trunk_driver,
+        vlan_network_segment,
+    ):
+        """A segment that already existed is not ours to release."""
+        port_context.current["trunk_details"] = {"trunk_id": "trunk-a"}
+        mocker.patch(
+            f"{MECH_UTILS}.vlan_segment_for_physnet",
+            return_value=vlan_network_segment,
+        )
+        understack_driver.trunk_driver = understack_trunk_driver
+        mocker.patch.object(
+            understack_driver.trunk_driver,
+            "configure_trunk",
+            side_effect=trunk.SubportSegmentationIDError(
+                seg_id=vlan_network_segment[api.SEGMENTATION_ID],
+                subport_id="subport-a",
+                physical_network=vlan_network_segment[api.PHYSICAL_NETWORK],
+            ),
+        )
+        release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
+        port_context._prepare_to_bind(port_context.network.network_segments)
+
+        with pytest.raises(trunk.SubportSegmentationIDError):
+            understack_driver._bind_port_segment(
+                port_context,
+                next(
+                    s
+                    for s in port_context.network.network_segments
+                    if s[api.NETWORK_TYPE] == "vxlan"
+                ),
+            )
+
+        release.assert_not_called()
+
     def test_refuses_unsupported_vnic_type(
         self, mocker, port_context, understack_driver
     ):
@@ -381,10 +499,38 @@ class TestBindPort:
         port_context._prepare_to_bind(port_context.network.network_segments)
 
         understack_driver.trunk_driver = understack_trunk_driver
-        mocker.patch.object(understack_driver.trunk_driver, "configure_trunk")
+        configure_trunk = mocker.patch.object(
+            understack_driver.trunk_driver, "configure_trunk"
+        )
         understack_driver.bind_port(port_context)
-        understack_driver.trunk_driver.configure_trunk.assert_called_once()
+        configure_trunk.assert_called_once_with(
+            trunk_details=port_context.current["trunk_details"],
+            port_id=port_context.current["id"],
+            physical_network="physnet",
+            native_vlan_id=666,
+        )
         port_context.continue_binding.assert_called_once()
+
+    @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
+    def test_rejects_new_native_vlan_used_by_existing_subport_before_binding(
+        self, mocker, understack_driver, port_context, understack_trunk_driver
+    ):
+        port_context.current["trunk_details"]["sub_ports"][0]["segmentation_id"] = 666
+        mocker.patch.object(port_context, "continue_binding")
+        port_context._prepare_to_bind(port_context.network.network_segments)
+        mocker.patch(
+            "neutron_understack.utils.fetch_network_node_trunk_id",
+            return_value="network-node-trunk",
+        )
+        mocker.patch(f"{MECH_UTILS}.ports_bound_to_segment", return_value=[])
+        release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
+        understack_driver.trunk_driver = understack_trunk_driver
+
+        with pytest.raises(trunk.SubportSegmentationIDError, match="used as both"):
+            understack_driver.bind_port(port_context)
+
+        port_context.continue_binding.assert_not_called()
+        release.assert_called_once()
 
 
 class TestCreateNetworkPostCommit:
