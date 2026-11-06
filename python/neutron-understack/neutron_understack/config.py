@@ -32,6 +32,16 @@ _mech_understack_opts = [
             "will be used for mapped VLANs on the switches."
         ),
     ),
+    cfg.StrOpt(
+        "fabric_vlan_physical_network",
+        default="understack_fabric_vlan",
+        help=(
+            "Physical network of the VLAN network segment range fabric_vlan "
+            "values come from. It also scopes the vni_vlan_mapping rows that "
+            "hold them. The range is resolved to an ID at startup, and again "
+            "only if it is missing or deleted."
+        ),
+    ),
 ]
 
 
@@ -68,7 +78,6 @@ _understack_vni_opts = [
         ),
     ),
 ]
-
 
 _netdev_reconcile_opts = [
     cfg.BoolOpt(
