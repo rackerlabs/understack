@@ -691,8 +691,8 @@ wheels = [
 
 [[package]]
 name = "neutron"
-version = "28.0.0.0b3.dev374"
-source = { git = "https://github.com/rackerlabs/neutron.git?rev=94d6f825e6edfafa158a9e0492a32fce7ee23747#94d6f825e6edfafa158a9e0492a32fce7ee23747" }
+version = "28.0.0.0b3.dev375"
+source = { git = "https://github.com/rackerlabs/neutron.git?rev=8a418eb484c7f5e63674c52189b097d06468e955#8a418eb484c7f5e63674c52189b097d06468e955" }
 dependencies = [
     { name = "alembic" },
     { name = "debtcollector" },
@@ -811,7 +811,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "keystoneauth1", specifier = ">=3.14.0" },
-    { name = "neutron", git = "https://github.com/rackerlabs/neutron.git?rev=94d6f825e6edfafa158a9e0492a32fce7ee23747" },
+    { name = "neutron", git = "https://github.com/rackerlabs/neutron.git?rev=8a418eb484c7f5e63674c52189b097d06468e955" },
     { name = "neutron-lib", git = "https://github.com/rackerlabs/neutron-lib.git?rev=275d4c95657ed4c3028401b48c15204d8a965420" },
     { name = "openstacksdk", specifier = ">=4.9.0" },
     { name = "oslo-config", specifier = ">=9.7.1" },
