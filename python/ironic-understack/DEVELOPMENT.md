@@ -38,3 +38,20 @@ development environment.
 
 [telepresence]: https://www.telepresence.io/
 [kubeseal]: https://github.com/bitnami-labs/sealed-secrets
+
+## Running the tests
+
+This package is installed into the OpenStack `ironic` container using the
+release's upper-constraints, so it has no `uv.lock`. Install and test it with
+the same constraints (`uv sync` and `uv run` can't take a constraints file, so
+use `uv pip`):
+
+```bash
+uv venv
+uv pip install -e . --group test \
+  --constraint <(curl -fsSL https://releases.openstack.org/constraints/upper/2026.1)
+uv run --no-sync pytest
+```
+
+Use the release that matches `OPENSTACK_VERSION` in
+`.github/workflows/code-test.yaml`.

@@ -19,6 +19,9 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
+env:
+  OPENSTACK_VERSION: "2026.1"
+
 jobs:
   discover:
     runs-on: ubuntu-latest
@@ -51,7 +54,21 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version-file: python/${{ matrix.project }}/pyproject.toml
-      - run: uv sync
+      - name: Install locked dependencies
+        if: ${{ hashFiles(format('python/{0}/uv.lock', matrix.project)) != '' }}
+        run: uv sync
+      - name: Install with OpenStack upper-constraints
+        if: ${{ hashFiles(format('python/{0}/uv.lock', matrix.project)) == '' }}
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/upper-constraints.txt" \
+            "https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION}"
+          # neutron-lib is installed from our fork (see [tool.uv.sources]), the
+          # same exclusion containers/neutron/Dockerfile makes.
+          grep -v '^neutron-lib===' "$RUNNER_TEMP/upper-constraints.txt" > "$RUNNER_TEMP/constraints.txt"
+          uv venv
+          uv pip install --constraint "$RUNNER_TEMP/constraints.txt" --group test -e .
+          # uv run must use this environment as-is, not lock and re-sync it.
+          echo "UV_NO_SYNC=1" >> "$GITHUB_ENV"
       - run: uv build --wheel
       - run: |
           set -e
