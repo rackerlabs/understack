@@ -9,6 +9,7 @@ metadata:
       Triggers on the following Ironic Events:
 
       - baremetal.node.update.end which happens when node fields are updated
+      - baremetal.node.delete.end which happens when a node is deleted
 
       Resulting code should be very similar to:
 
@@ -36,6 +37,7 @@ spec:
           type: "string"
           value:
             - "baremetal.node.update.end"
+            - "baremetal.node.delete.end"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
