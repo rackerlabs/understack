@@ -3,10 +3,10 @@ kind: WorkflowTemplate
 metadata:
   name: delete-server
   annotations:
-    workflows.argoproj.io/title: Delete server inventory
+    workflows.argoproj.io/title: Run server deletion cleanup
     workflows.argoproj.io/description: |
-      Run configured cleanup hooks, then remove the server from Nautobot.
-      All hooks must succeed before removal.
+      Run configured cleanup hooks after an Ironic node is deleted.
+      All hooks must succeed for the workflow to complete.
       Hooks: delete-server-config.pre_delete_workflows; [] skips cleanup.
       The ConfigMap requires workflows.argoproj.io/configmap-type: Parameter.
 spec:
@@ -16,12 +16,10 @@ spec:
       understack.rackspace.com/device-type: server
   entrypoint: main
   serviceAccountName: workflow
-  # Bound lock waiting, all hooks, and inventory deletion in the submitted workflow.
+  # Bound lock waiting and all cleanup hooks in the submitted workflow.
   activeDeadlineSeconds: 3600
   arguments:
     parameters:
-      - name: event-json
-        description: "Ironic node deletion event JSON."
       - name: node_uuid
         description: "Ironic node UUID to delete."
       # Omitted: use site configuration. Explicit []: skip pre-deletion hooks.
@@ -36,11 +34,10 @@ spec:
     - name: main
       inputs:
         parameters:
-          - name: event-json
           - name: node_uuid
           - name: pre_delete_workflows
             value: "{{workflow.parameters.pre_delete_workflows}}"
-      # Share registration's per-node lock through inventory deletion.
+      # Share registration's per-node lock while running cleanup hooks.
       # Hooks must not acquire this same lock again.
       synchronization:
         mutexes:
@@ -55,11 +52,3 @@ spec:
                 - name: node_uuid
                   value: "{{inputs.parameters.node_uuid}}"
             withParam: "{{inputs.parameters.pre_delete_workflows}}"
-        - - name: delete-nautobot
-            templateRef:
-              name: openstack-oslo-event
-              template: main
-            arguments:
-              parameters:
-                - name: event-json
-                  value: "{{inputs.parameters.event-json}}"
