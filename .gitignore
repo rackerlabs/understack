@@ -46,3 +46,9 @@ docs/release-notes/unreleased.md
 
 # miscellaneous
 .local/
+
+# OpenStack plugins are tested against the release upper-constraints, not a lockfile
+python/cinder-understack/uv.lock
+python/ironic-understack/uv.lock
+python/neutron-understack/uv.lock
+python/nova-understack/uv.lock

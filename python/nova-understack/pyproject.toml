@@ -17,9 +17,9 @@ dependencies = [
 
 [dependency-groups]
 test = [
-    "pytest>=9.0.1,<10",
+    "pytest",
     "pytest-github-actions-annotate-failures",
-    "pytest-cov>=7,<8",
+    "pytest-cov",
 ]
 
 [tool.uv]

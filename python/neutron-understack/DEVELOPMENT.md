@@ -33,3 +33,21 @@ development environment.
 - pytest
 - python 3.11
 - argo client to interact with the Argo workflows
+
+## Running the tests
+
+This package is installed into the OpenStack `neutron` container using the
+release's upper-constraints, so it has no `uv.lock`. Install and test it with
+the same constraints (`uv sync` and `uv run` can't take a constraints file, so
+use `uv pip`; `neutron-lib` is dropped from the constraints because the fork
+in `[tool.uv.sources]` provides it):
+
+```bash
+uv venv
+uv pip install -e . --group test \
+  --constraint <(curl -fsSL https://releases.openstack.org/constraints/upper/2026.1 | grep -v '^neutron-lib===')
+uv run --no-sync pytest
+```
+
+Use the release that matches `OPENSTACK_VERSION` in
+`.github/workflows/code-test.yaml`.
