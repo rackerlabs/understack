@@ -223,6 +223,9 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         trunk, since its subport segmentation_ids are the same as the network
         segment VLAN tags allocated to the subports. Therefore, there is no
         possibility of conflict with the native VLAN.
+
+        A subport tagged with its network's fabric_vlan is also exempt: that
+        network's segment uses the same VLAN, so the tag maps to itself.
         """
         if trunk_id == utils.fetch_network_node_trunk_id():
             return
@@ -230,6 +233,10 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         ns_ranges = utils.allowed_tenant_vlan_id_ranges()
         for subport in subports:
             seg_id = subport.segmentation_id
+            if utils.fabric_vlan_enabled() and seg_id == utils.network_fabric_vlan(
+                utils.fetch_subport_network_id(subport_id=subport.port_id)
+            ):
+                continue
             if not utils.segmentation_id_in_ranges(seg_id, ns_ranges):
                 raise SubportSegmentationIDError(
                     seg_id=seg_id,
@@ -259,6 +266,7 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
             network_segment = current_segment or utils.allocate_dynamic_segment(
                 network_id=subport_network_id,
                 physnet=physnet,
+                segmentation_id=utils.network_fabric_vlan(subport_network_id),
             )
             allowed_vlan_ids.add(int(network_segment["segmentation_id"]))
 

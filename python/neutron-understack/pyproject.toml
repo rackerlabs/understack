@@ -44,6 +44,9 @@ netdev-router-reconcile = "neutron_understack.config:list_netdev_reconcile_opts"
 understack = "neutron_understack.understack_mech:UnderstackDriver"
 undersync = "neutron_understack.undersync_mech:UndersyncDriver"
 
+[project.entry-points."neutron.ml2.extension_drivers"]
+understack_fabric_vlan = "neutron_understack.fabric_vlan:UnderstackFabricVlanExtensionDriver"
+
 [project.entry-points."neutron.service_plugins"]
 l3_service_cisco_asa = "neutron_understack.l3_service_cisco_asa:CiscoAsa"
 understack_vni = "neutron_understack.l3_router.vrf:UnderstackVniPlugin"
