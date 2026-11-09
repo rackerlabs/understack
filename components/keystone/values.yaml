@@ -368,6 +368,7 @@ mariadb_db:
     create: false
 
 manifests:
+  rabbitmq_topology: false
   mariadb_db: true
   job_credential_cleanup: false
   job_db_init: false
