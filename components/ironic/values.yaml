@@ -65,6 +65,8 @@ conf:
     "baremetal:node:set_console_state": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s) "
     # allow node lessee to get console
     "baremetal:node:get_console": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s)"
+    "baremetal:node:set_provision_state:clean_steps": "role:admin or role:ucadmin-role"
+    "baremetal:node:disable_cleaning": "role:admin or role:ucadmin-role"
   ironic:
     database:
       # The MariaDB operator writes the connection string into the
