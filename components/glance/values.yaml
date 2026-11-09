@@ -163,6 +163,7 @@ mariadb_db:
     create: false
 
 manifests:
+  rabbitmq_topology: false
   mariadb_db: true
   # its pre-delete hook makes ArgoCD add pre-delete finalizers to the
   # Application, which the app-of-apps then fights. no-op for us anyway.
