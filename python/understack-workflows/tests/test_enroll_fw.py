@@ -89,14 +89,18 @@ def _patch_paths(update_node_call) -> dict[str, Any]:
     return {op["path"]: op["value"] for op in patch}
 
 
+def _mock_engine(mocker, **kwargs):
+    """Mock the engine, and the inspection that follows it."""
+    mocker.patch.object(enroll_fw, "_inspect_and_provide")
+    return mocker.patch.object(enroll_fw.netdev_reconciler, "enroll", **kwargs)
+
+
 # --- enrollment path (new / re-enrollable node) -----------------------------
 
 
 def test_enroll_fw_hands_metadata_to_the_engine(mocker):
     _mock_client(mocker, node=None)  # not found -> new node -> engine enrolls
-    engine = mocker.patch.object(
-        enroll_fw.netdev_reconciler, "enroll", return_value="node-123"
-    )
+    engine = _mock_engine(mocker, return_value="node-123")
 
     node_uuid = enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
 
@@ -107,7 +111,6 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
         ports=BASE_ARGS["ports"],
         resource_class="pa1410",
         driver="panos",
-        external_cmdb_id=None,
         driver_info={
             "management_ip": "10.15.149.46",
             "management_switch": "n11-22-1d.dfw3",
@@ -117,6 +120,7 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
         properties={},
         assign_roles=True,
         traits={"CUSTOM_PRIMARY": False, "CUSTOM_SECONDARY": False},
+        provide=False,
     )
 
 
@@ -129,11 +133,23 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
 )
 def test_enroll_fw_hands_the_ha_role_trait_to_the_engine(mocker, ha_role, traits):
     _mock_client(mocker, node=None)
-    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+    engine = _mock_engine(mocker)
 
     enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, ha_role=ha_role)
 
     assert engine.call_args.kwargs["traits"] == traits
+
+
+def test_enroll_fw_hands_the_cmdb_id_to_the_engine_in_extra(mocker):
+    _mock_client(mocker, node=None)
+    engine = _mock_engine(mocker)
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, external_cmdb_id=12345)
+
+    assert engine.call_args.kwargs["extra"] == {
+        "mate_serial": "026701010045",
+        "external_cmdb_id": 12345,
+    }
 
 
 def test_enroll_fw_requires_a_mate_serial_with_an_ha_role(mocker):
@@ -150,7 +166,7 @@ def test_enroll_fw_optional_fw_fields_can_be_omitted(mocker):
     # management_switch/port are required; management_ip, mate_serial and
     # external_cmdb_id are optional and are simply absent from the metadata.
     _mock_client(mocker, node=None)
-    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+    engine = _mock_engine(mocker)
 
     enroll_fw.enroll_fw(
         **BASE_ARGS,
@@ -168,7 +184,7 @@ def test_enroll_fw_optional_fw_fields_can_be_omitted(mocker):
 
 def test_enroll_fw_passes_explicit_legacy_driver_to_engine(mocker):
     _mock_client(mocker, node=None)
-    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+    engine = _mock_engine(mocker)
 
     enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, driver="netdev")
 
@@ -191,7 +207,7 @@ def test_existing_non_active_node_delegates_to_engine(mocker):
     # A found-but-available node is re-enrollable, so it is handed to the engine
     # rather than treated as in-service.
     _mock_client(mocker, node=_node(provision_state="available"))
-    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+    engine = _mock_engine(mocker)
 
     enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
 
@@ -212,7 +228,7 @@ def test_enroll_fw_rejects_generic_and_empty_resource_class(mocker):
 
 def test_enroll_fw_normalizes_resource_class_whitespace(mocker):
     _mock_client(mocker, node=None)
-    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+    engine = _mock_engine(mocker)
     args = {**BASE_ARGS, "resource_class": "  pa1410  "}
 
     enroll_fw.enroll_fw(**args, **FW_FIELDS)
@@ -506,27 +522,36 @@ def test_active_node_with_port_roles_still_gets_metadata_updates(mocker):
 # --- enrollment without ports (inspection labels them) ----------------------
 
 
-def _enroll_without_ports(mocker, categories, physnet=None):
+def _inspected_ports(mocker, categories, physnet=None, macs=None):
     """Mock a new node whose inspection leaves ports with these categories."""
+    macs = macs or [f"60:15:2b:00:00:{i:02x}" for i in range(1, len(categories) + 1)]
     client = _mock_client(
         mocker,
         node_ports=[
             SimpleNamespace(
                 uuid=f"port-{i}",
                 name=f"fw:ethernet1/{i}",
+                address=mac,
                 category=c,
                 physical_network=physnet,
             )
-            for i, c in enumerate(categories, start=1)
+            for i, (mac, c) in enumerate(zip(macs, categories, strict=True), start=1)
         ],
     )
+    node = _node(provision_state="enroll")
+    client.get_node.side_effect = [ironic_exceptions.NotFound(), node]
+    transition = mocker.patch.object(enroll_fw.ironic_node, "transition")
+    return client, node, transition
+
+
+def _enroll_without_ports(mocker, categories, physnet=None):
+    client, node, transition = _inspected_ports(mocker, categories, physnet)
     mocker.patch.object(
         enroll_fw.netdev_reconciler,
         "find_or_create_netdev_node",
-        return_value=(_node(provision_state="enroll"), True),
+        return_value=(node, True),
     )
     engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
-    transition = mocker.patch.object(enroll_fw.ironic_node, "transition")
     return client, engine, transition
 
 
@@ -567,7 +592,19 @@ def test_enroll_without_ports_keeps_a_matching_physical_network(mocker):
 def test_enroll_without_ports_is_not_provided_without_both_roles(mocker):
     client, _engine, transition = _enroll_without_ports(mocker, ["outside", None])
 
-    with pytest.raises(RuntimeError, match="an outside and an inside port"):
+    with pytest.raises(RuntimeError, match="left 0 inside ports, expected one"):
+        enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
+
+    assert _steps(transition) == ["manage", "inspect"]
+    client.update_port.assert_not_called()
+
+
+def test_enroll_fw_is_not_provided_with_two_ports_in_one_role(mocker):
+    client, _engine, transition = _enroll_without_ports(
+        mocker, ["outside", "outside", "inside"]
+    )
+
+    with pytest.raises(RuntimeError, match="left 2 outside ports, expected one"):
         enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": []}, **FW_FIELDS)
 
     assert _steps(transition) == ["manage", "inspect"]
@@ -585,6 +622,69 @@ def test_enroll_without_ports_marks_a_secondary_before_providing(mocker):
     client.add_node_trait.assert_called_once_with("node-uuid", "CUSTOM_SECONDARY")
     steps = [kwargs.get("target_state", name) for name, _, kwargs in calls.mock_calls]
     assert steps == ["manage", "add_node_trait", "inspect", "provide"]
+
+
+# --- enrollment with ports (inspection checks them) -------------------------
+
+TWO_PORTS = [
+    {
+        "label": "ethernet1/19",
+        "mac": "60:15:2B:33:31:22",
+        "switch": "n11-22-1.dfw3",
+        "intf": "Ethernet1/43",
+    },
+    {
+        "label": "ethernet1/20",
+        "mac": "60:15:2b:33:31:23",
+        "switch": "n11-22-1.dfw3",
+        "intf": "Ethernet1/44",
+    },
+]
+OUTSIDE_MAC, INSIDE_MAC = (port["mac"].lower() for port in TWO_PORTS)
+
+
+def _enroll_with_ports(mocker, categories, macs):
+    """Mock enrolling TWO_PORTS; inspection leaves ports with these categories."""
+    client, _node, transition = _inspected_ports(
+        mocker, categories, physnet="f20-1-network", macs=macs
+    )
+    engine = mocker.patch.object(
+        enroll_fw.netdev_reconciler, "enroll", return_value="node-uuid"
+    )
+    return client, engine, transition
+
+
+def test_enroll_with_ports_inspects_before_providing(mocker):
+    client, engine, transition = _enroll_with_ports(
+        mocker, ["outside", "inside"], [OUTSIDE_MAC, INSIDE_MAC]
+    )
+
+    node_uuid = enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": TWO_PORTS}, **FW_FIELDS)
+
+    assert node_uuid == "node-uuid"
+    assert engine.call_args.kwargs["provide"] is False
+    assert _steps(transition) == ["inspect", "provide"]
+    client.update_port.assert_not_called()  # physical_network already matches
+
+
+@pytest.mark.parametrize(
+    ("categories", "macs"),
+    [
+        (["outside", "inside"], [INSIDE_MAC, OUTSIDE_MAC]),
+        (["outside", None, "inside"], [OUTSIDE_MAC, INSIDE_MAC, "60:15:2b:33:31:24"]),
+    ],
+    ids=["roles-swapped", "inside-moved"],
+)
+def test_enroll_with_ports_is_not_provided_when_inspection_disagrees(
+    mocker, categories, macs
+):
+    client, _engine, transition = _enroll_with_ports(mocker, categories, macs)
+
+    with pytest.raises(RuntimeError, match="check the cabling or the ports list"):
+        enroll_fw.enroll_fw(**{**BASE_ARGS, "ports": TWO_PORTS}, **FW_FIELDS)
+
+    assert _steps(transition) == ["inspect"]
+    client.update_port.assert_not_called()
 
 
 def test_active_node_without_ports_updates_metadata_only(mocker):

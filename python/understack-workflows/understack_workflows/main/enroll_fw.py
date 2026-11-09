@@ -119,6 +119,8 @@ def enroll_fw(
         vendor=vendor,
         model=model,
     )
+    if external_cmdb_id not in (None, ""):
+        extra = {**extra, "external_cmdb_id": external_cmdb_id}
 
     # Look up the node first so we can tell an in-service (active) firewall from
     # one we may (re)enroll. Only the active case is special-cased here; every
@@ -136,7 +138,6 @@ def enroll_fw(
             ports=ports,
             resource_class=resource_class,
             driver=driver,
-            external_cmdb_id=external_cmdb_id,
             driver_info=driver_info,
             extra=extra,
             properties=properties,
@@ -144,36 +145,36 @@ def enroll_fw(
         )
         return node.uuid
 
-    if not ports:
-        return _enroll_by_inspection(
-            client=client,
+    if ports:
+        # The engine writes the metadata, ports and roles but leaves the node
+        # manageable, so a router can't adopt it before inspection checks it.
+        node_uuid = netdev_reconciler.enroll(
             name=name,
             physical_network=physical_network,
+            ports=ports,
             resource_class=resource_class,
             driver=driver,
-            external_cmdb_id=external_cmdb_id,
+            driver_info=driver_info,
+            extra=extra,
+            properties=properties,
+            assign_roles=True,
+            traits=traits,
+            provide=False,
+        )
+    else:
+        node_uuid = _make_manageable_without_ports(
+            client=client,
+            name=name,
+            resource_class=resource_class,
+            driver=driver,
             driver_info=driver_info,
             extra=extra,
             properties=properties,
             traits=traits,
         )
 
-    # New or re-enrollable node: the engine writes the metadata inside the
-    # enrollment lifecycle (at create, or patched before the node becomes
-    # available), so the node is never allocatable in an under-described state.
-    return netdev_reconciler.enroll(
-        name=name,
-        physical_network=physical_network,
-        ports=ports,
-        resource_class=resource_class,
-        driver=driver,
-        external_cmdb_id=external_cmdb_id,
-        driver_info=driver_info,
-        extra=extra,
-        properties=properties,
-        assign_roles=True,
-        traits=traits,
-    )
+    _inspect_and_provide(client, node_uuid, physical_network, ports)
+    return node_uuid
 
 
 def _get_node_or_none(client: IronicClient, name: str):
@@ -184,26 +185,21 @@ def _get_node_or_none(client: IronicClient, name: str):
         return None
 
 
-def _enroll_by_inspection(
+def _make_manageable_without_ports(
     *,
     client: IronicClient,
     name: str,
-    physical_network: str,
     resource_class: str,
     driver: str,
-    external_cmdb_id: int | str | None,
     driver_info: dict,
     extra: dict,
     properties: dict,
     traits: dict[str, bool],
 ) -> str:
-    """Enroll a firewall without ports and let inspection find and label them.
+    """Create or update a firewall that has no ports yet, and make it manageable.
 
-    Provided only once it has an outside and an inside port, which get the
-    given physical_network.
+    Inspection then finds the ports and labels them.
     """
-    if external_cmdb_id not in (None, ""):
-        extra = {**extra, "external_cmdb_id": external_cmdb_id}
     node, created = netdev_reconciler.find_or_create_netdev_node(
         client=client,
         name=name,
@@ -213,8 +209,7 @@ def _enroll_by_inspection(
         extra=extra,
         properties=properties,
     )
-    if node.provision_state != "manageable":
-        ironic_node.transition(node, target_state="manage", expected_state="manageable")
+    netdev_reconciler.make_manageable(node, node.provision_state)
     if not created:
         netdev_reconciler.update_node_metadata(
             client=client,
@@ -225,21 +220,52 @@ def _enroll_by_inspection(
             properties=properties,
         )
     netdev_reconciler.update_node_traits(client=client, node=node, traits=traits)
+    return node.uuid
 
-    logger.info("[node:%s] Inspecting to discover and label the ports", node.uuid)
+
+def _role_macs(ports: list[dict]) -> dict[str, str]:
+    """Return the MAC that enroll gives each router role."""
+    labelled = netdev_reconciler.assign_port_roles(
+        netdev_reconciler.build_netdev_ports(ports)
+    )
+    return {
+        port.category: port.mac.lower()
+        for port in labelled
+        if port.category in netdev_reconciler.PORT_ROLES
+    }
+
+
+def _inspect_and_provide(
+    client: IronicClient, node_uuid: str, physical_network: str, ports: list[dict]
+) -> None:
+    """Inspect the firewall, check its outside and inside ports, then provide it.
+
+    Each role needs exactly one port, and with ports given, on the MAC enroll
+    gave it. Those ports get the given physical_network. A failed check leaves
+    the node manageable.
+    """
+    node = client.get_node(node_uuid)
+    given_roles = _role_macs(ports) if ports else None
+    logger.info("[node:%s] Inspecting to discover and check the ports", node.uuid)
     ironic_node.transition(node, target_state="inspect", expected_state="manageable")
-    role_ports = [
-        port
-        for port in client.list_ports(node.uuid)
-        if getattr(port, "category", None) in netdev_reconciler.PORT_ROLES
-    ]
-    if not {port.category for port in role_ports}.issuperset(
-        netdev_reconciler.PORT_ROLES
-    ):
-        raise RuntimeError(
-            f"[node:{node.uuid}] Inspection did not give the node an outside and "
-            "an inside port; leaving it manageable"
-        )
+
+    node_ports = list(client.list_ports(node.uuid))
+    role_ports = []
+    for role in netdev_reconciler.PORT_ROLES:
+        found = [p for p in node_ports if getattr(p, "category", None) == role]
+        if len(found) != 1:
+            raise RuntimeError(
+                f"[node:{node.uuid}] Inspection left {len(found)} {role} ports, "
+                "expected one; leaving it manageable"
+            )
+        mac = (found[0].address or "").lower()
+        if given_roles is not None and mac != given_roles[role]:
+            raise RuntimeError(
+                f"[node:{node.uuid}] Inspection put {role} on {mac}, but the ports "
+                f"list gave it to {given_roles[role]}; check the cabling or the "
+                "ports list. Leaving it manageable"
+            )
+        role_ports.append(found[0])
 
     for port in role_ports:
         if port.physical_network != physical_network:
@@ -262,7 +288,6 @@ def _enroll_by_inspection(
             )
 
     ironic_node.transition(node, target_state="provide", expected_state="available")
-    return node.uuid
 
 
 def _update_active_firewall(
@@ -274,7 +299,6 @@ def _update_active_firewall(
     ports: list[dict],
     resource_class: str,
     driver: str,
-    external_cmdb_id: int | str | None,
     driver_info: dict,
     extra: dict,
     properties: dict,
@@ -320,16 +344,12 @@ def _update_active_firewall(
             netdev_ports=netdev_reconciler.build_netdev_ports(ports),
         )
 
-    active_extra = dict(extra)
-    if external_cmdb_id not in (None, ""):
-        active_extra["external_cmdb_id"] = external_cmdb_id
-
     logger.info(
         "[node:%s] Node is active; ports/physical_network match the request, "
         "updating firewall metadata only",
         node.uuid,
     )
-    firewall.apply_node_metadata(client, node, driver_info, active_extra, properties)
+    firewall.apply_node_metadata(client, node, driver_info, extra, properties)
 
 
 def _reject_structural_drift(
@@ -396,8 +416,9 @@ def argument_parser():
         "sync can resolve the cable. Optional per-port 'bios_name' (the device "
         "interface name); defaults to the label. At least two ports: the "
         "lowest-numbered interface becomes the router's outside NIC (gateway) "
-        "and the next one its inside NIC (subnets). Leave it out to have "
-        "inspection discover the ports over LLDP and label them.",
+        "and the next one its inside NIC (subnets). The firewall is inspected "
+        "either way, and inspection must keep those roles on these ports. Leave "
+        "it out to have inspection discover the ports over LLDP and label them.",
     )
     parser.add_argument(
         "--resource-class",
