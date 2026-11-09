@@ -341,6 +341,7 @@ mariadb_db:
 
 manifests:
   job_db_init: false
+  rabbitmq_topology: false
   mariadb_db: true
   job_rabbit_init: false
   pod_rally_test: false
