@@ -17,6 +17,7 @@ def undersync(mocker):
 class TestKeystoneTokenRefresh:
     """Test that each Undersync request goes through the keystoneauth1 session."""
 
+    @pytest.mark.usefixtures("_ml2_understack_conf")
     def test_undersync_uses_session_per_request(self, undersync):
         """Test that sync calls _session.post, for token refresh.
 
@@ -29,3 +30,10 @@ class TestKeystoneTokenRefresh:
         assert undersync._session.post.call_count == 2
         assert result1.status_code == 200
         assert result2.status_code == 200
+
+    def test_disabled_undersync_does_not_use_session(self, oslo_config, undersync):
+        oslo_config.config(undersync_disabled=True, group="ml2_understack")
+
+        assert undersync.sync("vlan-group-1") is None
+
+        undersync._session.post.assert_not_called()
