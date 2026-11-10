@@ -488,6 +488,19 @@ class TestAllowedTenantVlanIdRanges:
         assert result == expected_result
 
 
+class TestIsNetworkFabricVlan:
+    @pytest.mark.parametrize(
+        ("fabric_vlan", "vlan", "expected"),
+        [(3005, 3005, True), (3005, 3006, False), (None, 3005, False)],
+    )
+    def test_matches_only_the_networks_own_fabric_vlan(
+        self, mocker, fabric_vlan, vlan, expected
+    ):
+        mocker.patch.object(utils, "network_fabric_vlan", return_value=fabric_vlan)
+
+        assert utils.is_network_fabric_vlan("net-1", vlan) is expected
+
+
 class TestIsUuid:
     def test_valid_uuid(self):
         assert utils._is_uuid("7ca98881-bca5-4c82-9369-66eb36292a95") is True

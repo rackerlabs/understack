@@ -598,8 +598,11 @@ class PaloAltoWiring:
         which allocates the fabric segment, binds it, and calls undersync to
         program the switch. No-ops if the port is already a subport.
 
-        pick_vlan is called only when the port is actually added, so an
-        exhausted VLAN pool cannot fail an already-attached port.
+        A port on a fabric_vlan network must be tagged with that fabric_vlan
+        (the trunk driver rejects any other tag), so it takes precedence over
+        pick_vlan. pick_vlan is called only when the port is actually added and
+        has no fabric_vlan, so an exhausted VLAN pool cannot fail an
+        already-attached port.
         """
         port_id = port["id"]
         if _has_subport(trunk, port_id):
@@ -611,7 +614,8 @@ class PaloAltoWiring:
             )
             return trunk
 
-        segmentation_id = pick_vlan()
+        fabric_vlan = utils.network_fabric_vlan(port["network_id"])
+        segmentation_id = fabric_vlan if fabric_vlan is not None else pick_vlan()
         admin_context = self._admin_context()
         LOG.info(
             "Adding Palo Alto %s port %s to trunk %s as VLAN %s subport for router %s",

@@ -704,6 +704,17 @@ def network_fabric_vlan(network_id: str) -> int | None:
     return network.get(understack_fabric_vlan.FABRIC_VLAN)
 
 
+def is_network_fabric_vlan(network_id: str, vlan: int) -> bool:
+    """Return True if vlan is the network's fabric_vlan.
+
+    A fabric_vlan lies in a shared segment range, so allowed_tenant_vlan_id_ranges()
+    excludes it. The network's own fabric_vlan is exempt from that range check;
+    any other VLAN in the fabric range is not.
+    """
+    fabric_vlan = network_fabric_vlan(network_id)
+    return fabric_vlan is not None and vlan == fabric_vlan
+
+
 def is_valid_vlan_network_segment(network_segment: dict):
     return (
         network_segment.get(segment_def.NETWORK_TYPE) == constants.TYPE_VLAN
