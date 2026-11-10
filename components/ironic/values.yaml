@@ -67,6 +67,11 @@ conf:
     "baremetal:node:get_console": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s)"
     "baremetal:node:set_provision_state:clean_steps": "role:admin or role:ucadmin-role"
     "baremetal:node:disable_cleaning": "role:admin or role:ucadmin-role"
+    # Upstream default plus the admins of the project that owns the node, so
+    # enroll-fw (baremetal-manage, admin on infra/baremetal) can link an HA
+    # firewall pair: the secondary's parent_node is its primary.
+    # default: "(role:member and system_scope:all) or rule:service_role"
+    "baremetal:node:update:parent_node": "(role:member and system_scope:all) or rule:service_role or (role:admin and project_id:%(node.owner)s)"
   ironic:
     database:
       # The MariaDB operator writes the connection string into the
