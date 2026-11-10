@@ -65,8 +65,20 @@ conf:
     "baremetal:node:set_console_state": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s) "
     # allow node lessee to get console
     "baremetal:node:get_console": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s)"
+
+    # Allow the Argo workflow to set cleaning steps using its current
+    # project-scoped credentials. This broadens access beyond the upstream
+    # policy and should be removed once workflows use a system-scoped user.
+    # default: "role:admin and system_scope:all"  # Verify upstream default
     "baremetal:node:set_provision_state:clean_steps": "role:admin or role:ucadmin-role"
+
+    # Allow the Argo workflow to disable cleaning using its current
+    # project-scoped credentials, which otherwise receive HTTP 403.
+    # This also permits project admins to disable cleaning.
+    # Remove this override once workflows use a system-scoped user.
+    # default: "role:admin and system_scope:all"
     "baremetal:node:disable_cleaning": "role:admin or role:ucadmin-role"
+
     # Upstream default plus the admins of the project that owns the node, so
     # enroll-fw (baremetal-manage, admin on infra/baremetal) can link an HA
     # firewall pair: the secondary's parent_node is its primary.
