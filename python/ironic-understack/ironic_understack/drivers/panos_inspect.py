@@ -117,8 +117,27 @@ def _discover_and_update_ports(task, client: panos_api.PanosClient) -> None:
 
     This temporarily enables LLDP on all interfaces, collects neighbors,
     then restores the original configuration.
+
+    LLDP is the source of truth for port connectivity. Any enrolled ports
+    are deleted before LLDP discovery runs.
+
+    Note: This enrolled port deletion can be removed if/when enroll-fw stops
+    accepting ports[] as an enrollment option.
     """
     node = task.node
+
+    # Delete all enrolled ports - LLDP discovery is the source of truth
+    # TODO: Remove this block when enroll-fw no longer accepts ports[] option
+    enrolled_port_count = len(task.ports)
+    if enrolled_port_count > 0:
+        LOG.info(
+            "[node:%s] Deleting %d enrolled port(s) - "
+            "LLDP discovery is source of truth",
+            node.uuid,
+            enrolled_port_count,
+        )
+        for port_obj in list(task.ports):
+            port_obj.destroy()
 
     # Get all physical interfaces based on model
     model = node.properties.get("model", "PA-1410")
@@ -134,6 +153,14 @@ def _discover_and_update_ports(task, client: panos_api.PanosClient) -> None:
     interface_macs = client.get_interface_macs()
     lldp_neighbors = client.get_lldp_neighbors()
     LOG.info("[node:%s] Discovered %d LLDP neighbors", node.uuid, len(lldp_neighbors))
+
+    # CRITICAL: Must have at least 2 neighbors (outside/inside minimum)
+    if len(lldp_neighbors) < 2:
+        raise exception.HardwareInspectionFailure(
+            f"Firewall {node.uuid} requires at least 2 LLDP neighbors "
+            f"(outside/inside minimum), but only discovered {len(lldp_neighbors)}. "
+            "Check physical cabling and switch LLDP configuration."
+        )
 
     # Restore original configuration (delete all interface config we added)
     _restore_interface_config(client, all_interfaces)
@@ -328,14 +355,6 @@ def _update_ports_from_neighbors(
         LOG.info("[node:%s] No ports with MAC addresses to create", node.uuid)
         return
 
-    # Validate minimum 2 interfaces before creating ports
-    # A firewall needs at least outside/inside ports to function properly
-    if len(inspected_ports) < 2:
-        raise exception.HardwareInspectionFailure(
-            error=f"Firewall {node.uuid} requires at least 2 ports (outside/inside), "
-            f"but only discovered {len(inspected_ports)} port(s) via LLDP. "
-        )
-
     # Get VLAN group names for all ports
     try:
         vlan_group_mapping = vlan_group_name_convention.vlan_group_names(
@@ -456,9 +475,9 @@ def _validate_firewall_readiness(task) -> None:
 
     Checks:
     - Port categories assigned (outside/inside)
-    - For PA-1410: warn if using slow 1G ports (eth1/1-18 instead of 10G eth1/19-22)
+    - For PA-1410: FAIL if using slow 1G ports (eth1/1-18 instead of 10G eth1/19-22)
 
-    Note: The minimum 2 ports check is done earlier in _update_ports_from_neighbors
+    Note: The minimum 2 neighbors check is done earlier in _discover_and_update_ports
     before ports are created.
 
     :raises HardwareInspectionFailure: if requirements not met
@@ -475,7 +494,7 @@ def _validate_firewall_readiness(task) -> None:
             categories - {None},
         )
 
-    # For PA-1410: warn if using slow 1G ports
+    # For PA-1410: FAIL if using slow 1G ports
     model = node.properties.get("model", "")
     if "1410" in model:
         slow_ports = []
@@ -485,11 +504,10 @@ def _validate_firewall_readiness(task) -> None:
                 slow_ports.append(bios_name)
 
         if slow_ports:
-            LOG.warning(
-                "[node:%s] PA-1410 using slow 1G ports %s; "
-                "should use 10G ports ethernet1/19-22 for production traffic",
-                node.uuid,
-                slow_ports,
+            raise exception.HardwareInspectionFailure(
+                f"PA-1410 cannot use slow 1G ports {slow_ports}. "
+                "Must use 10G ports ethernet1/19-22 for production traffic. "
+                "Check physical cabling."
             )
 
     LOG.info(
@@ -790,13 +808,12 @@ def _validate_and_pair_ha(
         hsci_state = ha_iface_status.get("hsci", {}).get("state")
 
         if ha1_a_state != "up" or ha1_b_state != "up" or hsci_state != "up":
-            LOG.info(
-                "[node:%s] HA interfaces not all up: ha1-a=%s, ha1-b=%s, hsci=%s",
-                node.uuid,
-                ha1_a_state,
-                ha1_b_state,
-                hsci_state,
+            reason = (
+                f"HA interfaces not all up: ha1-a={ha1_a_state}, "
+                f"ha1-b={ha1_b_state}, hsci={hsci_state}"
             )
+            LOG.info("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         LOG.info("[node:%s] HA interfaces operational", node.uuid)
@@ -807,21 +824,21 @@ def _validate_and_pair_ha(
         peer_conn = ha_status.get("peer", {}).get("conn_status")
 
         if peer_conn != "up":
-            LOG.info(
-                "[node:%s] HA peer connection not up: conn=%s, peer_serial=%s",
-                node.uuid,
-                peer_conn,
-                peer_serial,
+            reason = (
+                f"HA peer connection not up: "
+                f"conn={peer_conn}, peer_serial={peer_serial}"
             )
+            LOG.info("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         if peer_serial != mate_serial:
-            LOG.warning(
-                "[node:%s] HA peer serial mismatch: got %s, expected %s",
-                node.uuid,
-                peer_serial,
-                mate_serial,
+            reason = (
+                f"HA peer serial mismatch: got {peer_serial}, "
+                f"expected {mate_serial}"
             )
+            LOG.warning("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         LOG.info("[node:%s] HA peer connected: %s", node.uuid, peer_serial)
@@ -829,9 +846,9 @@ def _validate_and_pair_ha(
         # Step 3: Find mate node in Ironic
         mate = _find_mate_node(task, mate_serial)
         if not mate:
-            LOG.info(
-                "[node:%s] Mate node %s not found in Ironic", node.uuid, mate_serial
-            )
+            reason = f"Mate node {mate_serial} not found in Ironic"
+            LOG.info("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         # Step 4: Pre-flight compatibility checks
@@ -841,42 +858,37 @@ def _validate_and_pair_ha(
 
         # Check bidirectional mate_serial configuration
         if mate_mate_serial != my_serial:
-            LOG.warning(
-                "[node:%s] Mate serial mismatch: mate=%s, my=%s",
-                node.uuid,
-                mate_mate_serial,
-                my_serial,
+            reason = (
+                f"Mate serial mismatch: mate expects {mate_mate_serial}, "
+                f"my serial is {my_serial}"
             )
+            LOG.warning("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         # Check resource class match
         if node.resource_class != mate.resource_class:
-            LOG.warning(
-                "[node:%s] Resource class mismatch: self=%s, mate=%s",
-                node.uuid,
-                node.resource_class,
-                mate.resource_class,
+            reason = (
+                f"Resource class mismatch: self={node.resource_class}, "
+                f"mate={mate.resource_class}"
             )
+            LOG.warning("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         # Check opposite HA roles
         my_role = _get_ha_role(node)
         mate_role = _get_ha_role(mate)
         if not my_role or not mate_role:
-            LOG.warning(
-                "[node:%s] Missing HA roles: self=%s, mate=%s",
-                node.uuid,
-                my_role,
-                mate_role,
-            )
+            reason = f"Missing HA roles: self={my_role}, mate={mate_role}"
+            LOG.warning("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         if my_role == mate_role:
-            LOG.warning(
-                "[node:%s] Same HA role on both devices: %s",
-                node.uuid,
-                my_role,
-            )
+            reason = f"Same HA role on both devices: {my_role}"
+            LOG.warning("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         LOG.info(
@@ -890,7 +902,9 @@ def _validate_and_pair_ha(
         # Step 5: Bidirectional device validation - query mate device
         mate_address = mate.driver_info.get("management_ip")
         if not mate_address:
-            LOG.warning("[node:%s] Mate has no management_ip", node.uuid)
+            reason = "Mate has no management_ip"
+            LOG.warning("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         mate_client = panos_api.PanosClient(mate_address)
@@ -900,20 +914,18 @@ def _validate_and_pair_ha(
         mate_peer_conn = mate_ha_status.get("peer", {}).get("conn_status")
 
         if mate_peer_serial != my_serial:
-            LOG.warning(
-                "[node:%s] Mate peer serial mismatch: got %s, expected %s",
-                node.uuid,
-                mate_peer_serial,
-                my_serial,
+            reason = (
+                f"Mate peer serial mismatch: "
+                f"got {mate_peer_serial}, expected {my_serial}"
             )
+            LOG.warning("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         if mate_peer_conn != "up":
-            LOG.warning(
-                "[node:%s] Mate peer connection not up: %s",
-                node.uuid,
-                mate_peer_conn,
-            )
+            reason = f"Mate peer connection not up: {mate_peer_conn}"
+            LOG.warning("[node:%s] %s", node.uuid, reason)
+            extra["ha_check_reason"] = reason
             return
 
         LOG.info("[node:%s] Bidirectional HA validation passed", node.uuid)
@@ -955,7 +967,49 @@ def _validate_and_pair_ha(
                     e,
                 )
 
-        # Step 7: All validations passed - mark this node as operational
+        # Step 7: Validate HA pair switch diversity
+        # Both devices must connect to different switches (true HA requirement)
+        LOG.info("[node:%s] Validating HA pair switch diversity", node.uuid)
+
+        # Collect this device's switches from LLDP data
+        my_switches = set()
+        for port_obj in task.ports:
+            llc = port_obj.local_link_connection or {}
+            if hasattr(llc, "get"):
+                switch_info = llc.get("switch_info")
+                if switch_info and switch_info != "None":
+                    my_switches.add(switch_info)
+
+        # Collect mate device's switches from LLDP data
+        mate_switches = set()
+        for port_obj in mate.ports:
+            llc = port_obj.local_link_connection or {}
+            if hasattr(llc, "get"):
+                switch_info = llc.get("switch_info")
+                if switch_info and switch_info != "None":
+                    mate_switches.add(switch_info)
+
+        # Check for switch overlap (both devices on same switch = not true HA)
+        switch_overlap = my_switches & mate_switches
+        if switch_overlap:
+            error_msg = (
+                f"HA pair cabling error: both devices connected to same switch(es) "
+                f"({', '.join(sorted(switch_overlap))}). "
+                "HA pair must be on different switches."
+            )
+            LOG.error("[node:%s] %s", node.uuid, error_msg)
+            extra["ha_check_reason"] = error_msg
+            raise exception.HardwareInspectionFailure(error_msg)
+
+        LOG.info(
+            "[node:%s] Switch diversity validated: %d switches on this device, "
+            "%d on mate, no overlap",
+            node.uuid,
+            len(my_switches),
+            len(mate_switches),
+        )
+
+        # Step 8: All validations passed - mark this node as operational
         LOG.info(
             "[node:%s] HA pair fully validated: %s (%s) <-> %s (%s)",
             node.uuid,
@@ -968,6 +1022,8 @@ def _validate_and_pair_ha(
         # Set ha_operational = True (will be saved in finally block)
         LOG.info("[node:%s] All HA validation checks passed", node.uuid)
         extra["ha_operational"] = True
+        # Clear any previous failure reason
+        extra.pop("ha_check_reason", None)
 
     except Exception as e:
         LOG.exception(
@@ -975,6 +1031,8 @@ def _validate_and_pair_ha(
             node.uuid,
             e,
         )
+        # Set failure reason for troubleshooting
+        extra["ha_check_reason"] = str(e)
         # Don't raise - allow inspection to complete even if pairing fails
     finally:
         # Always save ha_operational status (True if all checks passed, False otherwise)
