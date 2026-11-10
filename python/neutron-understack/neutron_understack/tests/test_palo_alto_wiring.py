@@ -21,12 +21,14 @@ _UNANNOTATED_PARENT = {"id": "parent-1", "binding:host_id": "", "binding:profile
 
 _GATEWAY_PORT = {
     "id": "gw-1",
+    "network_id": "net-1",
     "device_id": "r1",
     "device_owner": "network:router_gateway",
 }
 
 _INTERFACE_PORT = {
     "id": "intf-1",
+    "network_id": "net-2",
     "device_id": "r1",
     "device_owner": "network:router_interface",
 }
@@ -121,6 +123,9 @@ def device_id(mocker):
 def wiring(mocker, ironic, core_plugin, trunk_plugin):
     # get_admin_context() would init oslo policy; not needed for these tests.
     mocker.patch.object(palo_alto_wiring.n_context, "get_admin_context")
+    mocker.patch.object(
+        palo_alto_wiring.utils, "network_fabric_vlan", return_value=None
+    )
     return palo_alto_wiring.PaloAltoWiring(ironic=lambda: ironic)
 
 
@@ -409,6 +414,19 @@ class TestGatewaySubport:
             "gw-1", "r1", "network:router_gateway"
         )
 
+    def test_fabric_vlan_network_overrides_fixed_vlan(
+        self, mocker, wiring, trunk_plugin, device_id
+    ):
+        mocker.patch.object(
+            palo_alto_wiring.utils, "network_fabric_vlan", return_value=3005
+        )
+        trunk = {"id": "trunk-1", "sub_ports": []}
+
+        wiring.add_gateway_subport("r1", trunk, dict(_GATEWAY_PORT))
+
+        _ctx, _trunk_id, body = trunk_plugin.add_subports.call_args[0]
+        assert body["sub_ports"][0]["segmentation_id"] == 3005
+
     def test_add_subport_is_idempotent(self, wiring, trunk_plugin, device_id):
         trunk = {
             "id": "trunk-1",
@@ -510,6 +528,25 @@ class TestInterfaceSubport:
         trunk_plugin.add_subports.assert_not_called()
         device_id.clear.assert_not_called()
         device_id.restore.assert_not_called()
+
+
+class TestInterfaceSubportFabricVlan:
+    def test_fabric_vlan_network_skips_allowed_ranges(
+        self, mocker, wiring, trunk_plugin, device_id
+    ):
+        mocker.patch.object(
+            palo_alto_wiring.utils, "network_fabric_vlan", return_value=3005
+        )
+        ranges = mocker.patch.object(
+            palo_alto_wiring.utils, "allowed_tenant_vlan_id_ranges"
+        )
+        trunk = {"id": "trunk-1", "sub_ports": []}
+
+        wiring.add_interface_subport("r1", trunk, dict(_INTERFACE_PORT))
+
+        ranges.assert_not_called()
+        _ctx, _trunk_id, body = trunk_plugin.add_subports.call_args[0]
+        assert body["sub_ports"][0]["segmentation_id"] == 3005
 
 
 class TestSubportVlanAllocation:

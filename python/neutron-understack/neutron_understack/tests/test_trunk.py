@@ -626,6 +626,38 @@ class TestCheckSubportsSegmentationId:
             understack_trunk_driver._check_subports_segmentation_id([subport], trunk_id)
 
 
+class TestCheckSubportsFabricVlan:
+    @pytest.fixture(autouse=True)
+    def _fabric_network(self, mocker):
+        mocker.patch(
+            "neutron_understack.utils.fetch_network_node_trunk_id",
+            return_value="different-trunk-id",
+        )
+        mocker.patch(
+            "neutron_understack.utils.allowed_tenant_vlan_id_ranges",
+            return_value=[(1, 1500)],
+        )
+        mocker.patch("neutron_understack.utils.fabric_vlan_enabled", return_value=True)
+        mocker.patch(
+            "neutron_understack.utils.fetch_subport_network_id",
+            return_value="net-1",
+        )
+        mocker.patch("neutron_understack.utils.network_fabric_vlan", return_value=3005)
+
+    def test_network_fabric_vlan_is_accepted(
+        self, understack_trunk_driver, trunk_id, subport
+    ):
+        subport.segmentation_id = 3005
+        understack_trunk_driver._check_subports_segmentation_id([subport], trunk_id)
+
+    def test_other_vlan_outside_allowed_range_is_rejected(
+        self, understack_trunk_driver, trunk_id, subport
+    ):
+        subport.segmentation_id = 3006
+        with pytest.raises(SubportSegmentationIDError):
+            understack_trunk_driver._check_subports_segmentation_id([subport], trunk_id)
+
+
 @pytest.mark.parametrize("binding_profile", [{"physical_network": None}], indirect=True)
 class TestMissingPhysicalNetwork:
     """physical_network is mandatory for allocating a subport's segment.

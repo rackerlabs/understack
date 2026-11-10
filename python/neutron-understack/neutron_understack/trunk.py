@@ -233,8 +233,8 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         ns_ranges = utils.allowed_tenant_vlan_id_ranges()
         for subport in subports:
             seg_id = subport.segmentation_id
-            if utils.fabric_vlan_enabled() and seg_id == utils.network_fabric_vlan(
-                utils.fetch_subport_network_id(subport_id=subport.port_id)
+            if utils.fabric_vlan_enabled() and utils.is_network_fabric_vlan(
+                utils.fetch_subport_network_id(subport_id=subport.port_id), seg_id
             ):
                 continue
             if not utils.segmentation_id_in_ranges(seg_id, ns_ranges):
