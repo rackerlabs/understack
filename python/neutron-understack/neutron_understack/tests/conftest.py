@@ -364,10 +364,7 @@ def oslo_config():
 
 @pytest.fixture
 def _ml2_understack_conf(oslo_config) -> None:
-    oslo_config.config(
-        undersync_dry_run=False,
-        group="ml2_understack",
-    )
+    oslo_config.config(group="ml2_understack")
 
 
 @pytest.fixture

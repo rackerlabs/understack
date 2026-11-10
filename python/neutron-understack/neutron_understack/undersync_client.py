@@ -57,9 +57,15 @@ class Undersync:
         self._log_and_raise_for_status(response)
         return response
 
-    def sync(self, vlan_group: str) -> requests.Response:
-        if cfg.CONF.ml2_understack.undersync_dry_run:
-            return self._undersync_post("dry-run", vlan_group)
+    def sync(self, vlan_group: str) -> requests.Response | None:
+        if cfg.CONF.ml2_understack.undersync_disabled:
+            LOG.info(
+                "Not syncing %s because the `undersync_disabled` "
+                "configuration option is set under [ml2_understack]",
+                vlan_group,
+            )
+            return None
+
         return self._undersync_post("sync", vlan_group)
 
     def dry_run(self, vlan_group: str) -> requests.Response:

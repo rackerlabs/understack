@@ -13,9 +13,7 @@ _mech_understack_opts = [
         "undersync_url",
         help="Undersync URL",
     ),
-    cfg.BoolOpt(
-        "undersync_dry_run", default=True, help="Call Undersync with dry-run mode"
-    ),
+    cfg.BoolOpt("undersync_disabled", default=False, help="Disable calls to Undersync"),
     cfg.StrOpt(
         "network_node_switchport_physnet",
         help=(

@@ -58,7 +58,6 @@ def _apply_understack_ml2_overrides():
     cfg.CONF.set_override(
         "undersync_url", "http://undersync.test", group="ml2_understack"
     )
-    cfg.CONF.set_override("undersync_dry_run", False, group="ml2_understack")
 
 
 class _UnderstackMl2ScenarioMixin:

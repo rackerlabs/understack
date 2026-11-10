@@ -605,8 +605,9 @@ VNI:
   router create, so it likely also needs the OVN fake.
 
 Cross-cutting:
-- DRYRUN-01 — `undersync_dry_run=True` routes to dry-run instead of sync. This
-  branch lives inside `Undersync.sync()` (an HTTP-client detail) which the
-  scenarios mock, so it has no scenario-observable effect; better unit-tested.
+- UNDERSYNC-DISABLED-01 — `undersync_disabled=True` disables all calls to
+  Undersync. This branch lives inside `Undersync.sync()` (an HTTP-client detail)
+  which the scenarios mock, so it has no scenario-observable effect; better
+  unit-tested.
 
 Explicitly out of scope: Cisco ASA floating-IP NAT.
