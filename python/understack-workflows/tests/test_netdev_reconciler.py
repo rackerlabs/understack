@@ -365,6 +365,42 @@ def test_enroll_skips_transitions_when_node_already_available(mocker):
     fake_ironic.node.wait_for_provision_state.assert_not_called()
 
 
+def _requested_states(fake_ironic):
+    return [c.args[1] for c in fake_ironic.node.set_provision_state.call_args_list]
+
+
+def test_enroll_without_provide_leaves_a_new_node_manageable(mocker):
+    fake_ironic, _ = make_ironic_client()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, provide=False)
+
+    assert fake_ironic.port.create.call_count == 2
+    assert _requested_states(fake_ironic) == ["manage"]
+
+
+def test_enroll_without_provide_steps_an_up_to_date_node_out_of_the_pool(mocker):
+    # Nothing to change, but the caller still needs it manageable to inspect.
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = SimpleNamespace(
+        uuid="node-123", driver="netdev", provision_state="available"
+    )
+    fake_ironic.port.list.return_value = matching_ports()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, provide=False)
+
+    fake_ironic.port.update.assert_not_called()
+    assert _requested_states(fake_ironic) == ["manage"]
+
+
 def test_enroll_steps_available_node_down_to_update_ports(mocker):
     fake_ironic, _ = make_ironic_client()
     fake_ironic.node.get.side_effect = None

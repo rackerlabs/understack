@@ -187,12 +187,15 @@ def enroll(
     properties: dict | None = None,
     assign_roles: bool = False,
     traits: dict[str, bool] | None = None,
+    provide: bool = True,
 ) -> str:
     """Enroll a netdev node and its ports, then make it available.
 
     ``assign_roles`` (enroll-fw only) labels ports outside/inside; other netdev
     devices are left as they were. ``traits`` maps a node trait to whether the
     node should have it, set before the node is made available.
+    ``provide=False`` (enroll-fw only) leaves the node manageable instead, so
+    the caller can inspect it first.
     """
     effective_resource_class = resource_class or DEFAULT_RESOURCE_CLASS
     effective_driver = driver or DEFAULT_DRIVER
@@ -272,13 +275,14 @@ def enroll(
     # connectivity changes while a node is available, so this is required for
     # port work. A metadata-only change on an available node (no pending ports)
     # is patched in place below and stays available -- its ports are already
-    # correct, so re-pooling is safe.
-    if pending and state == "available":
+    # correct, so re-pooling is safe. A caller that inspects before providing
+    # needs the node out of the pool even with no port work.
+    if (pending or not provide) and state == "available":
         logger.info(
             "[node:%s] Stepping available -> manageable to apply changes",
             node.uuid,
         )
-        ironic_node.transition(node, target_state="manage", expected_state="manageable")
+        make_manageable(node, state)
         state = "manageable"
 
     # Apply the reused node's metadata after planning has validated (so a port
@@ -321,7 +325,10 @@ def enroll(
             plan=plan,
         )
 
-    make_available(node, state)
+    if provide:
+        make_available(node, state)
+    else:
+        make_manageable(node, state)
     logger.info(
         "Completed enroll-netdev workflow name=%s node_uuid=%s",
         name,
@@ -709,6 +716,21 @@ def create_netdev_port(
     )
 
 
+def make_manageable(node: Node, state: str) -> None:
+    """Drive the node to "manageable" from enroll or available.
+
+    ``state`` is passed in for the same reason as in make_available.
+    """
+    if state == "manageable":
+        return
+    logger.info(
+        "[node:%s] Requesting manage transition, expecting manageable",
+        node.uuid,
+    )
+    ironic_node.transition(node, target_state="manage", expected_state="manageable")
+    logger.info("[node:%s] Node is manageable", node.uuid)
+
+
 def make_available(node: Node, state: str) -> None:
     """Drive the node to "available" given its current provision state.
 
@@ -726,14 +748,7 @@ def make_available(node: Node, state: str) -> None:
             f"provision_state {state!r}"
         )
 
-    if state == "enroll":
-        logger.info(
-            "[node:%s] Requesting manage transition, expecting manageable",
-            node.uuid,
-        )
-        ironic_node.transition(node, target_state="manage", expected_state="manageable")
-        logger.info("[node:%s] Node is manageable", node.uuid)
-
+    make_manageable(node, state)
     logger.info(
         "[node:%s] Requesting provide transition, expecting available",
         node.uuid,
