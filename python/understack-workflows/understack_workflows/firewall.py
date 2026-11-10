@@ -1,8 +1,8 @@
 """Shared helpers for firewall (netdev appliance) metadata.
 
-Used by enroll-fw: for a new/re-enrollable node the metadata is handed to the
-shared netdev engine so it is written inside the enrollment lifecycle; for an
-in-service (active) node apply_node_metadata patches it directly, in place.
+Used by enroll-fw: for a new/re-enrollable node the metadata is written by the
+shared netdev engine's node helpers; for an in-service (active) node
+apply_node_metadata patches it directly, in place.
 """
 
 import logging
@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 # The node trait for each HA role. Router selection in neutron-understack
 # (ironic.py) skips CUSTOM_SECONDARY; change both together.
 HA_ROLE_TRAITS = {"primary": "CUSTOM_PRIMARY", "secondary": "CUSTOM_SECONDARY"}
+
+# A port's role says which side of a router its NIC carries
+# stored as the ironic port's category (other netdev ports keep "network";
+# extra firewall ports get none)
+# inspection (panos_inspect) assigns roles from the interface names;
+# neutron-understack (ironic.py) attaches the router's NICs by them.
+PORT_ROLES = ("outside", "inside")
 
 
 def ha_role_traits(ha_role: str) -> dict[str, bool]:

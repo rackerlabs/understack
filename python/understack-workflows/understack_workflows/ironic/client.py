@@ -21,8 +21,32 @@ class IronicClient:
     def create_node(self, node_data: dict) -> Node:
         return cast(Node, self.client.node.create(**node_data))
 
-    def list_nodes(self):
-        return self.client.node.list()
+    def list_nodes(self, *, include_children: bool = False, **filters) -> list[Node]:
+        """List nodes; with include_children, child nodes too.
+
+        Ironic hides child nodes (an HA pair's secondary firewall) unless
+        include_children is set. Its "next" link drops that flag, so with it we
+        page by marker ourselves: each request is a single page (no limit, so
+        ironicclient never follows "next"), and an empty page means the end.
+        """
+        if not include_children:
+            return self.client.node.list(**filters)
+        nodes: list[Node] = []
+        marker = None
+        while page := self.client.node.list(
+            include_children=True, marker=marker, **filters
+        ):
+            nodes.extend(page)
+            marker = page[-1].uuid
+        return nodes
+
+    def list_child_nodes(self, parent_uuid: str) -> list[Node]:
+        """List the nodes whose parent_node is parent_uuid.
+
+        Never combine parent_node with include_children: Ironic then ignores
+        the parent_node filter and returns every node.
+        """
+        return self.client.node.list(parent_node=parent_uuid, detail=True)
 
     def get_node(self, node_ident: str, fields: list[str] | None = None) -> Node:
         return cast(Node, self.client.node.get(node_ident, fields))

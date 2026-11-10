@@ -36,7 +36,8 @@ def sync_nodes(nautobot: pynautobot.api) -> SyncResult:
     # lookups (e.g. racks, whose names are only unique within a location).
     region = get_openstack_client().config.region_name
     location = get_location_for_region(nautobot, region)
-    nodes = ironic.list_nodes()
+    # Children too: an HA pair's secondary firewall is a child node.
+    nodes = ironic.list_nodes(include_children=True)
     result = SyncResult()
 
     for node in nodes:
