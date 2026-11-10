@@ -458,7 +458,7 @@ site:
     wave: 4
     # -- Chart version for Skyline
     # renovate: datasource=helm depName=skyline registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.2.14+748d9d880
+    chartVersion: 2026.2.16+e85ad710e
 
   # -- Open vSwitch (Networking)
   openvswitch:

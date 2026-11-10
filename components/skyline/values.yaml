@@ -1,6 +1,8 @@
 ---
 conf:
   nginx:
+    # The default worker_process is 'auto' but for kubernetes pods this causes issues:
+    # https://review.opendev.org/c/openstack/openstack-helm/+/1012728
     worker_processes: 4
 
 endpoints:
