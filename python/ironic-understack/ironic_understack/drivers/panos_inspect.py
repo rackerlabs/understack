@@ -591,10 +591,11 @@ def _find_mate_node(task, mate_serial: str):
 
     try:
         # Cannot filter by extra.serial directly, so list all nodes and search
-        # Filter by driver to limit scope
+        # Filter by driver to limit scope; include_children ensures we see child nodes
         nodes = node_obj.Node.list(
             task.context,
             filters={"driver": "panos"},
+            include_children=True,
         )
 
         for node in nodes:
