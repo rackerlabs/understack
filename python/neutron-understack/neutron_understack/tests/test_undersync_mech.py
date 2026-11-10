@@ -188,7 +188,7 @@ class TestInitialize:
 
     def test_builds_the_client_from_the_configured_url(self, mocker, oslo_config):
         oslo_config.config(
-            undersync_url="http://undersync.example:8080", group="ml2_understack"
+            undersync_url="http://undersync.example:8080", group="ml2_undersync"
         )
         undersync_cls = mocker.patch("neutron_understack.undersync_mech.Undersync")
 

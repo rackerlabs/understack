@@ -32,7 +32,7 @@ class TestKeystoneTokenRefresh:
         assert result2.status_code == 200
 
     def test_disabled_undersync_does_not_use_session(self, oslo_config, undersync):
-        oslo_config.config(undersync_disabled=True, group="ml2_understack")
+        oslo_config.config(undersync_disabled=True, group="ml2_undersync")
 
         assert undersync.sync("vlan-group-1") is None
 

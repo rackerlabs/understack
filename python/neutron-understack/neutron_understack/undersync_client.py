@@ -31,6 +31,7 @@ class Undersync:
         # the credentials
         config.register_ironic_opts(cfg.CONF)
         config.register_ml2_understack_opts(cfg.CONF)
+        config.register_ml2_undersync_opts(cfg.CONF)
         self._session = config.get_session(config._OPT_GRP_IRONIC)
         self._session.app_name = "neutron_understack"
         self._session.app_version = version
@@ -58,10 +59,10 @@ class Undersync:
         return response
 
     def sync(self, vlan_group: str) -> requests.Response | None:
-        if cfg.CONF.ml2_understack.undersync_disabled:
+        if cfg.CONF.ml2_undersync.undersync_disabled:
             LOG.info(
                 "Not syncing %s because the `undersync_disabled` "
-                "configuration option is set under [ml2_understack]",
+                "configuration option is set under [ml2_undersync]",
                 vlan_group,
             )
             return None

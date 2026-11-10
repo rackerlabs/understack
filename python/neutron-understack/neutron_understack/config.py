@@ -3,17 +3,13 @@ from keystoneauth1 import session as ks_session
 from oslo_config import cfg
 
 _OPT_GRP_ML2_UNDERSTACK = "ml2_understack"
+_OPT_GRP_ML2_UNDERSYNC = "ml2_undersync"
 _OPT_GRP_IRONIC = "ironic"
 _OPT_GRP_L3_SVC_CISCO_ASA = "l3_service_cisco_asa"
 _OPT_GRP_UNDERSTACK_VNI = "understack_vni"
 _OPT_GRP_NETDEV_RECONCILE = "netdev_router_reconcile"
 
 _mech_understack_opts = [
-    cfg.StrOpt(
-        "undersync_url",
-        help="Undersync URL",
-    ),
-    cfg.BoolOpt("undersync_disabled", default=False, help="Disable calls to Undersync"),
     cfg.StrOpt(
         "network_node_switchport_physnet",
         help=(
@@ -40,6 +36,15 @@ _mech_understack_opts = [
             "only if it is missing or deleted."
         ),
     ),
+]
+
+_ml2_undersync_opts = [
+    cfg.StrOpt(
+        "undersync_url",
+        deprecated_group=_OPT_GRP_ML2_UNDERSTACK,
+        help="Undersync URL",
+    ),
+    cfg.BoolOpt("undersync_disabled", default=False, help="Disable calls to Undersync"),
 ]
 
 
@@ -107,6 +112,12 @@ def list_understack_opts():
     ]
 
 
+def list_undersync_opts():
+    return [
+        (_OPT_GRP_ML2_UNDERSYNC, _ml2_undersync_opts),
+    ]
+
+
 def list_ironic_opts():
     return [
         (
@@ -140,6 +151,10 @@ def list_netdev_reconcile_opts():
 
 def register_ml2_understack_opts(config):
     config.register_opts(_mech_understack_opts, _OPT_GRP_ML2_UNDERSTACK)
+
+
+def register_ml2_undersync_opts(config):
+    config.register_opts(_ml2_undersync_opts, _OPT_GRP_ML2_UNDERSYNC)
 
 
 def register_ironic_opts(config):
