@@ -55,8 +55,9 @@ def _apply_understack_ml2_overrides():
     # UnderstackDriver.initialize() registers these itself, but we register up
     # front so we can set values the driver reads while loading.
     understack_config.register_ml2_understack_opts(cfg.CONF)
+    understack_config.register_ml2_undersync_opts(cfg.CONF)
     cfg.CONF.set_override(
-        "undersync_url", "http://undersync.test", group="ml2_understack"
+        "undersync_url", "http://undersync.test", group="ml2_undersync"
     )
 
 

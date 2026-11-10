@@ -67,8 +67,8 @@ class UndersyncDriver(MechanismDriver):
 
     def initialize(self):
         self._check_driver_order()
-        config.register_ml2_understack_opts(cfg.CONF)
-        self.undersync = Undersync(cfg.CONF.ml2_understack.undersync_url)
+        config.register_ml2_undersync_opts(cfg.CONF)
+        self.undersync = Undersync(cfg.CONF.ml2_undersync.undersync_url)
         self.subscribe()
 
     @staticmethod
