@@ -1,3 +1,4 @@
+import copy
 import logging
 from types import SimpleNamespace
 from unittest.mock import ANY
@@ -97,7 +98,9 @@ def trunk_plugin(mocker):
 
 @pytest.fixture
 def ironic(mocker):
-    return mocker.Mock()
+    ironic = mocker.Mock()
+    ironic.secondaries_for_router.return_value = []  # no HA secondary
+    return ironic
 
 
 @pytest.fixture
@@ -387,11 +390,11 @@ class TestEnsureStack:
 
         stack = wiring.ensure_stack("r1")
 
-        m_parent.assert_called_once_with("r1", None)
+        m_parent.assert_called_once_with("r1", None, "primary")
         # VIF-attach runs on the parent BEFORE the trunk/subport
-        m_vif.assert_called_once_with("r1", parent, None)
+        m_vif.assert_called_once_with("r1", parent, None, "primary")
         # trunk + subport use the BOUND parent
-        m_trunk.assert_called_once_with("r1", bound, None)
+        m_trunk.assert_called_once_with("r1", bound, None, "primary")
         assert stack == palo_alto_wiring.AttachmentStack(parent=bound, trunk=trunk)
 
 
@@ -477,7 +480,7 @@ class TestInterfaceSubport:
         wiring.add_interface_subport("r1", trunk, dict(_INTERFACE_PORT))
 
         next_vlan.assert_called_once_with(
-            "r1", trunk, palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START
+            "r1", [trunk], palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START
         )
         trunk_plugin.add_subports.assert_called_once()
         _ctx, trunk_id, body = trunk_plugin.add_subports.call_args[0]
@@ -563,7 +566,7 @@ class TestSubportVlanAllocation:
         with pytest.raises(palo_alto_wiring.NoPaloAltoSubportVlanAvailable):
             wiring._next_available_subport_vlan(
                 "r1",
-                _TRUNK_USING_200_AND_201,
+                [_TRUNK_USING_200_AND_201],
                 palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START,
             )
 
@@ -602,6 +605,7 @@ class TestDeleteParentStack:
         self, wiring, trunk_plugin, ironic, core_plugin, node
     ):
         # after removal the trunk has no subports -> delete trunk + parent
+        core_plugin.get_port.return_value = _ANNOTATED_PARENT
         trunk_plugin.get_trunk.return_value = {
             "id": "trunk-1",
             "port_id": "parent-1",
@@ -634,18 +638,25 @@ class TestDeleteParentStack:
 
 
 class TestDetachAndDeleteParent:
-    def test_deletes_parent_even_when_node_is_gone(
-        self, wiring, ironic, core_plugin, caplog
-    ):
-        # The port is still removed if the node can no longer be found by router.
+    def test_deletes_parent_even_when_node_is_gone(self, wiring, ironic, core_plugin):
+        # An unbound parent and no node for the router: nothing to detach.
         ironic.node_by_instance_uuid.return_value = None
+        core_plugin.get_port.return_value = {"id": "parent-1"}
 
-        with caplog.at_level(logging.WARNING, logger=palo_alto_wiring.__name__):
-            wiring._detach_and_delete_parent("r1", "parent-1")
+        wiring._detach_and_delete_parent("r1", "parent-1")
 
         ironic.detach_vif_from_node.assert_not_called()
         core_plugin.delete_port.assert_called_once_with(ANY, "parent-1")
-        assert "No node found for router r1" in caplog.text
+
+    def test_detaches_from_the_binding_host_after_the_node_is_released(
+        self, wiring, ironic, core_plugin
+    ):
+        ironic.node_by_instance_uuid.return_value = None
+        core_plugin.get_port.return_value = _ANNOTATED_PARENT
+
+        wiring._detach_and_delete_parent("r1", "parent-1")
+
+        ironic.detach_vif_from_node.assert_called_once_with("node-1", "parent-1")
 
 
 class TestCleanupAttachment:
@@ -654,7 +665,10 @@ class TestCleanupAttachment:
     ):
         # partial add left a parent port but no trunk
         trunk_plugin.get_trunks.return_value = []
-        core_plugin.get_ports.return_value = [{"id": "parent-1"}]
+        core_plugin.get_ports.side_effect = _named(
+            {"palo-alto-router-anchor-r1": [{"id": "parent-1"}]}
+        )
+        core_plugin.get_port.return_value = _ANNOTATED_PARENT
 
         wiring.cleanup_attachment("r1", "gw-1", "gateway")
 
@@ -915,7 +929,8 @@ class TestSidedStacks:
         _ctx, trunk_id, _body = trunk_plugin.remove_subports.call_args[0]
         assert trunk_id == "trunk-outside"
         trunk_plugin.delete_trunk.assert_called_once_with(ANY, "trunk-outside")
-        ironic.detach_vif_from_node.assert_called_once_with(self.node, "parent-outside")
+        # The node comes from the parent port's binding host.
+        ironic.detach_vif_from_node.assert_called_once_with("node-1", "parent-outside")
         core_plugin.delete_port.assert_called_once_with(ANY, "parent-outside")
 
     def test_cleanup_still_finds_a_single_stack_router(self, wiring, trunk_plugin):
@@ -956,3 +971,257 @@ class TestSidedStacks:
 
         trunk_plugin.delete_trunk.assert_called_once_with(ANY, "trunk-inside")
         core_plugin.delete_port.assert_called_once_with(ANY, "parent-inside")
+
+
+# --- HA pairs: the secondary mirrors the primary's wiring -------------------
+
+_PRIMARY = SimpleNamespace(
+    id="node-pri", instance_info=_ROLE_INSTANCE_INFO, traits=["CUSTOM_PRIMARY"]
+)
+_SECONDARY = SimpleNamespace(
+    id="node-sec", instance_info=_ROLE_INSTANCE_INFO, traits=["CUSTOM_SECONDARY"]
+)
+_HA_GATEWAY = {
+    **_GATEWAY_PORT,
+    "network_id": "ext-net",
+    "fixed_ips": [{"subnet_id": "ext-subnet", "ip_address": "203.0.113.10"}],
+}
+_HA_INTERFACE = {
+    **_INTERFACE_PORT,
+    "network_id": "tenant-net",
+    "fixed_ips": [{"subnet_id": "tenant-subnet", "ip_address": "10.0.0.1"}],
+}
+_MIRROR_GW = "palo-alto-router-mirror-r1-gw-1"
+
+
+class _FakeNeutron:
+    """Ports and trunks in memory. IDs are their names, so asserts read clearly."""
+
+    def __init__(self):
+        self.ports = {}
+        self.trunks = {}
+        self.port_security = True
+        self.log = []  # deletes and subport changes, in order
+
+    def get_ports(self, _ctx, filters):
+        return [
+            copy.deepcopy(port)
+            for port in self.ports.values()
+            if all(port.get(key) in values for key, values in filters.items())
+        ]
+
+    def create_port(self, _ctx, body):
+        port = {**copy.deepcopy(body["port"]), "id": body["port"]["name"]}
+        self.ports[port["id"]] = port
+        return copy.deepcopy(port)
+
+    def get_port(self, _ctx, port_id):
+        return copy.deepcopy(self.ports[port_id])
+
+    def delete_port(self, _ctx, port_id):
+        self.log.append(("delete_port", port_id))
+        del self.ports[port_id]
+
+    def get_network(self, _ctx, network_id):
+        return {"id": network_id, "port_security_enabled": self.port_security}
+
+    def get_trunks(self, _ctx, filters):
+        return [
+            copy.deepcopy(trunk)
+            for trunk in self.trunks.values()
+            if trunk["name"] in filters["name"]
+        ]
+
+    def get_trunk(self, _ctx, trunk_id):
+        return copy.deepcopy(self.trunks[trunk_id])
+
+    def create_trunk(self, _ctx, body):
+        trunk = {**copy.deepcopy(body["trunk"]), "id": body["trunk"]["name"]}
+        self.trunks[trunk["id"]] = trunk
+        return copy.deepcopy(trunk)
+
+    def add_subports(self, _ctx, trunk_id, body):
+        self.trunks[trunk_id]["sub_ports"].extend(copy.deepcopy(body["sub_ports"]))
+        return copy.deepcopy(self.trunks[trunk_id])
+
+    def remove_subports(self, _ctx, trunk_id, body):
+        (port_id,) = (subport["port_id"] for subport in body["sub_ports"])
+        self.log.append(("remove_subport", trunk_id, port_id))
+        trunk = self.trunks[trunk_id]
+        trunk["sub_ports"] = [
+            subport for subport in trunk["sub_ports"] if subport["port_id"] != port_id
+        ]
+        return copy.deepcopy(trunk)
+
+    def delete_trunk(self, _ctx, trunk_id):
+        self.log.append(("delete_trunk", trunk_id))
+        del self.trunks[trunk_id]
+
+    def vlans(self, trunk_id):
+        """Return {port_id: VLAN} for the trunk's subports."""
+        return {
+            subport["port_id"]: subport["segmentation_id"]
+            for subport in self.trunks[trunk_id]["sub_ports"]
+        }
+
+
+@pytest.fixture
+def pair(mocker, wiring, ironic, core_plugin, trunk_plugin, device_id):
+    """Router r1 on an HA pair, against in-memory Neutron ports and trunks."""
+    neutron = _FakeNeutron()
+    for name in ("get_ports", "create_port", "get_port", "delete_port", "get_network"):
+        getattr(core_plugin, name).side_effect = getattr(neutron, name)
+    for name in (
+        "get_trunks",
+        "get_trunk",
+        "create_trunk",
+        "add_subports",
+        "remove_subports",
+        "delete_trunk",
+    ):
+        getattr(trunk_plugin, name).side_effect = getattr(neutron, name)
+    vifs = {}  # parent port -> node it is attached to
+
+    def attach_vif(node, port_id):
+        vifs[port_id] = node.id
+        neutron.ports[port_id].update(
+            {key: value for key, value in _ANNOTATED_PARENT.items() if key != "id"},
+            **{"binding:host_id": node.id},
+        )
+
+    ironic.node_by_instance_uuid.return_value = _PRIMARY
+    ironic.secondaries_for_router.return_value = [_SECONDARY]
+    ironic.node_vif_ids.side_effect = lambda node: [
+        port_id for port_id, node_id in vifs.items() if node_id == node.id
+    ]
+    ironic.attach_vif_to_node.side_effect = attach_vif
+    ironic.detach_vif_from_node.side_effect = lambda _node, port_id: vifs.pop(port_id)
+    ironic.port_for_vif.side_effect = lambda _node, vif: (
+        _OUTSIDE_NIC if "-outside" in vif else _INSIDE_NIC
+    )
+    ironic.node_ports.return_value = [_OUTSIDE_NIC, _INSIDE_NIC]
+    mocker.patch.object(
+        palo_alto_wiring.utils,
+        "allowed_tenant_vlan_id_ranges",
+        return_value=[(1, 1799)],
+    )
+    mocker.patch.object(wiring, "_tag_plugin")
+    return SimpleNamespace(neutron=neutron, vifs=vifs)
+
+
+class TestHaPairWiring:
+    def test_the_gateway_is_wired_on_both_units(self, wiring, pair, device_id):
+        wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
+
+        neutron = pair.neutron
+        assert pair.vifs == {
+            "palo-alto-router-anchor-r1-outside": "node-pri",
+            "palo-alto-router-anchor-r1-outside-secondary": "node-sec",
+        }
+        mirror = neutron.ports[_MIRROR_GW]
+        assert mirror["network_id"] == "ext-net"
+        assert mirror["fixed_ips"] == []
+        assert mirror["device_id"] == ""
+        assert mirror["allowed_address_pairs"] == [{"ip_address": "203.0.113.10"}]
+        # The same VLAN on both units' trunks.
+        assert neutron.vlans("palo-alto-router-trunk-r1-outside") == {"gw-1": 200}
+        assert neutron.vlans("palo-alto-router-trunk-r1-outside-secondary") == {
+            _MIRROR_GW: 200
+        }
+        # Only the router's own port has a device_id to clear for the add.
+        device_id.clear.assert_called_once_with("gw-1")
+
+    def test_a_subnet_gets_a_vlan_free_on_both_trunks(self, wiring, pair):
+        wiring.attach_port("r1", dict(_HA_INTERFACE), "interface")
+        neutron = pair.neutron
+        primary = "palo-alto-router-trunk-r1-inside"
+        secondary = "palo-alto-router-trunk-r1-inside-secondary"
+        # Make the trunks disagree: 202 is taken on one, 203 on the other.
+        for trunk_id, vlan in ((primary, 202), (secondary, 203)):
+            neutron.trunks[trunk_id]["sub_ports"].append(
+                {
+                    "port_id": "other",
+                    "segmentation_type": "vlan",
+                    "segmentation_id": vlan,
+                }
+            )
+        second = {**_HA_INTERFACE, "id": "intf-2"}
+
+        wiring.attach_port("r1", second, "interface")
+
+        assert neutron.vlans(primary)["intf-2"] == 204
+        assert neutron.vlans(secondary)["palo-alto-router-mirror-r1-intf-2"] == 204
+
+    def test_a_retry_puts_the_mirror_on_the_primarys_vlan(self, wiring, pair):
+        wiring.attach_port("r1", dict(_HA_INTERFACE), "interface")
+        neutron = pair.neutron
+        neutron.trunks["palo-alto-router-trunk-r1-inside"]["sub_ports"][0][
+            "segmentation_id"
+        ] = 250
+        neutron.trunks["palo-alto-router-trunk-r1-inside-secondary"]["sub_ports"] = []
+
+        wiring.attach_port("r1", dict(_HA_INTERFACE), "interface")
+
+        assert neutron.vlans("palo-alto-router-trunk-r1-inside-secondary") == {
+            "palo-alto-router-mirror-r1-intf-1": 250
+        }
+
+    def test_an_ha_primary_without_its_secondary_is_refused(self, wiring, ironic, pair):
+        ironic.secondaries_for_router.return_value = []
+
+        with pytest.raises(
+            palo_alto_wiring.PaloAltoHaSecondaryMissing, match="HA primary node-pri"
+        ):
+            wiring.check_can_attach("r1")
+        with pytest.raises(palo_alto_wiring.PaloAltoHaSecondaryMissing):
+            wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
+        assert pair.neutron.ports == {}
+
+    def test_no_address_pairs_where_port_security_is_off(self, wiring, pair):
+        pair.neutron.port_security = False
+
+        wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
+
+        assert "allowed_address_pairs" not in pair.neutron.ports[_MIRROR_GW]
+
+    def test_cleanup_tears_down_the_secondary_first(self, wiring, pair):
+        wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
+
+        wiring.cleanup_attachment("r1", "gw-1", "gateway")
+
+        assert pair.neutron.log == [
+            (
+                "remove_subport",
+                "palo-alto-router-trunk-r1-outside-secondary",
+                _MIRROR_GW,
+            ),
+            ("delete_trunk", "palo-alto-router-trunk-r1-outside-secondary"),
+            ("delete_port", "palo-alto-router-anchor-r1-outside-secondary"),
+            ("delete_port", _MIRROR_GW),
+            ("remove_subport", "palo-alto-router-trunk-r1-outside", "gw-1"),
+            ("delete_trunk", "palo-alto-router-trunk-r1-outside"),
+            ("delete_port", "palo-alto-router-anchor-r1-outside"),
+        ]
+        assert pair.vifs == {}
+        assert pair.neutron.ports == {}
+
+    def test_a_failed_secondary_attach_undoes_both_units(
+        self, wiring, pair, trunk_plugin
+    ):
+        snapshot = wiring.snapshot_attachment("r1", "gw-1", "gateway")
+        add = pair.neutron.add_subports
+
+        def fail_on_the_secondary(ctx, trunk_id, body):
+            if trunk_id.endswith("-secondary"):
+                raise RuntimeError("secondary subport failed")
+            return add(ctx, trunk_id, body)
+
+        trunk_plugin.add_subports.side_effect = fail_on_the_secondary
+
+        with pytest.raises(RuntimeError, match="secondary subport failed"):
+            wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
+        wiring.undo_attachment(snapshot)
+
+        assert pair.neutron.ports == {}
+        assert pair.neutron.trunks == {}
+        assert pair.vifs == {}

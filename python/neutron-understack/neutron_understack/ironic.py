@@ -63,6 +63,12 @@ def uses_port_roles(node) -> bool:
     return isinstance(traits, list) and ROLE_ATTACH_TRAIT in traits
 
 
+def is_ha_primary(node) -> bool:
+    """Return True if the node is the primary unit of an HA pair."""
+    traits = getattr(node, "traits", None)
+    return isinstance(traits, list) and _HA_PRIMARY_TRAIT in traits
+
+
 def _extra(node: BaremetalNode) -> dict:
     """Return the node's extra, or {} if it is unset or not a dict."""
     return node.extra if isinstance(node.extra, dict) else {}
