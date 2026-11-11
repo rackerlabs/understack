@@ -3,13 +3,18 @@ on:
   workflow_dispatch:
 jobs:
   launchpad-diagnostics:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     strategy:
       fail-fast: false
       matrix:
         dns: [public]
     steps:
+      - name: Runner connectivity
+        run: |
+          env | cut -d= -f1 | rg -i proxy || true
+          curl -4 -v --connect-timeout 10 --max-time 20 https://api.launchpad.net/1.0/ -o /dev/null || true
+          curl -4 -v --connect-timeout 10 --max-time 20 https://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu/dists/noble/Release -o /dev/null || true
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
         with:
           buildkitd-config-inline: |
