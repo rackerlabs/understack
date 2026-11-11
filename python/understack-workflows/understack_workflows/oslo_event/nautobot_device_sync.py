@@ -45,16 +45,26 @@ class InvalidRackPositionError(ValueError):
     """Raised when an explicit rack position cannot be applied safely."""
 
 
-def _is_netdev_appliance(node) -> bool:
-    """Check if node is a network appliance (netdev driver).
+def _is_network_appliance(node) -> bool:
+    """Check if node is a network appliance (non-server hardware).
 
     Network appliances (firewalls, load balancers, network security devices)
-    use the netdev driver and require different handling than servers:
-    - No hardware inventory (no inspection process yet for most)
+    have specialized drivers and require different handling than servers:
+    - No hardware inventory (no inspection process for network devices)
     - Manufacturer/model come from node properties, not inventory
     - Device role determined by device type (firewall, load balancer, etc.)
+
+    Currently supported drivers:
+    - panos: Palo Alto firewalls
+
+    Future drivers may include:
+    - f5: F5 load balancers
+    - netdev: Generic network devices
     """
-    return getattr(node, "driver", None) == "netdev"
+    driver = getattr(node, "driver", None)
+    # List of network appliance drivers (non-servers without hardware inventory)
+    # Example expansion: return driver in ("panos", "f5", "netdev")
+    return driver in ("panos",)
 
 
 def _determine_device_role(node) -> str:
@@ -67,7 +77,7 @@ def _determine_device_role(node) -> str:
     - rubrik-* resource_class → 'backup appliance' (future)
     Default to 'firewall' for netdev if can't determine
     """
-    if not _is_netdev_appliance(node):
+    if not _is_network_appliance(node):
         return "server"
 
     # Try to determine from properties.model
@@ -521,7 +531,7 @@ def fetch_node_details(
     try:
         inventory = ironic_client.get_node_inventory(node_ident=node_uuid)
     except ironic_exceptions.NotFound:
-        if _is_netdev_appliance(node):
+        if _is_network_appliance(node):
             logger.debug(
                 "[node:%s] No inventory for netdev appliance (expected)", node_uuid
             )
@@ -537,8 +547,20 @@ def fetch_node_details(
     _populate_from_node(device_info, node)
 
     # Use different population method based on device type
-    if _is_netdev_appliance(node):
+    if _is_network_appliance(node):
+        logger.info(
+            "[node:%s] Populating netdev device from properties: vendor=%s, model=%s",
+            node_uuid,
+            node.properties.get("vendor") if node.properties else None,
+            node.properties.get("model") if node.properties else None,
+        )
         _populate_from_netdev_properties(device_info, node)
+        logger.info(
+            "[node:%s] After populate: manufacturer=%s, model=%s",
+            node_uuid,
+            device_info.manufacturer,
+            device_info.model,
+        )
     else:
         _populate_from_inventory(device_info, inventory)
 
@@ -560,6 +582,14 @@ def _create_nautobot_device(device_info: DeviceInfo, nautobot_client: Nautobot):
     """
     if not device_info.location_id:
         raise ValueError(f"Cannot create device {device_info.uuid} without location")
+
+    logger.info(
+        "[node:%s] Creating Nautobot device: manufacturer=%s, model=%s, role=%s",
+        device_info.uuid,
+        device_info.manufacturer,
+        device_info.model,
+        device_info.role,
+    )
 
     # Only mandatory fields for creation
     device_attrs = {
