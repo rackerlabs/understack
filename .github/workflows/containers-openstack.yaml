@@ -4,11 +4,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  ironic:
+  openstack:
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - keystone
+          - octavia
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
-      container_name: ironic
-      dockerfile_path: containers/ironic/Dockerfile
+      container_name: ${{ matrix.project }}
+      dockerfile_path: containers/${{ matrix.project }}/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
+      latest_name: "v0.8.6"
+
+  ansible:
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: ansible
+      dockerfile_path: containers/ansible/Dockerfile
+      target: prod
       latest_name: "v0.8.6"
