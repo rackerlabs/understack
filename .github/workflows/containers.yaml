@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dns: [default, public]
+        dns: [public]
     steps:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
         with:
@@ -17,7 +17,7 @@ jobs:
             nameservers = ${{ matrix.dns == 'public' && '["1.1.1.1", "8.8.8.8"]' || '["168.63.129.16"]' }}
       - name: Probe DNS and Launchpad
         run: |
-          docker buildx build --progress=plain - <<'EOF'
+          docker buildx build --network=host --allow=network.host --progress=plain - <<'EOF'
           FROM curlimages/curl:latest
           RUN cat /etc/resolv.conf
           RUN curl -4 -v --connect-timeout 15 --max-time 20 https://api.launchpad.net/1.0/ || true
