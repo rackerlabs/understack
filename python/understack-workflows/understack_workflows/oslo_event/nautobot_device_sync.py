@@ -45,18 +45,26 @@ class InvalidRackPositionError(ValueError):
     """Raised when an explicit rack position cannot be applied safely."""
 
 
-def _is_netdev_appliance(node) -> bool:
-    """Check if node is a network appliance (panos driver).
+def _is_network_appliance(node) -> bool:
+    """Check if node is a network appliance (non-server hardware).
 
     Network appliances (firewalls, load balancers, network security devices)
-    use the panos driver and require different handling than servers:
+    have specialized drivers and require different handling than servers:
     - No hardware inventory (no inspection process for network devices)
     - Manufacturer/model come from node properties, not inventory
     - Device role determined by device type (firewall, load balancer, etc.)
 
-    Note: 'netdev' driver is reserved for future use with other network appliances.
+    Currently supported drivers:
+    - panos: Palo Alto firewalls
+
+    Future drivers may include:
+    - f5: F5 load balancers
+    - netdev: Generic network devices
     """
-    return getattr(node, "driver", None) == "panos"
+    driver = getattr(node, "driver", None)
+    # List of network appliance drivers (non-servers without hardware inventory)
+    # Example expansion: return driver in ("panos", "f5", "netdev")
+    return driver in ("panos",)
 
 
 def _determine_device_role(node) -> str:
@@ -69,7 +77,7 @@ def _determine_device_role(node) -> str:
     - rubrik-* resource_class → 'backup appliance' (future)
     Default to 'firewall' for netdev if can't determine
     """
-    if not _is_netdev_appliance(node):
+    if not _is_network_appliance(node):
         return "server"
 
     # Try to determine from properties.model
@@ -523,7 +531,7 @@ def fetch_node_details(
     try:
         inventory = ironic_client.get_node_inventory(node_ident=node_uuid)
     except ironic_exceptions.NotFound:
-        if _is_netdev_appliance(node):
+        if _is_network_appliance(node):
             logger.debug(
                 "[node:%s] No inventory for netdev appliance (expected)", node_uuid
             )
@@ -539,7 +547,7 @@ def fetch_node_details(
     _populate_from_node(device_info, node)
 
     # Use different population method based on device type
-    if _is_netdev_appliance(node):
+    if _is_network_appliance(node):
         logger.info(
             "[node:%s] Populating netdev device from properties: vendor=%s, model=%s",
             node_uuid,
