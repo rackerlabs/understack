@@ -16,3 +16,5 @@ jobs:
         echo 'Runner DNS diagnostics'
         cat /etc/resolv.conf
         getent ahostsv4 archive.ubuntu.com security.ubuntu.com github.com pkgs.k8s.io || true
+        dig @1.1.1.1 archive.ubuntu.com +time=3 +tries=1
+        dig @1.1.1.1 security.ubuntu.com +time=3 +tries=1
