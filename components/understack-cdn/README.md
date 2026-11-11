@@ -29,6 +29,31 @@ KEY_ID=`kubectl -n understack-cdn get secrets firmware-images -o jsonpath='{.dat
 KEY=`kubectl -n understack-cdn get secrets firmware-images -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d`
 ```
 
+### Using AWS CLI
+
+Create a port-forward to the object store in the cluster:
+
+``` sh
+kubectl -n rook-ceph port-forward service/rook-ceph-rgw-ceph-objectstore 18082:80
+```
+
+Set AWS CLI settings using credentials from the cluster:
+
+``` sh
+export AWS_ACCESS_KEY_ID=$(kubectl -n understack-cdn get secret firmware-images -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
+export AWS_SECRET_ACCESS_KEY=$(kubectl -n understack-cdn get secret firmware-images -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
+export AWS_ENDPOINT_URL=http://localhost:18082   # AWS CLI v2.13+
+export AWS_DEFAULT_REGION=us-east-1   # RGW ignores it, but the CLI wants one
+```
+
+Upload a file:
+
+``` sh
+aws s3 cp BIOS_MG8D3_WN64_1.8.26.EXE s3://firmware-images/DELL/XE7745/ --acl public-read
+```
+
+### Using minio CLI mc
+
 I was able to manage the bucket using the minio CLI client called "mc".
 
 ``` sh
