@@ -1,41 +1,26 @@
 name: Build non-OpenStack containers
-
 on:
   workflow_dispatch:
-
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        container:
-          - name: dnsmasq
-            target: prod
-          - name: ironic-nautobot-client
-            target: prod
-          - name: understack-tests
-            target: prod
-          - name: ironic-vnc-container
-            target: ''
-            dockerfile_path: ./containers/ironic-vnc-container/Dockerfile
-            context_path: "./containers/ironic-vnc-container/"
-            prebuild_script: ./sync_from_upstream.sh
-            prebuild_script_working_dir: containers/ironic-vnc-container/
-          - name: openstack-sync-operator
-            target: prod
-          - name: nautobot
-            target: prod
-          - name: nautobotop
-            target: ''
-            dockerfile_path: ./go/nautobotop/Dockerfile
-            context_path: "./go/nautobotop/"
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      latest_name: "v0.8.6"
-      container_name: ${{ matrix.container.name }}
-      dockerfile_path: ${{ matrix.container.dockerfile_path || format('containers/{0}/Dockerfile', matrix.container.name) }}
-      target: ${{ matrix.container.target }}
-      context_path: ${{ matrix.container.context_path || '{{defaultContext}}' }}
-      prebuild_script: ${{ matrix.container.prebuild_script }}
-      prebuild_script_working_dir: ${{ matrix.container.prebuild_script_working_dir }}
+  launchpad-diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe Launchpad from runner
+        run: |
+          for host in api.launchpad.net ppa.launchpadcontent.net keyserver.ubuntu.com; do
+            getent ahosts "$host" || true
+            curl -4 -I --connect-timeout 10 --max-time 20 "https://$host" || true
+          done
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+        with:
+          buildkitd-config-inline: |
+            [dns]
+              nameservers = ["1.1.1.1", "8.8.8.8"]
+      - name: Probe Launchpad from builder
+        run: |
+          docker buildx build --progress=plain - <<'EOF'
+          FROM curlimages/curl:latest
+          RUN curl -4 -I --connect-timeout 10 --max-time 20 https://api.launchpad.net || true
+          RUN curl -4 -I --connect-timeout 10 --max-time 20 https://ppa.launchpadcontent.net || true
+          RUN curl -4 -I --connect-timeout 10 --max-time 20 https://keyserver.ubuntu.com || true
+          EOF
