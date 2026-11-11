@@ -336,3 +336,24 @@ class TestConfigGates:
 
         obj._ironic_ref.release_orphan_node.assert_not_called()
         assert obj._orphans_seen == set()
+
+
+class TestHaPairRelease:
+    def test_an_orphaned_secondary_is_released_before_its_primary(
+        self, mocker, reconcile_conf
+    ):
+        # The primary's instance_uuid is the pair's lock, so it goes last. The
+        # IDs sort the other way round, so the order is not an accident.
+        primary = _node(mocker, "a-primary", "r1")
+        secondary = _node(
+            mocker, "z-secondary", None, extra={"understack_router_id": "r1"}
+        )
+        obj = _periodics(mocker, nodes=[primary, secondary])
+
+        obj._reconcile_once()
+        obj._reconcile_once()
+
+        released = [
+            call.args[0] for call in obj._ironic_ref.release_orphan_node.call_args_list
+        ]
+        assert released == ["z-secondary", "a-primary"]

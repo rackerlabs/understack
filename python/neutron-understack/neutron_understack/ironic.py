@@ -38,6 +38,11 @@ _ROUTER_RELEASE_MARKER = "understack_router_release"  # release is in progress
 # enroll-fw sets it on the secondary of an HA pair (understack_workflows
 # firewall.py); change both together.
 _HA_SECONDARY_TRAIT = "CUSTOM_SECONDARY"
+_HA_PRIMARY_TRAIT = "CUSTOM_PRIMARY"
+# PAN-OS inspection sets it once both units confirm the HA pair.
+_HA_OPERATIONAL = "ha_operational"
+# The router ID on an HA secondary: instance_uuid is unique, so the primary has it.
+_ROUTER_LABEL = "understack_router_id"
 # Adoption sets it in instance_info.traits when a port has a role.
 ROLE_ATTACH_TRAIT = "CUSTOM_NETDEV_ROLE_ATTACH"
 _TENANT_VIF_KEY = "tenant_vif_port_id"
@@ -56,6 +61,18 @@ def uses_port_roles(node) -> bool:
         return False
     traits = instance_info.get("traits")
     return isinstance(traits, list) and ROLE_ATTACH_TRAIT in traits
+
+
+def _extra(node: BaremetalNode) -> dict:
+    """Return the node's extra, or {} if it is unset or not a dict."""
+    return node.extra if isinstance(node.extra, dict) else {}
+
+
+def _set_extra_op(node: BaremetalNode, key: str, value) -> dict:
+    """Return a JSON patch op that sets one extra key, even with no extra yet."""
+    if isinstance(node.extra, dict):
+        return {"op": "add", "path": f"/extra/{key}", "value": value}
+    return {"op": "add", "path": "/extra", "value": {key: value}}
 
 
 @dataclass(frozen=True)
@@ -104,8 +121,8 @@ class IronicClient:
         """Return the first available Ironic node with the given resource class.
 
         Select the first matching Palo Alto node, excluding maintenance, HA
-        secondaries, instance associations and pending releases. No ranking is
-        applied.
+        secondaries, instance associations, pending releases and HA primaries
+        without a claimable secondary. No ranking is applied.
         """
         for node in self.irclient.nodes(
             driver=_PANOS_DRIVER,
@@ -115,10 +132,21 @@ class IronicClient:
             details=True,
         ):
             # Already claimed, or reserved by a release still cleaning up.
-            if node.instance_id or _ROUTER_RELEASE_MARKER in (node.extra or {}):
+            if self._is_claimed(node):
                 continue
             # A secondary is only ever claimed with its primary.
             if _HA_SECONDARY_TRAIT in (node.traits or []):
+                continue
+            secondary, problems = self._ha_secondary(node)
+            if problems:
+                LOG.warning(
+                    "Skipping Palo Alto node %s (name=%s, secondary=%s): HA pair "
+                    "can't be claimed: %s",
+                    node.id,
+                    node.name,
+                    secondary.id if secondary else None,
+                    "; ".join(problems),
+                )
                 continue
             LOG.info(
                 "Selected available Palo Alto node %s (name=%s) for resource_class=%s",
@@ -132,6 +160,67 @@ class IronicClient:
             resource_class,
         )
         return None
+
+    @staticmethod
+    def _is_claimed(node: BaremetalNode) -> bool:
+        """Return True if a router holds the node, or a release is pending."""
+        extra = _extra(node)
+        return bool(
+            node.instance_id
+            or _ROUTER_RELEASE_MARKER in extra
+            or _ROUTER_LABEL in extra
+        )
+
+    def _ha_secondary(
+        self, node: BaremetalNode
+    ) -> tuple[BaremetalNode | None, list[str]]:
+        """Return a candidate's HA secondary, and why the pair can't be claimed.
+
+        A node with no HA role and no child is a standalone firewall.
+        """
+        # parent_node alone: with include_children, Ironic ignores the filter.
+        children = list(self.irclient.nodes(parent_node=node.id, details=True))
+        is_primary = _HA_PRIMARY_TRAIT in (node.traits or [])
+        if not children and not is_primary:
+            return None, []
+        if len(children) != 1:
+            return None, [f"{len(children)} secondaries, expected one"]
+        secondary = children[0]
+        checks = [
+            (not is_primary, f"no {_HA_PRIMARY_TRAIT} trait"),
+            (
+                _HA_SECONDARY_TRAIT not in (secondary.traits or []),
+                f"secondary has no {_HA_SECONDARY_TRAIT} trait",
+            ),
+            (
+                secondary.provision_state != _STATE_AVAILABLE,
+                f"secondary is {secondary.provision_state}",
+            ),
+            (secondary.is_maintenance, "secondary is in maintenance"),
+            (
+                secondary.resource_class != node.resource_class,
+                f"secondary is resource class {secondary.resource_class}",
+            ),
+            (self._is_claimed(secondary), "secondary is already claimed"),
+            (
+                any(
+                    _extra(unit).get(_HA_OPERATIONAL) is not True
+                    for unit in (node, secondary)
+                ),
+                f"HA not confirmed on both units ({_HA_OPERATIONAL})",
+            ),
+        ]
+        return secondary, [reason for failed, reason in checks if failed]
+
+    def secondaries_for_router(self, router_id: str) -> list[BaremetalNode]:
+        """Return the nodes labelled as the router's HA secondary."""
+        return [
+            node
+            for node in self.irclient.nodes(
+                driver=_PANOS_DRIVER, include_children=True, details=True
+            )
+            if _extra(node).get(_ROUTER_LABEL) == router_id
+        ]
 
     def node_by_instance_uuid(self, instance_uuid: str) -> BaremetalNode | None:
         """Return the node currently adopted for the given instance UUID."""
@@ -151,6 +240,7 @@ class IronicClient:
             for node in self.irclient.nodes(
                 driver=_PANOS_DRIVER,
                 is_maintenance=False,
+                include_children=True,
                 details=True,
             )
             if self._is_router_reconcile_candidate(node)
@@ -161,7 +251,12 @@ class IronicClient:
         extra = node.extra or {}
         if not isinstance(extra, dict):
             return False
-        return bool(node.instance_id) or _ROUTER_RELEASE_MARKER in extra
+        return IronicClient._is_claimed(node)
+
+    @staticmethod
+    def holds_router_label(node: BaremetalNode) -> bool:
+        """Return True for an HA secondary claimed by a router."""
+        return _ROUTER_LABEL in _extra(node)
 
     @staticmethod
     def router_id_for_release(node: BaremetalNode) -> str | None:
@@ -170,11 +265,12 @@ class IronicClient:
         if not isinstance(extra, dict):
             return None
         identities = []
-        marker = extra.get(_ROUTER_RELEASE_MARKER)
-        if _ROUTER_RELEASE_MARKER in extra:
-            if not isinstance(marker, str) or not marker:
-                return None
-            identities.append(marker)
+        for key in (_ROUTER_RELEASE_MARKER, _ROUTER_LABEL):
+            if key in extra:
+                value = extra[key]
+                if not isinstance(value, str) or not value:
+                    return None
+                identities.append(value)
         instance_id = node.instance_id
         if instance_id:
             if not isinstance(instance_id, str):
@@ -226,12 +322,56 @@ class IronicClient:
         router_id: str,
         router_name: str,
     ) -> None:
-        """Adopt a node and bind it to the owning project and router.
+        """Adopt a node for the router, and its HA secondary if it has one.
+
+        The primary goes first: its ``instance_uuid`` locks the pair. If the
+        secondary can't be claimed, the primary is returned to the pool too.
+        """
+        primary = (
+            node if isinstance(node, BaremetalNode) else self.irclient.get_node(node)
+        )
+        secondary, problems = self._ha_secondary(primary)
+        if problems:
+            raise RuntimeError(
+                f"HA pair of node {primary.id} can't be claimed: " + "; ".join(problems)
+            )
+        claim = {
+            "project_id": project_id,
+            "router_id": router_id,
+            "router_name": router_name,
+        }
+        self._adopt_one(node, **claim)
+        if secondary is None:
+            return
+        try:
+            self._adopt_one(secondary, **claim, as_secondary=True)
+        except Exception:
+            LOG.warning(
+                "Claiming secondary %s for router %s failed; returning its "
+                "primary %s to the pool",
+                secondary.id,
+                router_id,
+                primary.id,
+            )
+            self._return_node_to_available(primary.id, router_id)
+            raise
+
+    def _adopt_one(
+        self,
+        node: str | BaremetalNode,
+        *,
+        project_id: str,
+        router_id: str,
+        router_name: str,
+        as_secondary: bool = False,
+    ) -> None:
+        """Adopt one node and bind it to the owning project and router.
 
         Drives available -> manageable -> active via the Ironic ``adopt`` verb,
         stamping ``lessee`` (owning project), ``instance_uuid`` (router UUID) and
         ``instance_name`` (router name). ``instance_name`` is a distinct field
         from the node's own ``name``, so the node's enrollment name is preserved.
+        An HA secondary gets the router UUID in ``extra`` instead.
 
         Identity is stamped after manage; earlier failures need manual recovery.
         Concurrent claims remain a separate concern.
@@ -262,9 +402,10 @@ class IronicClient:
             # the node was claimed by another router concurrently; it is terminal,
             # not a transient lock, so do not retry it.
             LOG.info(
-                "Stamping node %s: lessee=%s instance_uuid=%s instance_name=%s",
+                "Stamping node %s: lessee=%s %s=%s instance_name=%s",
                 node_id,
                 project_id,
+                f"extra.{_ROUTER_LABEL}" if as_secondary else "instance_uuid",
                 router_id,
                 router_name,
             )
@@ -280,7 +421,12 @@ class IronicClient:
                     role_instance_info["traits"],
                 )
                 stamp["instance_info"] = role_instance_info
-            self.irclient.update_node(node, retry_on_conflict=False, **stamp)
+            if as_secondary:
+                # instance_uuid is unique in Ironic: the router ID goes in extra.
+                del stamp["instance_id"]
+                self._stamp_secondary(node, router_id, stamp)
+            else:
+                self.irclient.update_node(node, retry_on_conflict=False, **stamp)
             LOG.info("Node %s: adopt (manageable -> active)", node_id)
             # Use wait=False: the SDK waits for available after adopt, not active.
             # https://review.opendev.org/c/openstack/openstacksdk/+/999686
@@ -306,6 +452,18 @@ class IronicClient:
             adopted.instance_id,
             adopted.instance_name,
         )
+
+    def _stamp_secondary(
+        self, node: str | BaremetalNode, router_id: str, fields: dict
+    ) -> None:
+        """Write a secondary's claim, label included, in one patch."""
+        current = self.irclient.get_node(node)
+        patch = [
+            {"op": "add", "path": f"/{field}", "value": value}
+            for field, value in fields.items()
+        ]
+        patch.append(_set_extra_op(current, _ROUTER_LABEL, router_id))
+        self.irclient.patch_node(current, patch, retry_on_conflict=False)
 
     def _role_attach_instance_info(self, node: str | BaremetalNode) -> dict | None:
         """Return instance_info whose traits match the node's port roles, or None.
@@ -388,19 +546,7 @@ class IronicClient:
                 return False
 
             if _ROUTER_RELEASE_MARKER not in extra:
-                marker_patch = (
-                    {
-                        "op": "add",
-                        "path": f"/extra/{_ROUTER_RELEASE_MARKER}",
-                        "value": router_id,
-                    }
-                    if isinstance(current.extra, dict)
-                    else {
-                        "op": "add",
-                        "path": "/extra",
-                        "value": {_ROUTER_RELEASE_MARKER: router_id},
-                    }
-                )
+                marker_patch = _set_extra_op(current, _ROUTER_RELEASE_MARKER, router_id)
                 self.irclient.patch_node(
                     current,
                     [marker_patch],
@@ -458,18 +604,24 @@ class IronicClient:
             cleanup_patch.append(
                 {"op": "remove", "path": f"/extra/{_ROUTER_RELEASE_MARKER}"}
             )
+            if _ROUTER_LABEL in _extra(current):
+                cleanup_patch.append(
+                    {"op": "remove", "path": f"/extra/{_ROUTER_LABEL}"}
+                )
             self.irclient.patch_node(
                 current,
                 cleanup_patch,
                 retry_on_conflict=False,
             )
             current = self.irclient.get_node(current.id)
+            extra = _extra(current)
             return (
                 current.provision_state == final_state
                 and not current.instance_id
                 and not current.instance_name
                 and not current.lessee
-                and _ROUTER_RELEASE_MARKER not in (current.extra or {})
+                and _ROUTER_RELEASE_MARKER not in extra
+                and _ROUTER_LABEL not in extra
             )
         except sdk_exc.NotFoundException:
             # A removed Ironic node has nothing left to release.
@@ -504,18 +656,22 @@ class IronicClient:
 
         A fully adopted node is ``active`` and is undeployed (triggering
         cleaning); failed or already manageable nodes are parked in
-        ``manageable`` after ownership cleanup.
+        ``manageable`` after ownership cleanup. An HA secondary goes first: its
+        primary's ``instance_uuid`` locks the pair.
         """
-        node = self.node_by_instance_uuid(router_id)
-        if node is None:
+        primary = self.node_by_instance_uuid(router_id)
+        nodes = self.secondaries_for_router(router_id)
+        if primary is not None:
+            nodes.append(primary)
+        if not nodes:
             return NodeReleaseResult(node=None, released=False)
-        LOG.info(
-            "Releasing node %s bound to router %s (current provision_state=%s)",
-            node.id,
-            router_id,
-            node.provision_state,
-        )
-        return NodeReleaseResult(
-            node=node,
-            released=self._return_node_to_available(node, router_id),
-        )
+        results = []
+        for node in nodes:
+            LOG.info(
+                "Releasing node %s bound to router %s (current provision_state=%s)",
+                node.id,
+                router_id,
+                node.provision_state,
+            )
+            results.append(self._return_node_to_available(node, router_id))
+        return NodeReleaseResult(node=primary or nodes[0], released=all(results))
