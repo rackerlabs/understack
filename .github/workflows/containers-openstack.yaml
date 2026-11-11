@@ -1,65 +1,18 @@
 name: Build OpenStack containers
 
 on:
-  push:
-    tags:
-      - v*
-    branches:
-      - main
-    paths: &triggerpaths
-      - "containers/cinder/**"
-      - "containers/glance/**"
-      - "containers/horizon/**"
-      - "containers/ironic/**"
-      - "containers/keystone/**"
-      - "containers/neutron/**"
-      - "containers/nova/**"
-      - "containers/octavia/**"
-      - "containers/openstack-client/**"
-      - "containers/placement/**"
-      - "containers/skyline/**"
-      - ".github/workflows/containers-openstack.yaml"
-      - ".github/workflows/build-container-reuse.yaml"
-      - "python/**"
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths: *triggerpaths
   workflow_dispatch:
-  merge_group:
-    types: [checks_requested]
 
 jobs:
-  openstack:
-    strategy:
-      matrix:
-        project:
-          - cinder
-          - glance
-          - ironic
-          - keystone
-          - nova
-          - neutron
-          - placement
-          - openstack-client
-          - octavia
+  ironic:
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
-      container_name: ${{ matrix.project }}
-      dockerfile_path: containers/${{ matrix.project }}/Dockerfile
+      container_name: ironic
+      dockerfile_path: containers/ironic/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
       latest_name: "2026.1"
-
-  openstack-2026-2:
-    strategy:
-      matrix:
-        project:
-          - horizon
-          - skyline
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: ${{ matrix.project }}
-      dockerfile_path: containers/${{ matrix.project }}/Dockerfile
-      build_args: OPENSTACK_VERSION=2026.2
-      latest_name: "2026.2"
+      prebuild_script: |
+        echo 'Runner DNS diagnostics'
+        cat /etc/resolv.conf
+        getent ahostsv4 archive.ubuntu.com security.ubuntu.com github.com pkgs.k8s.io || true
