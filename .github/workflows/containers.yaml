@@ -4,23 +4,23 @@ on:
 jobs:
   launchpad-diagnostics:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        dns: [default, public]
     steps:
-      - name: Probe Launchpad from runner
-        run: |
-          for host in api.launchpad.net ppa.launchpadcontent.net keyserver.ubuntu.com; do
-            getent ahosts "$host" || true
-            curl -4 -I --connect-timeout 10 --max-time 20 "https://$host" || true
-          done
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
         with:
           buildkitd-config-inline: |
             [dns]
-              nameservers = ["1.1.1.1", "8.8.8.8"]
-      - name: Probe Launchpad from builder
+            nameservers = ${{ matrix.dns == 'public' && '["1.1.1.1", "8.8.8.8"]' || '["168.63.129.16"]' }}
+      - name: Probe DNS and Launchpad
         run: |
           docker buildx build --progress=plain - <<'EOF'
           FROM curlimages/curl:latest
-          RUN curl -4 -I --connect-timeout 10 --max-time 20 https://api.launchpad.net || true
-          RUN curl -4 -I --connect-timeout 10 --max-time 20 https://ppa.launchpadcontent.net || true
-          RUN curl -4 -I --connect-timeout 10 --max-time 20 https://keyserver.ubuntu.com || true
+          RUN cat /etc/resolv.conf
+          RUN curl -4 -v --connect-timeout 15 --max-time 20 https://api.launchpad.net/1.0/ || true
+          RUN curl -4 -v --connect-timeout 15 --max-time 20 https://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu/dists/noble/Release || true
+          RUN curl -4 -v --connect-timeout 15 --max-time 20 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x0AB215679C571D1C8325275B9BDB3D89CE49EC21' || true
           EOF
