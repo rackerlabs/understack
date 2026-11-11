@@ -2,30 +2,22 @@ name: Build non-OpenStack containers
 on:
   workflow_dispatch:
 jobs:
-  launchpad-diagnostics:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 8
-    strategy:
-      fail-fast: false
-      matrix:
-        dns: [public]
+  retag-vnc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - name: Runner connectivity
-        run: |
-          env | cut -d= -f1 | rg -i proxy || true
-          curl -4 -v --connect-timeout 10 --max-time 20 https://api.launchpad.net/1.0/ -o /dev/null || true
-          curl -4 -v --connect-timeout 10 --max-time 20 https://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu/dists/noble/Release -o /dev/null || true
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
         with:
-          buildkitd-config-inline: |
-            [dns]
-            nameservers = ${{ matrix.dns == 'public' && '["1.1.1.1", "8.8.8.8"]' || '["168.63.129.16"]' }}
-      - name: Probe DNS and Launchpad
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tag unchanged v0.8.5 VNC image as v0.8.6
         run: |
-          docker buildx build --network=host --allow=network.host --progress=plain - <<'EOF'
-          FROM curlimages/curl:latest
-          RUN cat /etc/resolv.conf
-          RUN curl -4 -v --connect-timeout 15 --max-time 20 https://api.launchpad.net/1.0/ || true
-          RUN curl -4 -v --connect-timeout 15 --max-time 20 https://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu/dists/noble/Release || true
-          RUN curl -4 -v --connect-timeout 15 --max-time 20 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x0AB215679C571D1C8325275B9BDB3D89CE49EC21' || true
-          EOF
+          docker buildx imagetools create --prefer-index=false \
+            --tag ghcr.io/rackerlabs/understack/ironic-vnc-container:v0.8.6 \
+            ghcr.io/rackerlabs/understack/ironic-vnc-container@sha256:1cbce0f60ae3a02ec77364fafc65884420027b757c75cd07613059b2dd985831
+          docker buildx imagetools inspect ghcr.io/rackerlabs/understack/ironic-vnc-container:v0.8.6
