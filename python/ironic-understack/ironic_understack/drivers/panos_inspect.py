@@ -210,6 +210,18 @@ def _enable_lldp_discovery(
             vwires_deleted,
         )
 
+    # Delete any existing HA configuration to ensure device is not suspended
+    # (secondary/standby devices have interfaces down which breaks LLDP discovery)
+    try:
+        xpath = (
+            "/config/devices/entry[@name='localhost.localdomain']"
+            "/deviceconfig/high-availability"
+        )
+        client.config("delete", xpath, None)
+        LOG.debug("Deleted existing HA configuration")
+    except panos_api.PanosApiError:
+        pass  # No HA config to delete
+
     # Remove virtual-wire config from all interfaces (no per-interface logs)
     for iface in interfaces:
         with suppress(panos_api.PanosApiError):
