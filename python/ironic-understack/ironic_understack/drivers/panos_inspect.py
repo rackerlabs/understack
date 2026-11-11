@@ -118,26 +118,9 @@ def _discover_and_update_ports(task, client: panos_api.PanosClient) -> None:
     This temporarily enables LLDP on all interfaces, collects neighbors,
     then restores the original configuration.
 
-    LLDP is the source of truth for port connectivity. Any enrolled ports
-    are deleted before LLDP discovery runs.
-
-    Note: This enrolled port deletion can be removed if/when enroll-fw stops
-    accepting ports[] as an enrollment option.
+    LLDP is the source of truth for port connectivity.
     """
     node = task.node
-
-    # Delete all enrolled ports - LLDP discovery is the source of truth
-    # TODO: Remove this block when enroll-fw no longer accepts ports[] option
-    enrolled_port_count = len(task.ports)
-    if enrolled_port_count > 0:
-        LOG.info(
-            "[node:%s] Deleting %d enrolled port(s) - "
-            "LLDP discovery is source of truth",
-            node.uuid,
-            enrolled_port_count,
-        )
-        for port_obj in list(task.ports):
-            port_obj.destroy()
 
     # Get all physical interfaces based on model
     model = node.properties.get("model", "PA-1410")
@@ -594,8 +577,7 @@ def _find_mate_node(task, mate_serial: str):
         # Filter by driver to limit scope; include_children ensures we see child nodes
         nodes = node_obj.Node.list(
             task.context,
-            filters={"driver": "panos"},
-            include_children=True,
+            filters={"driver": "panos", "include_children": True},
         )
 
         for node in nodes:
@@ -983,7 +965,7 @@ def _validate_and_pair_ha(
 
         # Collect mate device's switches from LLDP data
         mate_switches = set()
-        for port_obj in mate.ports:
+        for port_obj in port.Port.list_by_node_id(task.context, mate.id):
             llc = port_obj.local_link_connection or {}
             if hasattr(llc, "get"):
                 switch_info = llc.get("switch_info")

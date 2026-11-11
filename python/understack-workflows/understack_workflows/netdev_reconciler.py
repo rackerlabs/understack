@@ -1,8 +1,6 @@
 import json
 import logging
-import re
 from dataclasses import dataclass
-from dataclasses import replace
 
 from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from ironicclient.common.utils import args_array_to_patch
@@ -34,11 +32,8 @@ REQUIRED_PORT_FIELDS = ("label", "mac", "switch", "intf")
 OPTIONAL_PORT_FIELDS = ("switch_id", "bios_name")
 ALLOWED_PORT_FIELDS = frozenset(REQUIRED_PORT_FIELDS + OPTIONAL_PORT_FIELDS)
 
-# A port's role says which side of a router its NIC carries
-# stored as the ironic port's category (other netdev ports keep "network";
-# extra firewall ports get none)
-# enroll-fw assigns roles from the interface names: see assign_port_roles.
-PORT_ROLES = ("outside", "inside")
+# Every netdev port gets this Ironic port category. Firewall router roles
+# (outside/inside) are set by inspection, not here.
 DEFAULT_PORT_CATEGORY = "network"
 
 
@@ -53,8 +48,6 @@ class NetdevPort:
     # Ironic port's extra.bios_name. The Nautobot device sync uses it to name
     # the interface. Defaults to the label when not supplied.
     bios_name: str | None = None
-    # enroll-fw sets the role here, or None.
-    category: str | None = DEFAULT_PORT_CATEGORY
 
 
 def _has_cmdb_id(external_cmdb_id: int | str | None) -> bool:
@@ -146,34 +139,6 @@ def build_netdev_ports(ports: list[dict]) -> list[NetdevPort]:
     return result
 
 
-def _interface_sort_key(port: NetdevPort) -> tuple:
-    """Order ports by the device's interface name, number by number."""
-    name = port.bios_name or port.label
-    pieces = re.split(r"(\d+)", name)
-    return (
-        tuple((0, int(piece)) if piece.isdigit() else (1, piece) for piece in pieces),
-        port.label,
-    )
-
-
-def assign_port_roles(ports: list[NetdevPort]) -> list[NetdevPort]:
-    """Give a firewall's ports their router roles from the interface names.
-
-    The lowest-numbered interface carries the router's outside (gateway), the
-    next one its inside (subnets), and any others get no category. Fewer than
-    two ports is refused: a firewall needs both.
-    Note: Inspection, once it discovers firewall ports, must apply the same rule.
-    """
-    if len(ports) < len(PORT_ROLES):
-        raise ValueError(
-            "A firewall needs at least two data ports, one outside and one "
-            f"inside; got {len(ports)}"
-        )
-    ordered = sorted(ports, key=_interface_sort_key)
-    roles = dict(zip((port.label for port in ordered), PORT_ROLES, strict=False))
-    return [replace(port, category=roles.get(port.label)) for port in ports]
-
-
 def enroll(
     *,
     name: str,
@@ -181,65 +146,36 @@ def enroll(
     ports: list[dict],
     external_cmdb_id: int | str | None = None,
     resource_class: str | None = DEFAULT_RESOURCE_CLASS,
-    driver: str | None = DEFAULT_DRIVER,
-    driver_info: dict | None = None,
-    extra: dict | None = None,
-    properties: dict | None = None,
-    assign_roles: bool = False,
-    traits: dict[str, bool] | None = None,
-    provide: bool = True,
 ) -> str:
-    """Enroll a netdev node and its ports, then make it available.
-
-    ``assign_roles`` (enroll-fw only) labels ports outside/inside; other netdev
-    devices are left as they were. ``traits`` maps a node trait to whether the
-    node should have it, set before the node is made available.
-    ``provide=False`` (enroll-fw only) leaves the node manageable instead, so
-    the caller can inspect it first.
-    """
+    """Enroll a netdev node and its ports, then make it available."""
     effective_resource_class = resource_class or DEFAULT_RESOURCE_CLASS
-    effective_driver = driver or DEFAULT_DRIVER
     netdev_ports = build_netdev_ports(ports)
-    if assign_roles:
-        netdev_ports = assign_port_roles(netdev_ports)
 
-    # driver_info/extra/properties are generic Ironic node metadata a caller may
-    # want set (e.g. the firewall workflow records management access in
-    # driver_info and vendor/model in properties). They are written inside the
-    # enrollment lifecycle -- at node create, or patched before the node is made
-    # available -- so the node is never allocatable in an under-described state.
-    # external_cmdb_id is folded into extra for convenience.
-    node_driver_info = dict(driver_info or {})
-    node_extra = dict(extra or {})
-    node_properties = dict(properties or {})
+    # external_cmdb_id is recorded in the node's extra. It is written inside
+    # the enrollment lifecycle -- at node create, or patched before the node is
+    # made available -- so the node is never allocatable in an under-described
+    # state.
+    node_extra = {}
     if _has_cmdb_id(external_cmdb_id):
         node_extra["external_cmdb_id"] = external_cmdb_id
 
     logger.info(
         "Starting enroll-netdev workflow name=%s physical_network=%s "
-        "driver=%s resource_class=%s port_count=%s",
+        "resource_class=%s port_count=%s",
         name,
         physical_network,
-        effective_driver,
         effective_resource_class,
         len(netdev_ports),
     )
-    if node_driver_info:
-        logger.info("Recording driver_info=%s on the Ironic node", node_driver_info)
     if node_extra:
         logger.info("Recording extra=%s on the Ironic node", node_extra)
-    if node_properties:
-        logger.info("Recording properties=%s on the Ironic node", node_properties)
 
     client = IronicClient()
     node, created = find_or_create_netdev_node(
         client=client,
         name=name,
         resource_class=effective_resource_class,
-        driver=effective_driver,
-        driver_info=node_driver_info,
         extra=node_extra,
-        properties=node_properties,
     )
 
     node_ports = list(client.list_ports(node.uuid))
@@ -263,8 +199,6 @@ def enroll(
     ]
     pending = [plan for plan in plans if plan is not None]
 
-    if assign_roles:
-        _reject_orphan_role_ports(node, name, node_ports, netdev_ports)
     warn_orphan_ports(node, name, node_ports, netdev_ports)
 
     state = node.provision_state
@@ -275,9 +209,8 @@ def enroll(
     # connectivity changes while a node is available, so this is required for
     # port work. A metadata-only change on an available node (no pending ports)
     # is patched in place below and stays available -- its ports are already
-    # correct, so re-pooling is safe. A caller that inspects before providing
-    # needs the node out of the pool even with no port work.
-    if (pending or not provide) and state == "available":
+    # correct, so re-pooling is safe.
+    if pending and state == "available":
         logger.info(
             "[node:%s] Stepping available -> manageable to apply changes",
             node.uuid,
@@ -295,12 +228,8 @@ def enroll(
             client=client,
             node=node,
             resource_class=effective_resource_class,
-            driver_info=node_driver_info,
             extra=node_extra,
-            properties=node_properties,
         )
-    if traits and update_node_traits(client=client, node=node, traits=traits):
-        metadata_changed = True
 
     if not pending and state == "available":
         if metadata_changed:
@@ -325,10 +254,7 @@ def enroll(
             plan=plan,
         )
 
-    if provide:
-        make_available(node, state)
-    else:
-        make_manageable(node, state)
+    make_available(node, state)
     logger.info(
         "Completed enroll-netdev workflow name=%s node_uuid=%s",
         name,
@@ -358,32 +284,13 @@ def warn_orphan_ports(
             )
 
 
-def _reject_orphan_role_ports(
-    node: Node, node_name: str, node_ports: list, netdev_ports: list[NetdevPort]
-) -> None:
-    """Refuse when a port left out of the request still has a role.
-
-    Its old label would give the router two NICs for one side, and Ironic
-    could pick the stale one.
-    """
-    requested = {f"{node_name}:{port.label}" for port in netdev_ports}
-    for existing in node_ports:
-        category = getattr(existing, "category", None)
-        if existing.name not in requested and category in PORT_ROLES:
-            raise RuntimeError(
-                f"[node:{node.uuid}] Port {existing.name} ({existing.uuid}) is "
-                f"not in the request but still has role {category!r}; delete "
-                "it, or include it in the ports list."
-            )
-
-
 def find_or_create_netdev_node(
     *,
     client: IronicClient,
     name: str,
     resource_class: str,
     driver: str = DEFAULT_DRIVER,
-    driver_info: dict,
+    driver_info: dict | None = None,
     extra: dict,
     properties: dict | None = None,
 ) -> tuple[Node, bool]:
@@ -436,7 +343,7 @@ def update_node_metadata(
     client: IronicClient,
     node: Node,
     resource_class: str,
-    driver_info: dict,
+    driver_info: dict | None = None,
     extra: dict,
     properties: dict | None = None,
 ) -> bool:
@@ -451,7 +358,7 @@ def update_node_metadata(
         updates.append(f"resource_class={resource_class}")
 
     node_driver_info = getattr(node, "driver_info", None) or {}
-    for key, value in driver_info.items():
+    for key, value in (driver_info or {}).items():
         if node_driver_info.get(key) != value:
             updates.append(f"driver_info/{key}={value}")
 
@@ -502,7 +409,7 @@ def create_netdev_node(
     name: str,
     resource_class: str,
     driver: str = DEFAULT_DRIVER,
-    driver_info: dict,
+    driver_info: dict | None = None,
     extra: dict,
     properties: dict | None = None,
 ) -> Node:
@@ -540,14 +447,12 @@ def plan_netdev_port(
     port: NetdevPort,
     existing=None,
     ports_by_mac: dict | None = None,
-    manage_category: bool = True,
 ) -> dict | None:
     """Decide what a single port needs, without mutating anything.
 
     Returns a plan dict describing the action, or None if the port already
     matches the request. Raises on a MAC conflict that would imply an
-    automatic label move/rename. With ``manage_category`` False the port's
-    category is left as it is.
+    automatic label move/rename.
 
     Plan shapes:
       {"kind": "create", "port": NetdevPort}
@@ -601,11 +506,8 @@ def plan_netdev_port(
         patch.append(
             {"op": "add", "path": "/physical_network", "value": physical_network}
         )
-    if manage_category and getattr(existing, "category", None) != port.category:
-        if port.category is None:
-            patch.append({"op": "remove", "path": "/category"})
-        else:
-            patch.append({"op": "add", "path": "/category", "value": port.category})
+    if getattr(existing, "category", None) != DEFAULT_PORT_CATEGORY:
+        patch.append({"op": "add", "path": "/category", "value": DEFAULT_PORT_CATEGORY})
     # Converge extra.bios_name (the device's interface name) so re-runs update
     # it. Replace the whole extra object is unsafe (would drop other keys), so
     # patch the single nested key.
@@ -681,6 +583,7 @@ def create_netdev_port(
     bios_name = port.bios_name or port.label
     port_data = {
         "address": port.mac,
+        "category": DEFAULT_PORT_CATEGORY,
         "extra": {"bios_name": bios_name},
         "local_link_connection": {
             "switch_id": switch_id,
@@ -691,13 +594,10 @@ def create_netdev_port(
         "node_uuid": node.uuid,
         "physical_network": physical_network,
     }
-    if port.category is not None:
-        port_data["category"] = port.category
 
     logger.info(
         "[node:%s] Creating baremetal port name=%s mac=%s "
-        "physical_network=%s switch_id=%s switch_info=%s port_id=%s "
-        "category=%s",
+        "physical_network=%s switch_id=%s switch_info=%s port_id=%s",
         node.uuid,
         port_name,
         port.mac,
@@ -705,7 +605,6 @@ def create_netdev_port(
         switch_id,
         port.switch,
         port.interface,
-        port.category,
     )
     created_port = client.create_port(port_data)
     logger.info(

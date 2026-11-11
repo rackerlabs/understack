@@ -6,11 +6,11 @@ metadata:
     workflows.argoproj.io/title: Enroll a firewall in Ironic
     workflows.argoproj.io/description: |
       Defined in `workflows/argo-events/workflowtemplates/enroll-fw.yaml`.
-      Reuses enroll-netdev for the node/port lifecycle and additionally records
-      firewall management details in driver_info and the HA mate serial in extra.
-      Defaults to the panos hardware type. It always inspects the firewall
-      before making it available: without ports, inspection discovers and
-      labels them; with ports, it must keep their outside and inside roles.
+      Reuses the netdev enrollment engine for the node lifecycle and
+      additionally records firewall management details in driver_info and the
+      HA mate serial in extra. Defaults to the panos hardware type. It always
+      inspects the firewall before making it available: inspection discovers
+      the ports over LLDP and labels their outside and inside roles.
 
       The workflow reads site-specific configuration from the
       `enroll-fw-config` ConfigMap. After enrollment, it runs the templates
@@ -39,10 +39,6 @@ spec:
       - name: name
       # VLAN group in Nautobot, e.g. f20-3-network.
       - name: physical_network
-      # JSON array of ports (same format as enroll-netdev). Leave it as [] to
-      # let inspection discover and label the ports.
-      - name: ports
-        value: "[]"
       - name: external_cmdb_id
         value: ""
       - name: rack
@@ -126,8 +122,6 @@ spec:
           - "{{workflow.parameters.name}}"
           - --physical-network
           - "{{workflow.parameters.physical_network}}"
-          - --ports
-          - "{{workflow.parameters.ports}}"
           - --external-cmdb-id
           - "{{workflow.parameters.external_cmdb_id}}"
           - --resource-class
