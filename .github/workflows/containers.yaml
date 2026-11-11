@@ -1,37 +1,14 @@
 name: Build non-OpenStack containers
 
 on:
-  push:
-    tags:
-      - v*
-    branches:
-      - main
-    paths: &triggerpaths
-      - "ansible/**"
-      - "containers/ansible/**"
-      - "containers/dnsmasq/**"
-      - "containers/ironic-nautobot-client/**"
-      - "containers/ironic-vnc-container/**"
-      - "containers/openstack-sync-operator/**"
-      - "go/nautobotop/**"
-      - "containers/understack-tests/**"
-      - "python/**"
-      - ".github/workflows/containers.yaml"
-      - ".github/workflows/build-container-reuse.yaml"
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths: *triggerpaths
   workflow_dispatch:
-  merge_group:
-    types: [checks_requested]
 
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         container:
-          - name: ansible
-            target: prod
           - name: dnsmasq
             target: prod
           - name: ironic-nautobot-client
@@ -55,6 +32,7 @@ jobs:
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
+      latest_name: "v0.8.6"
       container_name: ${{ matrix.container.name }}
       dockerfile_path: ${{ matrix.container.dockerfile_path || format('containers/{0}/Dockerfile', matrix.container.name) }}
       target: ${{ matrix.container.target }}
