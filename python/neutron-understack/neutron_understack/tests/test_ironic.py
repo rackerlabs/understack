@@ -46,6 +46,18 @@ def _client(mocker):
     return client
 
 
+def _pool(client, candidates, children=None):
+    """Answer the candidate query, and each parent_node (secondary) query."""
+    children = children or {}
+
+    def nodes(**filters):
+        if "parent_node" in filters:
+            return iter(children.get(filters["parent_node"], []))
+        return iter(candidates)
+
+    client.irclient.nodes.side_effect = nodes
+
+
 class _FakeBaremetal:
     def __init__(
         self,
@@ -76,7 +88,7 @@ class _FakeBaremetal:
     def nodes(self, **filters):
         node = self._copy()
         for key, value in filters.items():
-            if key == "details":
+            if key in ("details", "include_children"):
                 continue
             if key == "associated":
                 if bool(node.instance_id) is not value:
@@ -175,6 +187,7 @@ class TestAdoptRollback:
         # parked after clearing ownership.
         client = _client(mocker)
         client.irclient.ports.return_value = []  # read before manage
+        client.irclient.nodes.return_value = iter([])  # no HA secondary
         node = _node(state="available", router_id=None)
         owner = {"understack_router_id": "r"}
         marker = {
@@ -459,7 +472,7 @@ class TestNodeSelection:
         result = client.available_node_for_resource_class("pa1410")
 
         assert result is node
-        _, kwargs = client.irclient.nodes.call_args
+        _, kwargs = client.irclient.nodes.call_args_list[0]
         assert kwargs["driver"] == "panos"
         assert kwargs["resource_class"] == "pa1410"
         assert kwargs["provision_state"] == "available"
@@ -488,20 +501,21 @@ class TestNodeSelection:
         assert client.available_node_for_resource_class("pa1410").id == "n2"
 
     @pytest.mark.parametrize(
-        ("traits", "picked"),
-        [(["CUSTOM_PRIMARY"], "n1"), (["CUSTOM_SECONDARY"], "n2")],
-        ids=["primary", "secondary-skipped"],
+        "traits",
+        [["CUSTOM_PRIMARY"], ["CUSTOM_SECONDARY"]],
+        ids=["primary-without-secondary", "secondary"],
     )
-    def test_never_picks_an_ha_secondary(self, mocker, traits, picked):
+    def test_never_picks_an_ha_secondary_or_half_a_pair(self, mocker, traits):
         client = _client(mocker)
-        client.irclient.nodes.return_value = iter(
+        _pool(
+            client,
             [
                 _node(state="available", router_id=None, traits=traits),
                 _node(node_id="n2", state="available", router_id=None),
-            ]
+            ],
         )
 
-        assert client.available_node_for_resource_class("pa1410").id == picked
+        assert client.available_node_for_resource_class("pa1410").id == "n2"
 
 
 class TestReconcileDiscovery:
@@ -834,3 +848,272 @@ class TestPortForVif:
 
         assert client.port_for_vif(_node("n1"), "port-1") is holder
         assert client.port_for_vif(_node("n1"), "port-2") is None
+
+
+# --- HA pairs: the router claims the primary and its secondary together -----
+
+
+def _ha_pair(**secondary_fields):
+    """An available primary and its secondary (a child node), HA confirmed."""
+    primary = _node(
+        "p1",
+        state="available",
+        router_id=None,
+        lessee=None,
+        instance_name=None,
+        traits=["CUSTOM_PRIMARY"],
+        extra={"ha_operational": True},
+    )
+    secondary = _node(
+        "s1",
+        state="available",
+        router_id=None,
+        lessee=None,
+        instance_name=None,
+        traits=["CUSTOM_SECONDARY"],
+        extra={"ha_operational": True},
+    )
+    primary.resource_class = secondary.resource_class = "pa1410"
+    secondary.parent_node = "p1"
+    for field, value in secondary_fields.items():
+        setattr(secondary, field, value)
+    return primary, secondary
+
+
+class TestHaPairSelection:
+    def test_picks_a_primary_whose_secondary_can_be_claimed(self, mocker):
+        client = _client(mocker)
+        primary, secondary = _ha_pair()
+        _pool(client, [primary], {"p1": [secondary]})
+
+        assert client.available_node_for_resource_class("pa1410") is primary
+        # parent_node alone: with include_children, Ironic ignores it.
+        _, kwargs = client.irclient.nodes.call_args_list[1]
+        assert kwargs == {"parent_node": "p1", "details": True}
+
+    def test_a_standalone_firewall_is_still_picked(self, mocker):
+        client = _client(mocker)
+        standalone = _node(state="available", router_id=None)
+        _pool(client, [standalone])
+
+        assert client.available_node_for_resource_class("pa1410") is standalone
+
+    @pytest.mark.parametrize(
+        "secondary_fields",
+        [
+            {"provision_state": "manageable"},
+            {"is_maintenance": True},
+            {"traits": []},
+            {"resource_class": "pa3410"},
+            {"extra": {"ha_operational": True, "understack_router_id": "r-old"}},
+            {"extra": {"ha_operational": True, "understack_router_release": "r"}},
+            {"instance_id": "r-old"},
+            {"extra": {}},
+        ],
+        ids=[
+            "not-available",
+            "maintenance",
+            "no-secondary-trait",
+            "other-resource-class",
+            "labelled",
+            "release-pending",
+            "claimed",
+            "ha-not-confirmed",
+        ],
+    )
+    def test_skips_a_primary_whose_secondary_cant_be_claimed(
+        self, mocker, secondary_fields
+    ):
+        client = _client(mocker)
+        primary, secondary = _ha_pair(**secondary_fields)
+        standalone = _node("n2", state="available", router_id=None)
+        _pool(client, [primary, standalone], {"p1": [secondary]})
+
+        assert client.available_node_for_resource_class("pa1410") is standalone
+
+    def test_skips_a_primary_whose_own_ha_is_not_confirmed(self, mocker):
+        client = _client(mocker)
+        primary, secondary = _ha_pair()
+        primary.extra = {}
+        _pool(client, [primary], {"p1": [secondary]})
+
+        assert client.available_node_for_resource_class("pa1410") is None
+
+    def test_skips_a_node_with_a_child_but_no_primary_trait(self, mocker):
+        client = _client(mocker)
+        primary, secondary = _ha_pair()
+        primary.traits = []
+        _pool(client, [primary], {"p1": [secondary]})
+
+        assert client.available_node_for_resource_class("pa1410") is None
+
+    def test_skips_a_primary_with_two_secondaries(self, mocker):
+        client = _client(mocker)
+        primary, secondary = _ha_pair()
+        _pool(client, [primary], {"p1": [secondary, secondary]})
+
+        assert client.available_node_for_resource_class("pa1410") is None
+
+
+class _FakeIronic:
+    """Several nodes, and enough of the SDK proxy for whole claim/release flows."""
+
+    def __init__(self, *nodes, fail_adopt=()):
+        self.by_id = {node.id: node for node in nodes}
+        self.fail_adopt = set(fail_adopt)
+        self.undeployed = []
+
+    @staticmethod
+    def _id(node):
+        return node.id if isinstance(node, Node) else node
+
+    def _copy(self, node_id):
+        return Node(**self.by_id[node_id].to_dict())
+
+    def ports(self, **filters):
+        return []
+
+    def get_node(self, node):
+        node_id = self._id(node)
+        return self._copy(node_id) if node_id in self.by_id else None
+
+    def nodes(self, **filters):
+        include_children = filters.pop("include_children", False)
+        filters.pop("details", None)
+        found = []
+        for node in self.by_id.values():
+            hidden = node.parent_node and not include_children
+            if hidden and "parent_node" not in filters:
+                continue
+            if all(getattr(node, key) == value for key, value in filters.items()):
+                found.append(self._copy(node.id))
+        return iter(found)
+
+    def patch_node(self, node, patch, retry_on_conflict=False):
+        target = self.by_id[self._id(node)]
+        for op in patch:
+            path = op["path"]
+            if path.startswith("/extra/"):
+                extra = dict(target.extra or {})
+                key = path.removeprefix("/extra/")
+                if op["op"] == "remove":
+                    extra.pop(key, None)
+                else:
+                    extra[key] = op["value"]
+                target.extra = extra
+            else:
+                field = path.removeprefix("/")
+                setattr(
+                    target,
+                    {"instance_uuid": "instance_id"}.get(field, field),
+                    op["value"],
+                )
+
+    def update_node(self, node, retry_on_conflict=False, **fields):
+        target = self.by_id[self._id(node)]
+        for field, value in fields.items():
+            setattr(target, field, value)
+        return self._copy(target.id)
+
+    def set_node_provision_state(self, node, target_state, wait=True, timeout=None):
+        target = self.by_id[self._id(node)]
+        if target_state == "manage":
+            target.provision_state = "manageable"
+        elif target_state == "adopt":
+            if target.id in self.fail_adopt:
+                target.provision_state = "adopt failed"
+                raise RuntimeError("adopt failed")
+            target.provision_state = "active"
+        elif target_state == "deleted":
+            self.undeployed.append(target.id)
+            target.provision_state = "available"
+            target.instance_id = None
+            target.instance_name = None
+        elif target_state == "provide":
+            target.provision_state = "available"
+        return self._copy(target.id)
+
+    def wait_for_nodes_provision_state(self, nodes, state, timeout=None):
+        node_id = self._id(nodes[0])
+        if self.by_id[node_id].provision_state != state:
+            raise RuntimeError(f"{node_id} did not reach {state}")
+        return [self._copy(node_id)]
+
+
+def _pair_client(**kw):
+    client = IronicClient.__new__(IronicClient)
+    client.irclient = _FakeIronic(*_ha_pair(), **kw)
+    return client
+
+
+def _claim(client, router_id="r-1"):
+    client.adopt_node_for_router(
+        client.irclient.get_node("p1"),
+        project_id="proj",
+        router_id=router_id,
+        router_name="rtr",
+    )
+
+
+class TestHaPairLifecycle:
+    def test_router_claims_the_primary_and_its_secondary(self):
+        client = _pair_client()
+
+        _claim(client)
+
+        primary, secondary = client.irclient.by_id["p1"], client.irclient.by_id["s1"]
+        assert (primary.provision_state, primary.instance_id) == ("active", "r-1")
+        assert primary.lessee == "proj"
+        # instance_uuid is unique in Ironic: the secondary carries a label.
+        assert secondary.provision_state == "active"
+        assert secondary.instance_id is None
+        assert secondary.extra["understack_router_id"] == "r-1"
+        assert (secondary.lessee, secondary.instance_name) == ("proj", "rtr")
+
+    def test_a_failed_secondary_claim_returns_both_to_the_pool(self):
+        client = _pair_client(fail_adopt={"s1"})
+
+        with pytest.raises(RuntimeError, match="adopt failed"):
+            _claim(client)
+
+        primary, secondary = client.irclient.by_id["p1"], client.irclient.by_id["s1"]
+        assert primary.provision_state == "available"
+        assert not primary.instance_id
+        assert not primary.lessee
+        assert primary.extra == {"ha_operational": True}
+        # A failed adoption is parked, as for a single node.
+        assert secondary.provision_state == "manageable"
+        assert not secondary.lessee
+        assert secondary.extra == {"ha_operational": True}
+
+    def test_release_frees_the_secondary_before_the_primary(self):
+        client = _pair_client()
+        _claim(client)
+
+        result = client.release_node_for_router("r-1")
+
+        assert result.released is True
+        assert result.node.id == "p1"
+        assert client.irclient.undeployed == ["s1", "p1"]
+        for node in client.irclient.by_id.values():
+            assert node.provision_state == "available"
+            assert not node.instance_id
+            assert not node.lessee
+            assert node.extra == {"ha_operational": True}
+
+    def test_reconciler_finds_and_releases_an_orphaned_secondary(self):
+        client = _pair_client()
+        _claim(client, router_id="r-gone")
+
+        candidates = {node.id: node for node in client.panos_reconcile_nodes()}
+
+        assert set(candidates) == {"p1", "s1"}
+        assert IronicClient.holds_router_label(candidates["s1"])
+        assert IronicClient.router_id_for_release(candidates["s1"]) == "r-gone"
+        assert client.release_orphan_node("s1", "r-gone") is True
+        assert client.irclient.by_id["s1"].extra == {"ha_operational": True}
+
+    def test_a_label_that_disagrees_with_instance_uuid_is_not_released(self):
+        node = _node(extra={"understack_router_id": "r-other"})
+
+        assert IronicClient.router_id_for_release(node) is None

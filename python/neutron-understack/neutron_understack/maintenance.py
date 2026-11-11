@@ -86,6 +86,7 @@ class NetdevRouterMaintenancePeriodics:
         context = n_context.get_admin_context()
 
         orphans_now = set()
+        secondaries = set()
         for node in self._ironic().panos_reconcile_nodes():
             router_id = IronicClient.router_id_for_release(node)
             if not router_id:
@@ -95,6 +96,8 @@ class NetdevRouterMaintenancePeriodics:
             if l3_obj.Router.objects_exist(context, id=router_id):
                 continue
             orphans_now.add((node.id, router_id))
+            if IronicClient.holds_router_label(node):
+                secondaries.add(node.id)
 
         confirmed = orphans_now & self._orphans_seen
         # Only carry forward what is still orphaned, so a node that got a live
@@ -121,7 +124,10 @@ class NetdevRouterMaintenancePeriodics:
                 router_id,
             )
 
-        for node_id, router_id in sorted(confirmed):
+        # HA secondaries first: the primary's instance_uuid is the pair's lock.
+        for node_id, router_id in sorted(
+            confirmed, key=lambda orphan: (orphan[0] not in secondaries, orphan)
+        ):
             if not self.has_lock:
                 self._orphans_seen.clear()
                 return
