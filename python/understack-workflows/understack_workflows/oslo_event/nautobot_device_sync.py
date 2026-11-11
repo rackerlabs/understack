@@ -46,15 +46,17 @@ class InvalidRackPositionError(ValueError):
 
 
 def _is_netdev_appliance(node) -> bool:
-    """Check if node is a network appliance (netdev driver).
+    """Check if node is a network appliance (panos driver).
 
     Network appliances (firewalls, load balancers, network security devices)
-    use the netdev driver and require different handling than servers:
-    - No hardware inventory (no inspection process yet for most)
+    use the panos driver and require different handling than servers:
+    - No hardware inventory (no inspection process for network devices)
     - Manufacturer/model come from node properties, not inventory
     - Device role determined by device type (firewall, load balancer, etc.)
+
+    Note: 'netdev' driver is reserved for future use with other network appliances.
     """
-    return getattr(node, "driver", None) == "netdev"
+    return getattr(node, "driver", None) == "panos"
 
 
 def _determine_device_role(node) -> str:
@@ -538,7 +540,19 @@ def fetch_node_details(
 
     # Use different population method based on device type
     if _is_netdev_appliance(node):
+        logger.info(
+            "[node:%s] Populating netdev device from properties: vendor=%s, model=%s",
+            node_uuid,
+            node.properties.get("vendor") if node.properties else None,
+            node.properties.get("model") if node.properties else None,
+        )
         _populate_from_netdev_properties(device_info, node)
+        logger.info(
+            "[node:%s] After populate: manufacturer=%s, model=%s",
+            node_uuid,
+            device_info.manufacturer,
+            device_info.model,
+        )
     else:
         _populate_from_inventory(device_info, inventory)
 
@@ -560,6 +574,14 @@ def _create_nautobot_device(device_info: DeviceInfo, nautobot_client: Nautobot):
     """
     if not device_info.location_id:
         raise ValueError(f"Cannot create device {device_info.uuid} without location")
+
+    logger.info(
+        "[node:%s] Creating Nautobot device: manufacturer=%s, model=%s, role=%s",
+        device_info.uuid,
+        device_info.manufacturer,
+        device_info.model,
+        device_info.role,
+    )
 
     # Only mandatory fields for creation
     device_attrs = {
