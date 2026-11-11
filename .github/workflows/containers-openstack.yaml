@@ -11,10 +11,4 @@ jobs:
       container_name: ironic
       dockerfile_path: containers/ironic/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
-      latest_name: "2026.1"
-      prebuild_script: |
-        echo 'Runner DNS diagnostics'
-        cat /etc/resolv.conf
-        getent ahostsv4 archive.ubuntu.com security.ubuntu.com github.com pkgs.k8s.io || true
-        dig @1.1.1.1 archive.ubuntu.com +time=3 +tries=1
-        dig @1.1.1.1 security.ubuntu.com +time=3 +tries=1
+      latest_name: "v0.8.6"

@@ -5,16 +5,6 @@ FROM quay.io/airshipit/venv_builder:${OPENSTACK_VERSION}-ubuntu_noble AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Temporary DNS diagnostics for the isolated Ironic build.
-RUN <<EOF
-id
-ls -l /etc/resolv.conf
-cat /etc/resolv.conf
-cat /etc/nsswitch.conf
-getent ahostsv4 archive.ubuntu.com security.ubuntu.com github.com pkgs.k8s.io || true
-su -s /bin/sh -c 'getent ahostsv4 archive.ubuntu.com security.ubuntu.com github.com pkgs.k8s.io' _apt || true
-EOF
-
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         git \
@@ -72,16 +62,6 @@ wget -qO- https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | gpg --dearmo
 chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' > /etc/apt/sources.list.d/kubernetes.list
 chmod 644 /etc/apt/sources.list.d/kubernetes.list
-EOF
-
-# Temporary DNS diagnostics for the isolated Ironic build.
-RUN <<EOF
-id
-ls -l /etc/resolv.conf
-cat /etc/resolv.conf
-cat /etc/nsswitch.conf
-getent ahostsv4 archive.ubuntu.com security.ubuntu.com github.com pkgs.k8s.io || true
-su -s /bin/sh -c 'getent ahostsv4 archive.ubuntu.com security.ubuntu.com github.com pkgs.k8s.io' _apt || true
 EOF
 
 RUN apt-get update && \
