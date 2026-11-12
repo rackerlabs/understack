@@ -31,10 +31,16 @@ def setup_conf():
                 "1d": "bmc",
             },
         ),
-        cfg.DictOpt(
-            "pci_device_capabilities",
-            help="Dictionary of pci device IDs (xxxx:xxxx) to capability name",
-            default={},
+        cfg.MultiStrOpt(
+            "pci_device_alias",
+            default=[],
+            help=(
+                "An alias for a PCI device identified by "
+                "'vendor_id' and 'product_id' fields. Format: "
+                '{"vendor_id": "1234", "product_id": "5678", '
+                '"name": "pci_dev1"}. Use double quotes for the '
+                "keys and values."
+            ),
         ),
     ]
     cfg.CONF.register_group(grp)
