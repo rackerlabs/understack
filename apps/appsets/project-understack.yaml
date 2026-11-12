@@ -25,6 +25,8 @@ spec:
     server: '*'
   - namespace: 'nautobotop'
     server: '*'
+  - namespace: 'nodedash'
+    server: '*'
   - namespace: 'undersync'
     server: '*'
   - namespace: 'openstack'
