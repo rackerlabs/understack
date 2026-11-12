@@ -13,7 +13,7 @@ spec:
     - alert: QueueHasNoConsumers
       expr: |
           (
-            ((rabbitmq_detailed_queue_consumers{vhost="/", queue=~".*"} == 0) + rabbitmq_detailed_queue_messages) > 0
+            ((rabbitmq_detailed_queue_consumers{queue!~".*_fanout|reply_.*|.*notifications.*"} == 0) + rabbitmq_detailed_queue_messages) > 0
           ) * on (instance) group_left(rabbitmq_cluster) max by (instance, rabbitmq_cluster) (rabbitmq_identity_info)
       for: 10m
       annotations:
