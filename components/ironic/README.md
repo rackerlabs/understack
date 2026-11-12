@@ -55,6 +55,30 @@ helm --namespace openstack \
 
 At this point Ironic will go through some initialization and start up.
 
+## PCI device traits
+
+The `pci-device-trait` inspection hook counts PCI devices that match aliases
+configured in the `[ironic_understack]` section of `ironic.conf`. Each alias is
+a JSON object with `vendor_id`, `product_id`, and `name` fields. In the
+OpenStack-Helm values this is configured as:
+
+```yaml
+conf:
+  ironic:
+    ironic_understack:
+      pci_device_alias:
+        - '{"vendor_id": "1002", "product_id": "75a8", "name": "gpu_amd_mi350p"}'
+```
+
+The option uses the same JSON `MultiStrOpt` format as Ironic's upstream
+`pci_device_alias` option, but remains in the `[ironic_understack]` section.
+The hook normalizes the alias name and adds a custom trait containing the
+number of matching devices. For example, a node with two matching devices from
+the configuration above receives the `CUSTOM_PCI_2_GPU_AMD_MI350P` trait.
+
+On subsequent inspections, the hook replaces traits in the `CUSTOM_PCI_`
+namespace with the current counts while preserving all other node traits.
+
 ## Validating Ironic
 
 You can run an OpenStack client in the cluster to validate it is running correctly.
