@@ -69,6 +69,7 @@ def _make_provider(mocker, flavor_plugin, ironic=None, core_plugin=None):
     # Assigning fills the cached_property cache, so neither lookup runs.
     provider._flavor_plugin = flavor_plugin
     if ironic is not None:
+        ironic.secondaries_for_router.return_value = []  # no HA secondary
         provider._ironic = ironic
     return provider
 
@@ -80,7 +81,9 @@ _OTHER_DRIVER = "neutron_understack.l3_router.vrf.Vrf"
 @pytest.fixture
 def provider(mocker):
     """A provider whose router r1 uses the Palo Alto flavor."""
-    provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
+    provider = _make_provider(
+        mocker, FakeFlavorPlugin(_palo_alto_driver()), ironic=mocker.Mock()
+    )
     provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
     return provider
 
@@ -538,7 +541,10 @@ class TestEventSubscriptions:
     def test_gateway_teardown_runs_before_gateway_port_delete(self, mocker):
         # BEFORE_DELETE is the last point where the gateway port still exists.
         core = mocker.Mock()
-        core.get_ports.return_value = [dict(_GATEWAY_PORT)]
+        # Only the gateway lookup finds a port: there are no parent or mirror ports.
+        core.get_ports.side_effect = lambda _ctx, filters: (
+            [dict(_GATEWAY_PORT)] if "device_owner" in filters else []
+        )
         trunk_plugin = mocker.Mock()
         trunk_plugin.get_trunks.return_value = [
             {
@@ -610,7 +616,7 @@ class TestGatewayCreateHandler:
 
         # The VIF-bound stack exists before the subport is added to its trunk.
         assert calls.mock_calls == [
-            mocker.call.ensure_stack("r1", None),
+            mocker.call.ensure_stack("r1", None, "primary"),
             mocker.call.add_gateway_subport("r1", stack.trunk, {"id": "gw-1"}),
         ]
 
@@ -654,7 +660,7 @@ class TestRouterInterfaceCreateHandler:
 
         # The VIF-bound stack exists before the subport is added to its trunk.
         assert calls.mock_calls == [
-            mocker.call.ensure_stack("r1", None),
+            mocker.call.ensure_stack("r1", None, "primary"),
             mocker.call.add_interface_subport("r1", stack.trunk, dict(_INTERFACE_PORT)),
         ]
 
