@@ -1,0 +1,42 @@
+{{- if eq (include "understack.isEnabled" (list $.Values.global "nodedash")) "true" }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-%s" $.Release.Name "nodedash" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
+spec:
+  destination:
+    namespace: {{ $.Values.global.nodedash.namespace | default "nodedash" }}
+    server: {{ $.Values.cluster_server }}
+  project: understack
+  sources:
+  - chart: nodedash
+    helm:
+      ignoreMissingValueFiles: true
+      releaseName: nodedash
+      valueFiles:
+      - $deploy/{{ include "understack.deploy_path" $ }}/nodedash/values.yaml
+    repoURL: ghcr.io/rackerlabs/charts
+    targetRevision: 0.1.1
+  - path: {{ include "understack.deploy_path" $ }}/nodedash
+    ref: deploy
+    repoURL: {{ include "understack.deploy_url" $ }}
+    targetRevision: {{ include "understack.deploy_ref" $ }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      annotations:
+        argocd.argoproj.io/sync-options: Delete=false
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    - ApplyOutOfSyncOnly=true
+{{- end }}

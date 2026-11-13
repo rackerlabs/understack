@@ -160,6 +160,15 @@ global:
     # @default -- false
     enabled: false
 
+  # -- nodedash: web UI for Ironic bare metal hardware administration
+  nodedash:
+    # -- Enable/disable deploying nodedash
+    # @default -- false
+    enabled: false
+    # -- Namespace to deploy nodedash into
+    # @default -- nodedash
+    namespace: nodedash
+
   # -- OpenEBS
   openebs:
     # -- Enable/disable deploying OpenEBS

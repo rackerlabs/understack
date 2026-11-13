@@ -161,6 +161,7 @@ Components deployed on global clusters:
 | monitoring | `global.monitoring` | Prometheus stack |
 | nautobot | `global.nautobot` | Network source of truth |
 | nautobotop | `global.nautobotop` | Nautobot operator |
+| nodedash | `global.nodedash` | Ironic hardware administration UI |
 | openstack-resource-controller | `global.openstack_resource_controller` | ORC operator |
 | opentelemetry-operator | `global.opentelemetry_operator` | OTel operator |
 | rabbitmq-system | `global.rabbitmq_system` | RabbitMQ operator |
