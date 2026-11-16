@@ -21,7 +21,10 @@ from neutron_understack import config
 from neutron_understack.ironic import IronicClient
 
 LOG = logging.getLogger(__name__)
-RECONCILE_SPACING = 600
+# Two sightings one interval apart must outlast a router create: between
+# stamping the primary and inserting the router row, an HA create waits on
+# Ironic up to three times (primary adopt, secondary manage, secondary adopt).
+RECONCILE_SPACING = 1200
 
 
 class NetdevRouterMaintenancePeriodics:

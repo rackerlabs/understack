@@ -14,6 +14,8 @@ from oslo_config import cfg
 from oslo_config import fixture as config_fixture
 
 from neutron_understack import config as understack_config
+from neutron_understack import ironic
+from neutron_understack.maintenance import RECONCILE_SPACING
 from neutron_understack.maintenance import NetdevRouterMaintenancePeriodics
 
 
@@ -119,6 +121,10 @@ class TestOrphanConfirmation:
 
         obj._ironic_ref.release_orphan_node.assert_not_called()
         assert obj._orphans_seen == {("n1", "r1")}
+
+    def test_sightings_outlast_the_slowest_router_create(self):
+        # See RECONCILE_SPACING: an HA create waits on Ironic up to three times.
+        assert 3 * ironic._PROVISION_TIMEOUT < RECONCILE_SPACING
 
     def test_second_sighting_releases(self, mocker, reconcile_conf):
         obj = _periodics(mocker, nodes=[_node(mocker, "n1", "r1")])
