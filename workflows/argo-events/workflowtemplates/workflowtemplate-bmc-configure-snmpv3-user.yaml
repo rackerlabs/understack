@@ -7,8 +7,9 @@ metadata:
     workflows.argoproj.io/description: |
       Defined in `workflows/argo-events/workflowtemplates/workflowtemplate-bmc-configure-snmpv3-user.yaml`
 
-      Runs the SNMPv3 runbook through Ironic cleaning or servicing. Available
-      nodes temporarily disable automated cleaning and return to available.
+      Runs the SNMPv3 runbook through Ironic cleaning (manageable nodes) or
+      servicing (active nodes). Nodes in other states, including available, fail
+      unchanged; move an available node to manageable first.
 spec:
   entrypoint: run
   serviceAccountName: workflow
