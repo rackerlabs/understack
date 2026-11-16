@@ -36,7 +36,7 @@ spec:
               - key: clouds.yaml
                 path: clouds.yaml
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-2725
         command:
           - configure-snmpv3-user
         args:
