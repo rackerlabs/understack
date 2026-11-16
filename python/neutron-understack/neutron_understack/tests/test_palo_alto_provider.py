@@ -18,6 +18,7 @@ from neutron_lib.db import api as db_api
 from neutron_lib.exceptions import l3 as l3_exc
 from oslo_db import exception as db_exc
 
+from neutron_understack.ironic import NodeNoLongerAvailable
 from neutron_understack.ironic import NodeReleaseResult
 from neutron_understack.l3_router import palo_alto
 from neutron_understack.l3_router import palo_alto_wiring
@@ -250,6 +251,15 @@ def _adopting_plugin():
     )
 
 
+def _claiming_provider(mocker, ironic):
+    """A provider whose anchor network already exists."""
+    core_plugin = mocker.Mock()
+    core_plugin.get_networks.return_value = [{"id": "anchor-net"}]
+    return _make_provider(
+        mocker, _adopting_plugin(), ironic=ironic, core_plugin=core_plugin
+    )
+
+
 class TestRouterCreate:
     """Adoption happens on the cancellable BEFORE_CREATE event.
 
@@ -350,6 +360,32 @@ class TestRouterCreate:
             provider._process_router_create(
                 "router", "before_create", "trigger", FakePayload(_router())
             )
+
+    def test_selects_again_when_another_create_claims_the_node(self, mocker):
+        ironic = mocker.Mock()
+        taken, free = mocker.Mock(id="n1"), mocker.Mock(id="n2")
+        ironic.available_node_for_resource_class.side_effect = [taken, free]
+        ironic.adopt_node_for_router.side_effect = [NodeNoLongerAvailable("n1"), None]
+        provider = _claiming_provider(mocker, ironic)
+
+        provider._process_router_create(
+            "router", "before_create", "trigger", FakePayload(_router())
+        )
+
+        claimed = [c.args[0] for c in ironic.adopt_node_for_router.call_args_list]
+        assert claimed == [taken, free]
+
+    def test_selection_is_bounded_when_nodes_keep_being_taken(self, mocker):
+        ironic = mocker.Mock()
+        ironic.available_node_for_resource_class.return_value = mocker.Mock(id="n1")
+        ironic.adopt_node_for_router.side_effect = NodeNoLongerAvailable("n1")
+        provider = _claiming_provider(mocker, ironic)
+
+        with pytest.raises(palo_alto.NoNetdevNodeAvailable):
+            provider._process_router_create(
+                "router", "before_create", "trigger", FakePayload(_router())
+            )
+        assert ironic.adopt_node_for_router.call_count == palo_alto._CLAIM_ATTEMPTS
 
     def test_skips_non_palo_alto_router(self, mocker):
         ironic = mocker.Mock()

@@ -7,9 +7,11 @@ inject a mock ``irclient`` (the openstacksdk baremetal proxy).
 from types import SimpleNamespace
 
 import pytest
+from openstack import exceptions as sdk_exc
 from openstack.baremetal.v1.node import Node
 
 from neutron_understack.ironic import IronicClient
+from neutron_understack.ironic import NodeNoLongerAvailable
 from neutron_understack.ironic import NodeReleaseResult
 from neutron_understack.ironic import uses_port_roles
 
@@ -955,6 +957,10 @@ class TestHaPairSelection:
         assert client.available_node_for_resource_class("pa1410") is None
 
 
+# States Ironic accepts the manage verb from (that these tests reach).
+_MANAGE_FROM = {"available", "adopt failed", "clean failed"}
+
+
 class _FakeIronic:
     """Several nodes, and enough of the SDK proxy for whole claim/release flows."""
 
@@ -1018,6 +1024,12 @@ class _FakeIronic:
     def set_node_provision_state(self, node, target_state, wait=True, timeout=None):
         target = self.by_id[self._id(node)]
         if target_state == "manage":
+            # Ironic's own refusal, as a losing router create saw it on dev.
+            if target.provision_state not in _MANAGE_FROM:
+                raise sdk_exc.BadRequestException(
+                    f'The requested action "manage" can not be performed on node '
+                    f'"{target.id}" while it is in state "{target.provision_state}".'
+                )
             target.provision_state = "manageable"
         elif target_state == "adopt":
             if target.id in self.fail_adopt:
@@ -1117,3 +1129,78 @@ class TestHaPairLifecycle:
         node = _node(extra={"understack_router_id": "r-other"})
 
         assert IronicClient.router_id_for_release(node) is None
+
+
+class TestConcurrentClaim:
+    """Two router creates select the same node; the second must step aside."""
+
+    def test_a_node_claimed_by_another_router_is_left_alone(self):
+        free = _node(state="available", router_id=None, lessee=None)
+        client = IronicClient.__new__(IronicClient)
+        client.irclient = _FakeIronic(free)
+        selected = client.irclient.get_node("n1")  # both creates selected it
+        client.adopt_node_for_router(
+            "n1", project_id="proj", router_id="r-1", router_name="rtr-1"
+        )
+
+        with pytest.raises(NodeNoLongerAvailable):
+            client.adopt_node_for_router(
+                selected, project_id="proj", router_id="r-2", router_name="rtr-2"
+            )
+
+        node = client.irclient.by_id["n1"]
+        assert (node.provision_state, node.instance_id) == ("active", "r-1")
+        assert node.instance_name == "rtr-1"
+
+    def test_losing_the_secondary_returns_the_primary(self):
+        client = _pair_client()
+        fake = client.irclient
+        set_state = fake.set_node_provision_state
+
+        def secondary_taken_first(node, target_state, **kw):
+            # Someone takes the secondary after the pair check passed.
+            if fake._id(node) == "s1":
+                fake.by_id["s1"].provision_state = "manageable"
+            return set_state(node, target_state, **kw)
+
+        fake.set_node_provision_state = secondary_taken_first
+
+        with pytest.raises(NodeNoLongerAvailable):
+            _claim(client, router_id="r-2")
+
+        primary, secondary = fake.by_id["p1"], fake.by_id["s1"]
+        assert primary.provision_state == "available"
+        assert not primary.instance_id
+        assert not primary.lessee
+        assert secondary.provision_state == "manageable"
+        assert secondary.extra == {"ha_operational": True}
+
+    def test_a_pair_claimed_after_selection_is_left_alone(self):
+        client = _pair_client()
+        selected = client.irclient.get_node("p1")
+        _claim(client, router_id="r-1")
+
+        with pytest.raises(NodeNoLongerAvailable, match="can't be claimed"):
+            client.adopt_node_for_router(
+                selected, project_id="proj", router_id="r-2", router_name="rtr-2"
+            )
+
+        assert client.irclient.by_id["p1"].instance_id == "r-1"
+        assert client.irclient.by_id["s1"].extra["understack_router_id"] == "r-1"
+
+    def test_a_refused_manage_on_a_still_available_node_is_a_real_error(self, mocker):
+        client = _client(mocker)
+        client.irclient.ports.return_value = []
+        client.irclient.nodes.return_value = iter([])  # no HA secondary
+        client.irclient.get_node.return_value = _node(state="available", router_id=None)
+        client.irclient.set_node_provision_state.side_effect = (
+            sdk_exc.BadRequestException("bad request")
+        )
+
+        with pytest.raises(sdk_exc.BadRequestException):
+            client.adopt_node_for_router(
+                _node(state="available", router_id=None),
+                project_id="p",
+                router_id="r",
+                router_name="n",
+            )

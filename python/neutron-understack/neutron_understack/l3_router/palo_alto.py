@@ -17,10 +17,15 @@ from neutron_lib.plugins import constants as plugin_constants
 from neutron_lib.plugins import directory
 
 from neutron_understack.ironic import IronicClient
+from neutron_understack.ironic import NodeNoLongerAvailable
 from neutron_understack.l3_router.palo_alto_wiring import AttachmentSnapshot
 from neutron_understack.l3_router.palo_alto_wiring import PaloAltoWiring
 
 LOG = logging.getLogger(__name__)
+
+# How many times a router create selects a node when other creates keep
+# claiming the selected one first.
+_CLAIM_ATTEMPTS = 3
 
 
 # Conflict -> HTTP 409: the request cannot be satisfied because the hardware
@@ -233,6 +238,7 @@ class PaloAlto(base.L3ServiceProvider):
         flavor, or a failed Ironic transition) raises and is returned to the API
         as a clean error with no router created -- and adopt_node_for_router
         rolls a partially-adopted node back to available, so nothing is stranded.
+        If another create claims the selected node first, select again.
         """
         router = payload.states[0]
         context = payload.context
@@ -240,30 +246,41 @@ class PaloAlto(base.L3ServiceProvider):
             return
 
         resource_class = self._resource_class_for_router(context, router)
-        node = self._ironic.available_node_for_resource_class(resource_class)
-        if node is None:
-            raise NoNetdevNodeAvailable(
-                resource_class=resource_class, router_id=router["id"]
+        for _attempt in range(_CLAIM_ATTEMPTS):
+            node = self._ironic.available_node_for_resource_class(resource_class)
+            if node is None:
+                break
+            # Ensure the shared anchor network first: it is idempotent and meant
+            # to persist, so creating it before adoption never strands a node.
+            self._wiring.ensure_anchor_network()
+            try:
+                self._ironic.adopt_node_for_router(
+                    node,
+                    project_id=router.get("project_id"),
+                    router_id=router["id"],
+                    router_name=router.get("name") or router["id"],
+                )
+            except NodeNoLongerAvailable as exc:
+                LOG.info(
+                    "Ironic node %s is no longer available; selecting again "
+                    "for router %s: %s",
+                    node.id,
+                    router["id"],
+                    exc,
+                )
+                continue
+            LOG.info(
+                "Adopted Ironic node %s for Palo Alto router=%s name=%s "
+                "project=%s resource_class=%s",
+                node.id,
+                router["id"],
+                router.get("name"),
+                router.get("project_id"),
+                resource_class,
             )
-
-        # Ensure the shared anchor network first: it is idempotent and meant to
-        # persist, so creating it before adoption never strands an adopted node.
-        self._wiring.ensure_anchor_network()
-        self._ironic.adopt_node_for_router(
-            node,
-            project_id=router.get("project_id"),
-            router_id=router["id"],
-            router_name=router.get("name") or router["id"],
-        )
-
-        LOG.info(
-            "Adopted Ironic node %s for Palo Alto router=%s name=%s project=%s "
-            "resource_class=%s",
-            node.id,
-            router["id"],
-            router.get("name"),
-            router.get("project_id"),
-            resource_class,
+            return
+        raise NoNetdevNodeAvailable(
+            resource_class=resource_class, router_id=router["id"]
         )
 
     # Use AFTER_DELETE: BEFORE_DELETE precedes the router-in-use check and
