@@ -37,8 +37,27 @@ from openstack_sync.plugins.neutron.segment_ranges.config import TUNNEL_NETWORK_
 
 LOG = logging.getLogger(__name__)
 
-#: Segment ranges already fetched this run, keyed by Neutron name.
-RangeCache = dict[str, Any]
+#: Identity of a range within one credential group: ``(name, project_id)``,
+#: where ``project_id`` is ``None`` for a shared spec.
+RangeKey = tuple[str, str | None]
+
+#: Segment ranges already fetched this run, keyed by :data:`RangeKey`.
+RangeCache = dict[RangeKey, Any]
+
+
+def _cache_key(spec: dict[str, Any]) -> RangeKey:
+    """Return the cache key for *spec*, scoped the same way as its lookup.
+
+    The key must carry every field the Neutron query filters on. An unshared
+    spec is looked up by ``name`` and ``project_id``, so two projects can each
+    hold a range with the same name; keying by name alone would hand one
+    project's range to the other project's CR. A shared spec is looked up by
+    name only, so its key has no project.
+    """
+    name = str(spec["name"])
+    if spec.get("shared", True):
+        return (name, None)
+    return (name, spec.get("project_id"))
 
 
 def _validate_spec(spec: dict[str, Any]) -> None:
@@ -82,16 +101,18 @@ def find_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> Any | None
     hold same-named ranges without colliding. More than one match is ambiguous
     and raises rather than guessing which range to converge.
 
-    The *cache* is populated once per credential group and shared across the
-    group's CRs so each reconcile reuses one listing of Neutron.
+    The *cache* is shared across a credential group's CRs and keyed by
+    :func:`_cache_key`, so a hit always matches the scope the query would have
+    used.
     """
-    name = str(spec["name"])
-    if name in cache:
-        return cache[name]
+    key = _cache_key(spec)
+    if key in cache:
+        return cache[key]
 
+    name, project_id = key
     query: dict[str, Any] = {"name": name}
-    if not spec.get("shared", True) and spec.get("project_id"):
-        query["project_id"] = spec["project_id"]
+    if project_id:
+        query["project_id"] = project_id
 
     matches = [
         segment_range
@@ -105,7 +126,7 @@ def find_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> Any | None
         )
     match = matches[0] if matches else None
     if match is not None:
-        cache[name] = match
+        cache[key] = match
     return match
 
 
@@ -211,7 +232,7 @@ def sync_segment_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> li
             spec["maximum"],
         )
         created = conn.network.create_network_segment_range(**_create_kwargs(spec))
-        cache[name] = created
+        cache[_cache_key(spec)] = created
         LOG.info(
             "Reconciled segment range: %s",
             json.dumps(render_range(created), sort_keys=True),
@@ -239,7 +260,7 @@ def sync_segment_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> li
     updated = conn.network.update_network_segment_range(
         resource_id(existing), **updates
     )
-    cache[name] = updated
+    cache[_cache_key(spec)] = updated
     LOG.info(
         "Reconciled segment range: %s",
         json.dumps(render_range(updated), sort_keys=True),

@@ -40,9 +40,10 @@ class SegmentRangePlugin(SyncPlugin):
         )
 
     def new_cache(self) -> reconcile_module.RangeCache:
-        # Keyed by range name and shared across every CR in one credential
-        # group, so Neutron is listed once and reused by each reconcile in the
-        # group.
+        # Keyed by (name, project_id) -- project_id is None for a shared
+        # range -- and shared across every CR in one credential group, so each
+        # range is looked up once per run without one project's range leaking
+        # into another project's same-named CR.
         return {}
 
     def reconcile(

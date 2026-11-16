@@ -446,3 +446,121 @@ def test_main_uses_the_credentials_named_by_each_cr(monkeypatch, tmp_path):
         assert hook.main() == 0
 
     connect.assert_called_once_with("other-secret", "other-cloud")
+
+
+# ---------------------------------------------------------------------------
+# Same-named unshared ranges in different projects share one credential group
+# ---------------------------------------------------------------------------
+
+
+def _project_resource(name: str, project_id: str) -> SyncResource:
+    return SyncResource(
+        spec={
+            "name": name,
+            "network_type": "vlan",
+            "physical_network": "physnet1",
+            "minimum": 100,
+            "maximum": 200,
+            "shared": False,
+            "project_id": project_id,
+        },
+        name=f"{name}-{project_id}",
+        namespace="openstack",
+        generation=3,
+        secret_name="infrasetup",
+        cloud_name="understack",
+    )
+
+
+def _filtering_conn(ranges: list[Any]) -> Any:
+    """A conn whose range listing honours the name/project_id filters."""
+
+    def list_ranges(**query: Any) -> list[Any]:
+        return [
+            r
+            for r in ranges
+            if all(getattr(r, field) == value for field, value in query.items())
+        ]
+
+    conn = mock.MagicMock()
+    conn.network.network_segment_ranges.side_effect = list_ranges
+    return conn
+
+
+def _run_sync_group(resources: list[SyncResource], conn: Any) -> tuple[int, Any]:
+    plugin = hook.SegmentRangePlugin(_config(status_enabled=True))
+    inputs = SyncPlan(
+        resources_to_reconcile=resources,
+        desired_resources_for_prune=resources,
+        deleted_resources=[],
+        prune_credentials=frozenset(),
+        unreadable_resources=frozenset(),
+    )
+    with (
+        mock.patch(
+            "openstack_sync.hooks.framework.get_openstack_connection",
+            return_value=conn,
+        ),
+        mock.patch(
+            "openstack_sync.hooks.framework.patch_resource_status"
+        ) as patch_status,
+        mock.patch.object(hook, "wait_for_openstack_network"),
+    ):
+        code = hook.run_sync(plugin, inputs)
+    return code, patch_status
+
+
+def test_run_sync_matches_same_named_ranges_to_their_own_projects():
+    """Two projects each own a range named tenant-vlans; both CRs converge.
+
+    Both CRs share one credential group and therefore one cache. Keying that
+    cache by name alone would hand P1's range to P2's CR and fail it with a
+    false project_id drift.
+    """
+    conn = _filtering_conn(
+        [
+            _range("tenant-vlans", id="p1-range", shared=False, project_id="p1"),
+            _range("tenant-vlans", id="p2-range", shared=False, project_id="p2"),
+        ]
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 0
+    statuses = [c.kwargs["sync_status"] for c in patch_status.call_args_list]
+    assert statuses == ["Synced", "Synced"]
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_not_called()
+
+
+def test_run_sync_creates_a_range_for_a_project_that_lacks_one():
+    """P1 already has tenant-vlans; P2's same-named CR creates its own."""
+    conn = _filtering_conn(
+        [_range("tenant-vlans", id="p1-range", shared=False, project_id="p1")]
+    )
+    conn.network.create_network_segment_range.return_value = _range(
+        "tenant-vlans", id="p2-range", shared=False, project_id="p2"
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 0
+    statuses = [c.kwargs["sync_status"] for c in patch_status.call_args_list]
+    assert statuses == ["Synced", "Synced"]
+    conn.network.create_network_segment_range.assert_called_once()
+    create_kwargs = conn.network.create_network_segment_range.call_args.kwargs
+    assert create_kwargs["project_id"] == "p2"
+    assert create_kwargs["shared"] is False
+    conn.network.update_network_segment_range.assert_not_called()
