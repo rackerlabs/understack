@@ -103,6 +103,19 @@ func TestParse_SensorValues(t *testing.T) {
 	if temp.Health == nil || *temp.Health != "OK" {
 		t.Errorf("expected health=OK, got %v", temp.Health)
 	}
+	if temp.Name == nil || *temp.Name != "System Board Inlet Temp" {
+		t.Errorf("expected name=System Board Inlet Temp, got %v", temp.Name)
+	}
+	if temp.UpperThresholdCritical == nil || *temp.UpperThresholdCritical != 37 {
+		t.Errorf("expected upper_threshold_critical=37, got %v", temp.UpperThresholdCritical)
+	}
+	if temp.LowerThresholdCritical == nil || *temp.LowerThresholdCritical != -7 {
+		t.Errorf("expected lower_threshold_critical=-7, got %v", temp.LowerThresholdCritical)
+	}
+	// upper_threshold_fatal is null in the payload → must stay nil
+	if temp.UpperThresholdFatal != nil {
+		t.Errorf("expected nil upper_threshold_fatal, got %v", *temp.UpperThresholdFatal)
+	}
 
 	// power sensor "0:Power@System.Embedded.1" should be 9W
 	power, ok := msg.Sensors.Power["0:Power@System.Embedded.1"]
