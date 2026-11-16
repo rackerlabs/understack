@@ -125,3 +125,133 @@ def test_existing_port_keeps_its_physical_network(
     panos_inspect._update_ports_from_neighbors(task, neighbors, macs)
 
     assert [p.physical_network for p in task.ports] == [expected, expected]
+
+
+def test_switches_for_ports_skips_ports_without_a_switch():
+    ports = [
+        Mock(local_link_connection={"switch_info": "leaf-1"}),
+        Mock(local_link_connection={"switch_info": "leaf-1"}),
+        Mock(local_link_connection={"switch_info": "None"}),
+        Mock(local_link_connection={}),
+        Mock(local_link_connection=None),
+    ]
+
+    assert panos_inspect._switches_for_ports(ports) == {"leaf-1"}
+
+
+@pytest.mark.parametrize(
+    ("hsci_speed", "warns"),
+    [("10G", True), ("25000", False), ("unknown", False)],
+    ids=["slower", "same", "unparsable"],
+)
+def test_warns_only_when_hsci_is_slower_than_data_ports(mocker, hsci_speed, warns):
+    log = mocker.patch.object(panos_inspect, "LOG")
+    ports = [Mock(local_link_connection={"port_speed": "25000"})]
+
+    panos_inspect._warn_if_hsci_slower("n1", ports, {"hsci": {"speed": hsci_speed}})
+
+    assert log.warning.called is warns
+
+
+def _ha_status(serial, conn):
+    return {"peer": {"serial": serial, "conn_status": conn}}
+
+
+def _ha_pair(
+    mocker,
+    task,
+    *,
+    hsci="up",
+    peer=("S2", "up"),
+    mate_peer=("S1", "up"),
+    mate_switch="leaf-2",
+):
+    """A primary, its secondary in Ironic and both devices; returns this device."""
+    task.node.traits = ["CUSTOM_PRIMARY"]
+    task.node.extra = {"serial": "S1", "mate_serial": "S2"}
+    task.node.resource_class = "pa1410"
+    task.ports = [Mock(local_link_connection={"switch_info": "leaf-1"})]
+    mate = Mock(
+        id=2,
+        uuid="mate-uuid",
+        traits=["CUSTOM_SECONDARY"],
+        extra={"serial": "S2", "mate_serial": "S1"},
+        resource_class="pa1410",
+        driver_info={"management_ip": "192.0.2.11"},
+    )
+    mocker.patch("ironic.objects.node.Node.list", return_value=[mate])
+    mocker.patch.object(
+        panos_inspect.port.Port,
+        "list_by_node_id",
+        return_value=[Mock(local_link_connection={"switch_info": mate_switch})],
+    )
+    device = Mock()
+    device.get_ha_interface_status.return_value = {
+        "ha1-a": {"state": "up"},
+        "ha1-b": {"state": "up"},
+        "hsci": {"state": hsci},
+    }
+    device.get_ha_status.return_value = _ha_status(*peer)
+    mate_device = mocker.patch.object(panos_api, "PanosClient").return_value
+    mate_device.get_ha_status.return_value = _ha_status(*mate_peer)
+    return device
+
+
+def _validate_ha(task, device):
+    """Run the real HA checks; return the node they saved."""
+    node = task.node
+    panos_inspect._validate_and_pair_ha(
+        task, device, node, dict(node.extra), "S2", "primary"
+    )
+    node.save.assert_called_once()
+    return node
+
+
+def test_a_healthy_pair_is_operational(mocker, task):
+    device = _ha_pair(mocker, task)
+    task.node.last_error = "stale"
+
+    node = _validate_ha(task, device)
+
+    assert node.extra["ha_operational"] is True
+    assert node.last_error is None
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        ({"peer": ("S2", "down")}, "HA peer connection not up"),
+        ({"peer": ("S9", "up")}, "HA peer serial mismatch"),
+        ({"mate_peer": ("S9", "up")}, "Mate peer serial mismatch"),
+        ({"mate_peer": ("S1", "down")}, "Mate peer connection not up"),
+        ({"mate_switch": "leaf-1"}, "same switch"),
+    ],
+    ids=["peer-down", "wrong-peer", "mate-sees-other", "mate-down", "same-switch"],
+)
+def test_an_unhealthy_pair_is_not_operational(mocker, task, change, reason):
+    device = _ha_pair(mocker, task, **change)
+
+    node = _validate_ha(task, device)
+
+    assert node.extra["ha_operational"] is False
+    assert reason in node.last_error
+
+
+def test_a_local_link_down_never_contacts_the_mate(mocker, task):
+    device = _ha_pair(mocker, task, hsci="down")
+
+    node = _validate_ha(task, device)
+
+    assert node.extra["ha_operational"] is False
+    assert "HA interfaces not all up" in node.last_error
+    panos_api.PanosClient.assert_not_called()
+
+
+def test_a_device_timeout_is_recorded_not_raised(mocker, task):
+    device = _ha_pair(mocker, task)
+    device.get_ha_status.side_effect = requests.Timeout("read timed out")
+
+    node = _validate_ha(task, device)
+
+    assert node.extra["ha_operational"] is False
+    assert node.last_error == "read timed out"

@@ -620,50 +620,6 @@ def _find_mate_node(task, mate_serial: str):
         return None
 
 
-def _validate_mate_compatibility(node, mate) -> tuple[bool, str]:
-    """Verify mate has same model and opposite role trait.
-
-    :returns: (is_valid, error_message)
-    """
-    # 1. Resource class should match (same model)
-    if node.resource_class != mate.resource_class:
-        return (
-            False,
-            f"Resource class mismatch: {node.resource_class} vs "
-            f"{mate.resource_class} - mates must be same model",
-        )
-
-    # 2. Roles should be opposite
-    my_role = _get_ha_role(node)
-    mate_role = _get_ha_role(mate)
-
-    if my_role == mate_role:
-        return (
-            False,
-            f"Both nodes have same role: {my_role} - "
-            "primary must pair with secondary",
-        )
-
-    if my_role not in ("primary", "secondary") or mate_role not in (
-        "primary",
-        "secondary",
-    ):
-        return (False, f"Invalid HA roles: self={my_role}, mate={mate_role}")
-
-    # 3. Check bidirectional mate_serial
-    mate_mate_serial = mate.extra.get("mate_serial")
-    my_serial = node.extra.get("serial")
-
-    if mate_mate_serial != my_serial:
-        return (
-            False,
-            f"Mate serial mismatch: mate expects {mate_mate_serial}, "
-            f"but my serial is {my_serial}",
-        )
-
-    return (True, "")
-
-
 def _calculate_ha_addresses(role: str) -> dict[str, str]:
     """Calculate HA IP addresses based on role.
 
@@ -768,6 +724,57 @@ def _handle_ha_configuration(
     return None
 
 
+def _switches_for_ports(ports) -> set[str]:
+    """Return the switches named in the ports' LLDP data."""
+    switches = set()
+    for port_obj in ports:
+        llc = port_obj.local_link_connection or {}
+        if hasattr(llc, "get"):
+            switch_info = llc.get("switch_info")
+            if switch_info and switch_info != "None":
+                switches.add(switch_info)
+    return switches
+
+
+def _warn_if_hsci_slower(node_uuid: str, ports, ha_iface_status: dict) -> None:
+    """Warn when the HSCI link is slower than the fastest data port."""
+    # Get data plane interface speeds from discovered ports
+    discovered_speeds = []
+    for port_obj in ports:
+        port_info = port_obj.local_link_connection or {}
+        if hasattr(port_info, "get"):
+            speed = port_info.get("port_speed")
+            if speed:
+                with suppress(ValueError, TypeError):
+                    discovered_speeds.append(int(speed))
+
+    if discovered_speeds:
+        max_data_speed = max(discovered_speeds)
+        hsci_speed_str = ha_iface_status.get("hsci", {}).get("speed", "0")
+        try:
+            # Convert speed string like "10000" or "10G" to Mbps
+            if "G" in hsci_speed_str:
+                hsci_speed = int(hsci_speed_str.replace("G", "")) * 1000
+            else:
+                hsci_speed = int(hsci_speed_str)
+
+            if hsci_speed < max_data_speed:
+                LOG.warning(
+                    "[node:%s] HSCI speed (%s Mbps) < data plane (%s Mbps) - "
+                    "may impact HA statefulness",
+                    node_uuid,
+                    hsci_speed,
+                    max_data_speed,
+                )
+                # Don't fail, just warn
+        except (ValueError, TypeError) as e:
+            LOG.debug(
+                "[node:%s] Could not parse interface speeds: %s",
+                node_uuid,
+                e,
+            )
+
+
 def _validate_and_pair_ha(
     task,
     client: panos_api.PanosClient,
@@ -785,7 +792,8 @@ def _validate_and_pair_ha(
     4. Interface speed validation (hsci vs data plane)
     5. Pre-flight compatibility checks (resource_class, roles)
 
-    Sets extra.ha_operational = True only when ALL checks pass.
+    Sets extra.ha_operational = True only when ALL checks pass;
+    otherwise the reason goes in last_error.
     Does NOT modify mate node's extra fields or transition states.
     The enroll-fw workflow will read ha_operational from both devices
     and decide whether to promote.
@@ -808,7 +816,7 @@ def _validate_and_pair_ha(
                 f"ha1-b={ha1_b_state}, hsci={hsci_state}"
             )
             LOG.info("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         LOG.info("[node:%s] HA interfaces operational", node.uuid)
@@ -824,7 +832,7 @@ def _validate_and_pair_ha(
                 f"conn={peer_conn}, peer_serial={peer_serial}"
             )
             LOG.info("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         if peer_serial != mate_serial:
@@ -833,7 +841,7 @@ def _validate_and_pair_ha(
                 f"expected {mate_serial}"
             )
             LOG.warning("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         LOG.info("[node:%s] HA peer connected: %s", node.uuid, peer_serial)
@@ -843,7 +851,7 @@ def _validate_and_pair_ha(
         if not mate:
             reason = f"Mate node {mate_serial} not found in Ironic"
             LOG.info("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         # Step 4: Pre-flight compatibility checks
@@ -858,7 +866,7 @@ def _validate_and_pair_ha(
                 f"my serial is {my_serial}"
             )
             LOG.warning("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         # Check resource class match
@@ -868,7 +876,7 @@ def _validate_and_pair_ha(
                 f"mate={mate.resource_class}"
             )
             LOG.warning("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         # Check opposite HA roles
@@ -877,13 +885,13 @@ def _validate_and_pair_ha(
         if not my_role or not mate_role:
             reason = f"Missing HA roles: self={my_role}, mate={mate_role}"
             LOG.warning("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         if my_role == mate_role:
             reason = f"Same HA role on both devices: {my_role}"
             LOG.warning("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         LOG.info(
@@ -899,7 +907,7 @@ def _validate_and_pair_ha(
         if not mate_address:
             reason = "Mate has no management_ip"
             LOG.warning("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         mate_client = panos_api.PanosClient(mate_address)
@@ -914,75 +922,30 @@ def _validate_and_pair_ha(
                 f"got {mate_peer_serial}, expected {my_serial}"
             )
             LOG.warning("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         if mate_peer_conn != "up":
             reason = f"Mate peer connection not up: {mate_peer_conn}"
             LOG.warning("[node:%s] %s", node.uuid, reason)
-            extra["ha_check_reason"] = reason
+            node.last_error = reason
             return
 
         LOG.info("[node:%s] Bidirectional HA validation passed", node.uuid)
 
         # Step 6: Validate interface speeds (hsci >= data plane)
-        # Get data plane interface speeds from discovered ports
-        discovered_speeds = []
-        for port_obj in task.ports:
-            port_info = port_obj.local_link_connection or {}
-            if hasattr(port_info, "get"):
-                speed = port_info.get("port_speed")
-                if speed:
-                    with suppress(ValueError, TypeError):
-                        discovered_speeds.append(int(speed))
-
-        if discovered_speeds:
-            max_data_speed = max(discovered_speeds)
-            hsci_speed_str = ha_iface_status.get("hsci", {}).get("speed", "0")
-            try:
-                # Convert speed string like "10000" or "10G" to Mbps
-                if "G" in hsci_speed_str:
-                    hsci_speed = int(hsci_speed_str.replace("G", "")) * 1000
-                else:
-                    hsci_speed = int(hsci_speed_str)
-
-                if hsci_speed < max_data_speed:
-                    LOG.warning(
-                        "[node:%s] HSCI speed (%s Mbps) < data plane (%s Mbps) - "
-                        "may impact HA statefulness",
-                        node.uuid,
-                        hsci_speed,
-                        max_data_speed,
-                    )
-                    # Don't fail, just warn
-            except (ValueError, TypeError) as e:
-                LOG.debug(
-                    "[node:%s] Could not parse interface speeds: %s",
-                    node.uuid,
-                    e,
-                )
+        _warn_if_hsci_slower(node.uuid, task.ports, ha_iface_status)
 
         # Step 7: Validate HA pair switch diversity
         # Both devices must connect to different switches (true HA requirement)
         LOG.info("[node:%s] Validating HA pair switch diversity", node.uuid)
 
         # Collect this device's switches from LLDP data
-        my_switches = set()
-        for port_obj in task.ports:
-            llc = port_obj.local_link_connection or {}
-            if hasattr(llc, "get"):
-                switch_info = llc.get("switch_info")
-                if switch_info and switch_info != "None":
-                    my_switches.add(switch_info)
+        my_switches = _switches_for_ports(task.ports)
 
         # Collect mate device's switches from LLDP data
-        mate_switches = set()
-        for port_obj in port.Port.list_by_node_id(task.context, mate.id):
-            llc = port_obj.local_link_connection or {}
-            if hasattr(llc, "get"):
-                switch_info = llc.get("switch_info")
-                if switch_info and switch_info != "None":
-                    mate_switches.add(switch_info)
+        mate_ports = port.Port.list_by_node_id(task.context, mate.id)
+        mate_switches = _switches_for_ports(mate_ports)
 
         # Check for switch overlap (both devices on same switch = not true HA)
         switch_overlap = my_switches & mate_switches
@@ -993,7 +956,7 @@ def _validate_and_pair_ha(
                 "HA pair must be on different switches."
             )
             LOG.error("[node:%s] %s", node.uuid, error_msg)
-            extra["ha_check_reason"] = error_msg
+            node.last_error = error_msg
             raise exception.HardwareInspectionFailure(error_msg)
 
         LOG.info(
@@ -1018,7 +981,7 @@ def _validate_and_pair_ha(
         LOG.info("[node:%s] All HA validation checks passed", node.uuid)
         extra["ha_operational"] = True
         # Clear any previous failure reason
-        extra.pop("ha_check_reason", None)
+        node.last_error = None
 
     except Exception as e:
         LOG.exception(
@@ -1027,7 +990,7 @@ def _validate_and_pair_ha(
             e,
         )
         # Set failure reason for troubleshooting
-        extra["ha_check_reason"] = str(e)
+        node.last_error = str(e)
         # Don't raise - allow inspection to complete even if pairing fails
     finally:
         # Always save ha_operational status (True if all checks passed, False otherwise)
@@ -1038,305 +1001,3 @@ def _validate_and_pair_ha(
             node.uuid,
             extra.get("ha_operational"),
         )
-
-
-def _validate_ha_status(
-    client: panos_api.PanosClient,
-    node_uuid: str,
-    expected_peer_serial: str,
-    role: str,
-) -> tuple[bool, str]:
-    """Validate HA configuration and connectivity after setup.
-
-    Checks:
-    - HA enabled
-    - Peer serial matches expected mate
-    - Peer connection status
-    - HA link status (HA1, HA1-backup)
-    - Local state matches role expectations
-
-    :param client: PanosClient for the device to validate
-    :param node_uuid: Node UUID for logging
-    :param expected_peer_serial: Expected serial number of HA peer
-    :param role: Expected role ('primary' or 'secondary')
-    :returns: (is_valid, error_message) - error_message empty if valid
-    """
-    try:
-        ha_status = client.get_ha_status()
-
-        # Check if query failed
-        if "error" in ha_status:
-            return (False, f"Failed to query HA status: {ha_status['error']}")
-
-        # Check HA enabled
-        if ha_status.get("enabled") != "yes":
-            return (False, "HA not enabled on device")
-
-        # Check peer serial (critical - must match)
-        peer_serial = ha_status.get("peer", {}).get("serial", "unknown")
-        if peer_serial == "unknown":
-            # Peer not discovered yet - could be transient
-            LOG.warning(
-                "[node:%s] Peer not discovered yet, may need more time", node_uuid
-            )
-            return (False, "Peer not discovered yet (HA may still be initializing)")
-
-        if peer_serial != expected_peer_serial:
-            return (
-                False,
-                f"Peer serial mismatch: expected {expected_peer_serial}, "
-                f"got {peer_serial}",
-            )
-
-        # Check peer connection (warn if down, but don't fail - could be cabling)
-        peer_conn = ha_status.get("peer", {}).get("conn_status", "down")
-        if peer_conn != "up":
-            LOG.warning(
-                "[node:%s] Peer connection not up: %s (check physical HA links)",
-                node_uuid,
-                peer_conn,
-            )
-
-        # Check HA link status (warn only - physical cabling may not be complete)
-        conn_ha1_up = ha_status.get("peer", {}).get("conn_ha1_up", False)
-        conn_ha1_backup_up = ha_status.get("peer", {}).get("conn_ha1_backup_up", False)
-
-        if not conn_ha1_up:
-            LOG.warning("[node:%s] HA1 link not up (check ha1-a cabling)", node_uuid)
-
-        if not conn_ha1_backup_up:
-            LOG.warning(
-                "[node:%s] HA1-backup link not up (check ha1-b cabling)", node_uuid
-            )
-
-        # Check local state matches role expectations
-        local_state = ha_status.get("local", {}).get("state", "unknown")
-
-        # Note: States can vary during initialization:
-        # - active, active-primary, active-secondary
-        # - passive, suspended
-        # - initial, tentative
-        if role == "primary":
-            # Primary should eventually become active, but may be in transition
-            if local_state not in [
-                "active",
-                "active-primary",
-                "tentative",
-                "initial",
-            ]:
-                LOG.warning(
-                    "[node:%s] Primary in unexpected state: %s (expected active)",
-                    node_uuid,
-                    local_state,
-                )
-        elif role == "secondary" and local_state not in [
-            "passive",
-            "active-secondary",
-            "tentative",
-            "initial",
-            "suspended",
-        ]:
-            # Secondary should eventually become passive, but may be in transition
-            LOG.warning(
-                "[node:%s] Secondary in unexpected state: %s (expected passive)",
-                node_uuid,
-                local_state,
-            )
-
-        LOG.info(
-            "[node:%s] HA validation passed: peer=%s, state=%s, conn=%s, "
-            "ha1=%s, ha1-backup=%s",
-            node_uuid,
-            peer_serial,
-            local_state,
-            peer_conn,
-            "up" if conn_ha1_up else "down",
-            "up" if conn_ha1_backup_up else "down",
-        )
-
-        return (True, "")
-
-    except Exception as e:
-        return (False, f"Exception during HA validation: {e}")
-
-
-def _validate_ha_interfaces(
-    client: panos_api.PanosClient, node_uuid: str
-) -> tuple[bool, str]:
-    """Validate HA interface operational status.
-
-    :param client: PanosClient for the device
-    :param node_uuid: Node UUID for logging
-    :returns: (all_up, warning_message)
-    """
-    try:
-        interfaces = client.get_ha_interface_status()
-
-        all_up = True
-        down_interfaces = []
-
-        for iface_name, status in interfaces.items():
-            state = status.get("state", "unknown")
-            if state != "up":
-                all_up = False
-                down_interfaces.append(iface_name)
-                LOG.warning(
-                    "[node:%s] HA interface %s is %s (speed: %s, duplex: %s)",
-                    node_uuid,
-                    iface_name,
-                    state,
-                    status.get("speed", "unknown"),
-                    status.get("duplex", "unknown"),
-                )
-            else:
-                LOG.debug(
-                    "[node:%s] HA interface %s is up (speed: %s, duplex: %s)",
-                    node_uuid,
-                    iface_name,
-                    status.get("speed", "unknown"),
-                    status.get("duplex", "unknown"),
-                )
-
-        if not all_up:
-            return (
-                False,
-                f"HA interfaces down: {', '.join(down_interfaces)} - "
-                "check physical cabling",
-            )
-
-        return (True, "")
-
-    except Exception as e:
-        LOG.warning("[node:%s] Could not query HA interface status: %s", node_uuid, e)
-        return (False, f"Failed to query interface status: {e}")
-
-
-def _configure_ha_pair(
-    task, my_client: panos_api.PanosClient, node, mate, my_role: str, mate_role: str
-) -> bool:
-    """Configure HA on both devices in the pair.
-
-    :returns: True if successful, False otherwise
-    """
-    LOG.info(
-        "[node:%s] Configuring HA: self=%s, mate=%s(%s)",
-        node.uuid,
-        my_role,
-        mate.uuid,
-        mate_role,
-    )
-
-    # Get mate serials for validation
-    my_serial = node.extra.get("serial")
-    mate_serial = mate.extra.get("serial")
-
-    try:
-        # Calculate addresses for each device
-        my_addresses = _calculate_ha_addresses(my_role)
-        mate_addresses = _calculate_ha_addresses(mate_role)
-
-        # Configure this device
-        LOG.info("[node:%s] Configuring HA as %s", node.uuid, my_role)
-        success = my_client.configure_ha(
-            role=my_role,
-            ha1_ip=my_addresses["ha1_ip"],
-            ha1_backup_ip=my_addresses["ha1_backup_ip"],
-            ha2_ip=my_addresses["ha2_ip"],
-            peer_ha1=my_addresses["peer_ha1"],
-            peer_ha1_backup=my_addresses["peer_ha1_backup"],
-            priority=my_addresses["priority"],
-        )
-
-        if not success:
-            LOG.error("[node:%s] Failed to configure HA", node.uuid)
-            return False
-
-        # Configure mate device
-        mate_address = mate.driver_info.get("management_ip")
-        if not mate_address:
-            LOG.error("[node:%s] Mate has no management_ip", node.uuid)
-            return False
-
-        LOG.info(
-            "[node:%s] Configuring HA on mate %s as %s",
-            node.uuid,
-            mate.uuid,
-            mate_role,
-        )
-        mate_client = panos_api.PanosClient(mate_address)
-        mate_client.login()
-
-        success = mate_client.configure_ha(
-            role=mate_role,
-            ha1_ip=mate_addresses["ha1_ip"],
-            ha1_backup_ip=mate_addresses["ha1_backup_ip"],
-            ha2_ip=mate_addresses["ha2_ip"],
-            peer_ha1=mate_addresses["peer_ha1"],
-            peer_ha1_backup=mate_addresses["peer_ha1_backup"],
-            priority=mate_addresses["priority"],
-        )
-
-        if not success:
-            LOG.error(
-                "[node:%s] Failed to configure HA on mate %s", node.uuid, mate.uuid
-            )
-            return False
-
-        # Wait for HA to initialize
-        LOG.info("[node:%s] Waiting for HA to initialize...", node.uuid)
-        time.sleep(10)  # Give HA time to establish connections
-
-        # Validate this device
-        LOG.info("[node:%s] Validating HA configuration on this device", node.uuid)
-        is_valid, error_msg = _validate_ha_status(
-            my_client, node.uuid, mate_serial, my_role
-        )
-
-        if not is_valid:
-            LOG.error("[node:%s] HA validation failed: %s", node.uuid, error_msg)
-            # Don't fail hard - configuration may be applied but links not up
-            # Log error but continue - operator can fix cabling
-            LOG.warning(
-                "[node:%s] Continuing despite validation failure - "
-                "may be physical cabling issue",
-                node.uuid,
-            )
-
-        # Validate mate device
-        LOG.info("[node:%s] Validating HA configuration on mate device", node.uuid)
-        is_valid, error_msg = _validate_ha_status(
-            mate_client, mate.uuid, my_serial, mate_role
-        )
-
-        if not is_valid:
-            LOG.error("[node:%s] Mate HA validation failed: %s", node.uuid, error_msg)
-            LOG.warning(
-                "[node:%s] Continuing despite mate validation failure - "
-                "may be physical cabling issue",
-                node.uuid,
-            )
-
-        # Validate HA interfaces on both devices
-        LOG.info("[node:%s] Checking HA interface status", node.uuid)
-        all_up, warning = _validate_ha_interfaces(my_client, node.uuid)
-        if not all_up:
-            LOG.warning("[node:%s] %s", node.uuid, warning)
-
-        all_up, warning = _validate_ha_interfaces(mate_client, mate.uuid)
-        if not all_up:
-            LOG.warning("[node:%s] Mate: %s", node.uuid, warning)
-
-        LOG.info(
-            "[node:%s] HA configuration and validation completed "
-            "(check warnings for any link issues)",
-            node.uuid,
-        )
-        return True
-
-    except Exception as e:
-        LOG.exception(
-            "[node:%s] Exception during HA configuration: %s",
-            node.uuid,
-            e,
-        )
-        return False

@@ -246,8 +246,9 @@ def _inspect_and_provide(
     if _extra(node).get("ha_operational") is not True:
         logger.warning(
             "[node:%s] Left manageable: HA pair not confirmed yet. It is waiting "
-            "for its mate, or the HA checks failed; see the conductor log",
+            "for its mate, or the HA checks failed: %s",
             node.uuid,
+            node.last_error,
         )
         return
     _promote_ha_pair(client, node, ha_role, physical_network, role_ports)
