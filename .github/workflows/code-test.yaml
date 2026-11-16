@@ -20,7 +20,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 env:
-  OPENSTACK_VERSION: "2026.1"
+  OPENSTACK_VERSION: "2026.2"
 
 jobs:
   discover:

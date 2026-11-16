@@ -35,7 +35,6 @@ jobs:
         project:
           - cinder
           - glance
-          - ironic
           - keystone
           - nova
           - neutron
@@ -55,6 +54,7 @@ jobs:
       matrix:
         project:
           - horizon
+          - ironic
           - skyline
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit

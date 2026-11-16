@@ -1,24 +1,23 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENSTACK_VERSION="required_argument"
-FROM quay.io/airshipit/venv_builder:${OPENSTACK_VERSION}-ubuntu_noble AS build
+FROM quay.io/airshipit/venv_builder:${OPENSTACK_VERSION}-ubuntu_resolute AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         git \
-        patch \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2026.1
-ARG IRONIC_GIT_REF=ff0628e8219db14f16f17e8491465275277b21d7
+# renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2026.2
+ARG IRONIC_GIT_REF=53fd32a1e0f840ef8ee051fbe4b4672237cd68c0
 ADD --keep-git-dir=true https://github.com/rackerlabs/ironic.git#${IRONIC_GIT_REF} /src/ironic
 RUN git -C /src/ironic fetch --unshallow --tags
 
-# renovate: name=openstack/sushy repo=https://github.com/rackerlabs/sushy.git branch=understack/2026.1
-ARG SUSHY_GIT_REF=5edf1e928de059c74424a29db1fa5dafb571e78f
-ADD --keep-git-dir=true https://github.com/rackerlabs/sushy.git#${SUSHY_GIT_REF} /src/sushy
+# renovate: name=openstack/sushy repo=https://github.com/openstack/sushy.git branch=stable/2026.2
+ARG SUSHY_GIT_REF=8d3544ded8cb31cf694e4b331e851d24451821cc
+ADD --keep-git-dir=true https://github.com/openstack/sushy.git#${SUSHY_GIT_REF} /src/sushy
 RUN git -C /src/sushy fetch --unshallow --tags && \
     sed -i '/sushy==.*/d' /upper-constraints.txt
 
@@ -31,12 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
       --constraint /upper-constraints.txt \
         /src/ironic \
         /src/sushy \
-        /src/understack/ironic-understack \
-        proliantutils==2.16.3
-
-COPY containers/ironic/patches /tmp/patches/
-RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
-    patch -p1 < /tmp/patches/0002-Solve-IPMI-call-issue-results-in-UTF-8-format-error-.patch
+        /src/understack/ironic-understack
 
 # download and unpack novnc
 ARG NOVNC_VERSION=1.6.0
@@ -48,12 +42,12 @@ RUN \
    mkdir -p /usr/share/novnc/ && \
    wget -q -O "$DEST_FILE" "$URL" && \
    tar -C /usr/share/novnc/ --strip-components=1 -zxvf "${DEST_FILE}" "$PFX/app" "$PFX/core" "$PFX/vendor" "$PFX/vnc.html"
-COPY containers/ironic/ironic-console-pod.yaml.template /var/lib/openstack/lib/python3.12/site-packages/ironic/console/container/
+COPY containers/ironic/ironic-console-pod.yaml.template /var/lib/openstack/lib/python3.14/site-packages/ironic/console/container/
 
 # renovate: datasource=docker depName=ghcr.io/rackerlabs/understack/ironic-ipxe versioning=semver
 FROM ghcr.io/rackerlabs/understack/ironic-ipxe:1.0.0 AS ipxe
 
-FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_noble AS final
+FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_resolute AS final
 
 ENV PATH="/var/lib/openstack/bin:$PATH"
 

@@ -10,18 +10,18 @@ The branch for these are `understack/$OPENSTACK_VERSION`
 
 ```bash
 git clone https://github.com/openstack/ironic
-git checkout --track origin/stable/2026.1
+git checkout --track origin/stable/2026.2
 git remote add rackerlabs https://github.com/rackerlabs/ironic
 git fetch rackerlabs
-git checkout --track rackerlabs/understack/2026.1
+git checkout --track rackerlabs/understack/2026.2
 ```
 
 ## Adding patches is done via `git cherry-pick`
 
 ```bash
-git checkout understack/2026.1
+git checkout understack/2026.2
 git cherry-pick GITISH_TO_PORT
-git push rackerlabs understack/2026.1
+git push rackerlabs understack/2026.2
 ```
 
 ## Creating the next stable series
@@ -39,7 +39,7 @@ branches to `rackerlabs` after you confirm each step. It expects a remote named 
 (pointing at `openstack/ironic`, not `origin`) and a remote named `rackerlabs`.
 
 ```bash
-scripts/git-understack-rebase ~/work/ironic 2026.1
+scripts/git-understack-rebase ~/work/ironic 2026.2
 ```
 
 ### Patches that landed upstream (possibly tweaked)
@@ -65,24 +65,24 @@ commits are involved before anything is rewritten.
 To do it manually instead:
 
 ```bash
-git checkout stable/2026.1
+git checkout stable/2026.2
 git pull -p
-git checkout understack/2026.1
-git rebase stable/2026.1
-git push rackerlabs understack/2026.1
+git checkout understack/2026.2
+git rebase stable/2026.2
+git push rackerlabs understack/2026.2
 ```
 
 ## Updating the container
 
 ```bash
-git checkout understack/2026.1
+git checkout understack/2026.2
 git show
 # ensure the git-ish in the Dockerfile matches
 ```
 
 ## Backporting patches from upstream master
 
-To backport a patch from upstream master (or another branch) to understack/2026.1:
+To backport a patch from upstream master (or another branch) to understack/2026.2:
 
 ```bash
 # Fetch all branches from upstream (openstack/ironic)
@@ -93,7 +93,7 @@ git fetch origin
 git fetch rackerlabs
 
 # Checkout the understack branch
-git checkout understack/2026.1
+git checkout understack/2026.2
 
 # Cherry-pick the commit from master
 # You can get the commit hash from the PR or upstream repository
@@ -104,7 +104,7 @@ git add <conflicted-files>
 git cherry-pick --continue
 
 # Push to rackerlabs fork
-git push rackerlabs understack/2026.1
+git push rackerlabs understack/2026.2
 ```
 
 ### Example workflow for a specific PR
