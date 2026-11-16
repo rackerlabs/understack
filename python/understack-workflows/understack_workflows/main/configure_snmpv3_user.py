@@ -115,15 +115,35 @@ def restore_available_node(client: IronicClient, node_uuid: str) -> None:
             ) from exc
 
 
+def wait_for_interrupted_runbook(client: IronicClient, node_uuid: str, node) -> None:
+    if CLEANING_POLICY_KEY in node.extra and node.provision_state in BUSY_STATES:
+        client.wait_for_node_provision_state(
+            node_uuid, node.target_provision_state or "manageable"
+        )
+
+
+def recover_available_node(client: IronicClient, node_uuid: str) -> None:
+    """Restore an interrupted available node without executing the SNMP runbook."""
+    node = client.get_node(node_uuid)
+    if CLEANING_POLICY_KEY not in node.extra:
+        return
+    wait_for_interrupted_runbook(client, node_uuid, node)
+    node = get_idle_node(client, node_uuid)
+    if node.maintenance or node.provision_state not in {
+        "available",
+        "manageable",
+        "clean failed",
+    }:
+        raise ValueError(f"Node {node_uuid} is not ready for state restoration")
+    restore_available_node(client, node_uuid)
+
+
 def configure_snmpv3_user(client: IronicClient, node_uuid: str) -> None:
     """Run the SNMP runbook and preserve an available node's cleaning policy."""
     node = client.get_node(node_uuid)
     restoring_available = CLEANING_POLICY_KEY in node.extra
     try:
-        if restoring_available and node.provision_state in BUSY_STATES:
-            client.wait_for_node_provision_state(
-                node_uuid, node.target_provision_state or "manageable"
-            )
+        wait_for_interrupted_runbook(client, node_uuid, node)
         node = get_idle_node(client, node_uuid)
         if node.maintenance:
             raise ValueError(f"Node {node_uuid} is in maintenance")
@@ -170,6 +190,12 @@ def argument_parser() -> argparse.ArgumentParser:
         description="Configure BMC SNMPv3 through its Ironic runbook."
     )
     parser.add_argument("--node", required=True, help="Node name or UUID")
+    parser.add_argument(
+        "--mode",
+        choices=("configure", "restore"),
+        default="configure",
+        help="Configure SNMP (default) or restore saved node state and cleaning policy",
+    )
     return parser
 
 
@@ -178,6 +204,10 @@ def main() -> None:
     args = argument_parser().parse_args()
     client = IronicClient()
     node = client.get_node(args.node)
+    if args.mode == "restore":
+        recover_available_node(client, node.uuid)
+        logger.info("State restoration completed for node %s", node.uuid)
+        return
     configure_snmpv3_user(client, node.uuid)
     logger.info("SNMPv3 configured on node %s", node.uuid)
 

@@ -264,6 +264,112 @@ def test_main_resolves_node(mocker):
     configure.assert_called_once_with(client, "node-uuid")
 
 
+@pytest.mark.parametrize("original", [None, True, False])
+@pytest.mark.parametrize("target", ["manageable", "available", None])
+def test_recovery_waits_for_interrupted_cleaning_without_running_snmp(
+    client, original, target
+):
+    client.node.provision_state = "cleaning"
+    client.node.automated_clean = False
+    client.node.extra[cli.CLEANING_POLICY_KEY] = original
+    client.node.target_provision_state = target
+
+    cli.recover_available_node(client, "node-uuid")
+
+    assert client.node.provision_state == "available"
+    assert client.node.automated_clean is original
+    assert client.node.extra == {"existing": "value"}
+    client.get_runbook.assert_not_called()
+    if target == "available":
+        client.wait_for_node_provision_state.assert_called_once_with(
+            "node-uuid", "available"
+        )
+        client.set_node_provision_state.assert_not_called()
+    else:
+        assert client.wait_for_node_provision_state.call_args_list == [
+            call("node-uuid", "manageable"),
+            call("node-uuid", "available"),
+        ]
+        client.set_node_provision_state.assert_called_once_with("node-uuid", "provide")
+
+
+@pytest.mark.parametrize("state", ["available", "manageable", "clean failed"])
+def test_recovery_restores_policy_from_settled_state(client, state):
+    client.node.provision_state = state
+    client.node.automated_clean = False
+    client.node.extra[cli.CLEANING_POLICY_KEY] = True
+
+    cli.recover_available_node(client, "node-uuid")
+
+    assert client.node.provision_state == (
+        "clean failed" if state == "clean failed" else "available"
+    )
+    assert client.node.automated_clean is True
+    assert client.node.extra == {"existing": "value"}
+    client.get_runbook.assert_not_called()
+    if state == "manageable":
+        client.set_node_provision_state.assert_called_once_with("node-uuid", "provide")
+    else:
+        client.set_node_provision_state.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("state", "maintenance"),
+    [("manageable", True), ("active", False), ("service failed", False)],
+)
+def test_recovery_leaves_ineligible_node_unchanged(client, state, maintenance):
+    client.node.provision_state = state
+    client.node.maintenance = maintenance
+    client.node.automated_clean = False
+    client.node.extra[cli.CLEANING_POLICY_KEY] = True
+
+    with pytest.raises(ValueError, match="not ready for state restoration"):
+        cli.recover_available_node(client, "node-uuid")
+
+    client.update_node.assert_not_called()
+    client.set_node_provision_state.assert_not_called()
+    client.get_runbook.assert_not_called()
+
+
+@pytest.mark.parametrize("target", ["manageable", "available"])
+def test_recovery_timeout_keeps_saved_policy_for_retry(client, target):
+    client.node.provision_state = "cleaning"
+    client.node.target_provision_state = target
+    client.node.automated_clean = False
+    client.node.extra[cli.CLEANING_POLICY_KEY] = True
+    client.wait_for_node_provision_state.side_effect = TimeoutError("Still cleaning")
+
+    with pytest.raises(TimeoutError, match="Still cleaning"):
+        cli.recover_available_node(client, "node-uuid")
+
+    assert client.node.automated_clean is False
+    assert client.node.extra[cli.CLEANING_POLICY_KEY] is True
+    client.update_node.assert_not_called()
+    client.set_node_provision_state.assert_not_called()
+    client.get_runbook.assert_not_called()
+
+
+def test_recovery_without_saved_policy_does_nothing(client):
+    cli.recover_available_node(client, "node-uuid")
+    client.update_node.assert_not_called()
+    client.set_node_provision_state.assert_not_called()
+    client.wait_for_node_provision_state.assert_not_called()
+
+
+def test_main_restore_mode_does_not_configure_snmp(mocker):
+    mocker.patch(
+        "sys.argv",
+        ["configure-snmpv3-user", "--node", "Dell-ABC1234", "--mode=restore"],
+    )
+    client = mocker.patch.object(cli, "IronicClient").return_value
+    client.get_node.return_value.uuid = "node-uuid"
+    recover = mocker.patch.object(cli, "recover_available_node")
+    configure = mocker.patch.object(cli, "configure_snmpv3_user")
+    cli.main()
+    recover.assert_called_once_with(client, "node-uuid")
+    configure.assert_not_called()
+
+
 @pytest.mark.parametrize("action", ["manage", "clean", "service", "provide"])
 def test_conflicting_transition_is_retried_without_repeating_runbook(client, action):
     client.node.provision_state = "active" if action == "service" else "available"

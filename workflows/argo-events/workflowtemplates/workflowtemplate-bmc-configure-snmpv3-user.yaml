@@ -20,9 +20,14 @@ spec:
       inputs:
         parameters:
           - name: node_uuid
+          - name: mode
+            default: configure
+          - name: timeout
+            default: ""
       synchronization:
         mutexes:
           - name: ironic-runbooks-{{inputs.parameters.node_uuid}}
+      timeout: "{{inputs.parameters.timeout}}"
       volumes:
         - name: openstack
           secret:
@@ -37,6 +42,7 @@ spec:
         args:
           - --node
           - "{{inputs.parameters.node_uuid}}"
+          - "--mode={{inputs.parameters.mode}}"
         envFrom:
           - configMapRef:
               name: cluster-metadata
