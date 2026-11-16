@@ -301,10 +301,18 @@ class IronicClient:
 
         Returns whatever the SDK reports (False when the VIF was not attached);
         ``ignore_missing=True`` so tearing down an already-detached VIF is a no-op.
+        A node deleted from Ironic is a no-op too: nothing is left to detach.
         """
         node_id = node.id if isinstance(node, BaremetalNode) else node
         LOG.info("Detaching VIF %s from Ironic node %s", vif_id, node_id)
-        return self.irclient.detach_vif_from_node(node, vif_id, ignore_missing=True)
+        try:
+            return self.irclient.detach_vif_from_node(node, vif_id, ignore_missing=True)
+        except sdk_exc.NotFoundException:
+            # ignore_missing covers a missing VIF (400), not a missing node (404).
+            LOG.warning(
+                "Ironic node %s is gone; skipping detach of VIF %s", node_id, vif_id
+            )
+            return False
 
     def node_vif_ids(self, node: str | BaremetalNode) -> list[str]:
         """Return the Neutron port (VIF) ids currently attached to the node."""

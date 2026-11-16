@@ -262,6 +262,14 @@ class TestVifAttach:
             node, "port-1", ignore_missing=True
         )
 
+    def test_detach_from_a_deleted_node_is_a_noop(self, mocker):
+        client = _client(mocker)
+        client.irclient.detach_vif_from_node.side_effect = sdk_exc.NotFoundException(
+            "Node n1 could not be found."
+        )
+
+        assert client.detach_vif_from_node("n1", "port-1") is False
+
     def test_node_vif_ids(self, mocker):
         client = _client(mocker)
         node = mocker.Mock(id="n1")
