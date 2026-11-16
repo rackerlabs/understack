@@ -81,6 +81,10 @@ def _set_extra_op(node: BaremetalNode, key: str, value) -> dict:
     return {"op": "add", "path": "/extra", "value": {key: value}}
 
 
+class NodeNoLongerAvailable(Exception):
+    """The selected node, or its HA pair, changed before it could be claimed."""
+
+
 @dataclass(frozen=True)
 class NodeReleaseResult:
     """Outcome of looking up and releasing a router's Ironic node."""
@@ -338,7 +342,8 @@ class IronicClient:
         )
         secondary, problems = self._ha_secondary(primary)
         if problems:
-            raise RuntimeError(
+            # Selection ran the same checks moments ago, so the pair changed.
+            raise NodeNoLongerAvailable(
                 f"HA pair of node {primary.id} can't be claimed: " + "; ".join(problems)
             )
         claim = {
@@ -380,7 +385,7 @@ class IronicClient:
         An HA secondary gets the router UUID in ``extra`` instead.
 
         Identity is stamped after manage; earlier failures need manual recovery.
-        Concurrent claims remain a separate concern.
+        A node another create claimed first raises NodeNoLongerAvailable.
         """
         node_id = node.id if isinstance(node, BaremetalNode) else node
         LOG.info(
@@ -396,9 +401,7 @@ class IronicClient:
         try:
             # available -> manageable, required before the adopt verb is valid.
             # Attempt identity-checked rollback if manage or a later step fails.
-            managed = self.irclient.set_node_provision_state(
-                node, _PROVISION_MANAGE, wait=True, timeout=_PROVISION_TIMEOUT
-            )
+            managed = self._manage(node)
             LOG.debug(
                 "Node %s provision_state=%s after manage",
                 node_id,
@@ -440,6 +443,9 @@ class IronicClient:
             adopted = self.irclient.wait_for_nodes_provision_state(
                 [node], _STATE_ACTIVE, timeout=_PROVISION_TIMEOUT
             )[0]
+        except NodeNoLongerAvailable:
+            # Ironic refused our manage, so nothing here is ours to roll back.
+            raise
         except Exception:
             LOG.warning(
                 "Adoption of node %s for router %s failed; rolling back to available",
@@ -458,6 +464,22 @@ class IronicClient:
             adopted.instance_id,
             adopted.instance_name,
         )
+
+    def _manage(self, node: str | BaremetalNode) -> BaremetalNode:
+        """Move the node from available to manageable.
+
+        Ironic refuses manage once the node has left available, so when two
+        creates select the same node, only the first gets past here.
+        """
+        try:
+            return self.irclient.set_node_provision_state(
+                node, _PROVISION_MANAGE, wait=True, timeout=_PROVISION_TIMEOUT
+            )
+        except (sdk_exc.BadRequestException, sdk_exc.ConflictException) as exc:
+            current = self.irclient.get_node(node)
+            if current is not None and current.provision_state == _STATE_AVAILABLE:
+                raise
+            raise NodeNoLongerAvailable(str(exc)) from exc
 
     def _stamp_secondary(
         self, node: str | BaremetalNode, router_id: str, fields: dict
