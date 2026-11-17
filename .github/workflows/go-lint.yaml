@@ -65,7 +65,7 @@ jobs:
 
       # golangci-lint-action does not install Go, so each module's toolchain
       # comes from its own go.mod rather than a version pinned in this file.
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go/${{ matrix.app }}/go.mod
           cache-dependency-path: go/${{ matrix.app }}/go.sum
