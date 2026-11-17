@@ -4,9 +4,6 @@ kind: Kustomization
 
 resources:
   - nova-rabbitmq-queue.yaml
-  - nova-mariadb-db.yaml  # creates 'nova' database
-  - nova-api-mariadb-db.yaml  # creates 'nova_api' database
-  - nova-cell0-mariadb-db.yaml  # creates 'nova_cell0' database
   - secret-nova-argo-token.yaml
   - roles-nova-argo-token.yaml
   - job-nova-post-deploy.yaml
