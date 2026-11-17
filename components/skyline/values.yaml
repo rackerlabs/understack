@@ -4,6 +4,24 @@ conf:
     # The default worker_process is 'auto' but for kubernetes pods this causes issues:
     # https://review.opendev.org/c/openstack/openstack-helm/+/1012728
     worker_processes: 4
+  # (nicholas.kuechler) Using a custom gunicorn config so we can set a
+  # specific worker count. There are issues with using "CPU" count inside
+  # of kubernetes + containers, where it's getting the underlying host's
+  # CPU count rather than the CPU limits for the pod. This causes it to
+  # spawn too many workers and get OOMKilled.
+  gunicorn: |
+    import multiprocessing
+    bind = "unix:/var/lib/skyline/skyline.sock"
+    workers = 4
+    worker_class = "uvicorn.workers.UvicornWorker"
+    timeout = 300
+    keepalive = 5
+    reuse_port = False
+    proc_name = "skyline"
+    log_level = "info"
+    disable_redirect_access_to_syslog = True
+    access_logfile = "-"
+    error_logfile = "-"
 
 endpoints:
   oslo_db:
