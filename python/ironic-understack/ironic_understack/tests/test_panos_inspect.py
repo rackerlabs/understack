@@ -170,6 +170,8 @@ def _ha_pair(
     task.node.traits = ["CUSTOM_PRIMARY"]
     task.node.extra = {"serial": "S1", "mate_serial": "S2"}
     task.node.resource_class = "pa1410"
+    task.node.last_error = None  # Ironic clears it when inspection starts
+    task.node.maintenance = False
     task.ports = [Mock(local_link_connection={"switch_info": "leaf-1"})]
     mate = Mock(
         id=2,
@@ -221,12 +223,10 @@ def test_a_healthy_pair_is_operational(mocker, task):
     ("change", "reason"),
     [
         ({"peer": ("S2", "down")}, "HA peer connection not up"),
-        ({"peer": ("S9", "up")}, "HA peer serial mismatch"),
         ({"mate_peer": ("S9", "up")}, "Mate peer serial mismatch"),
         ({"mate_peer": ("S1", "down")}, "Mate peer connection not up"),
-        ({"mate_switch": "leaf-1"}, "same switch"),
     ],
-    ids=["peer-down", "wrong-peer", "mate-sees-other", "mate-down", "same-switch"],
+    ids=["peer-down", "mate-sees-other", "mate-down"],
 )
 def test_an_unhealthy_pair_is_not_operational(mocker, task, change, reason):
     device = _ha_pair(mocker, task, **change)
@@ -235,6 +235,42 @@ def test_an_unhealthy_pair_is_not_operational(mocker, task, change, reason):
 
     assert node.extra["ha_operational"] is False
     assert reason in node.last_error
+    assert node.maintenance is False
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        ({"peer": ("S9", "up")}, "HA peer serial mismatch"),
+        ({"mate_switch": "leaf-1"}, "same switch"),
+    ],
+    ids=["wrong-peer", "same-switch"],
+)
+def test_a_cabling_fault_puts_the_node_in_maintenance(mocker, task, change, reason):
+    device = _ha_pair(mocker, task, **change)
+
+    node = _validate_ha(task, device)
+
+    assert node.extra["ha_operational"] is False
+    assert node.maintenance is True
+    assert reason in node.maintenance_reason
+    assert node.last_error is None
+
+
+@pytest.mark.parametrize(
+    ("held", "expected"),
+    [
+        ("Replace failed PSU", "Replace failed PSU; wrong peer"),
+        ("Replace failed PSU; wrong peer", "Replace failed PSU; wrong peer"),
+    ],
+    ids=["another-hold", "same-fault-again"],
+)
+def test_a_cabling_fault_keeps_an_existing_hold(held, expected):
+    node = Mock(maintenance=True, maintenance_reason=held)
+
+    panos_inspect._hold_for_cabling_fault(node, "wrong peer")
+
+    assert node.maintenance_reason == expected
 
 
 def test_a_local_link_down_never_contacts_the_mate(mocker, task):

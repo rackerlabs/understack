@@ -244,6 +244,8 @@ def _inspect_and_provide(
     # Inspection wrote extra.ha_operational, so read the node again.
     node = client.get_node(node.uuid)
     if _extra(node).get("ha_operational") is not True:
+        if node.maintenance:
+            raise _left_manageable(node, f"In maintenance: {node.maintenance_reason}")
         logger.warning(
             "[node:%s] Left manageable: HA pair not confirmed yet. It is waiting "
             "for its mate, or the HA checks failed: %s",
