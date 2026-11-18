@@ -6,7 +6,7 @@ FROM quay.io/airshipit/nova:${OPENSTACK_VERSION}-ubuntu_noble AS build
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # renovate: name=openstack/nova repo=https://github.com/rackerlabs/nova.git branch=understack/2026.1
-ARG NOVA_GIT_REF=08b9fc684d325c739518e6b87cb5856769892be9
+ARG NOVA_GIT_REF=8a5b33664945846f6d3a080d41f5a9c018a072d4
 ADD --keep-git-dir=true https://github.com/rackerlabs/nova.git#${NOVA_GIT_REF} /src/nova
 RUN git -C /src/nova fetch --unshallow --tags
 
