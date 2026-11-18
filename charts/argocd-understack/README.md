@@ -157,7 +157,6 @@ Components deployed on global clusters:
 | envoy-gateway | `global.envoy_gateway` | API gateway |
 | external-dns | `global.external_dns` | DNS management |
 | external-secrets | `global.external_secrets` | Secret management |
-| ingress-nginx | `global.ingress_nginx` | Ingress controller |
 | monitoring | `global.monitoring` | Prometheus stack |
 | nautobot | `global.nautobot` | Network source of truth |
 | nautobotop | `global.nautobotop` | Nautobot operator |

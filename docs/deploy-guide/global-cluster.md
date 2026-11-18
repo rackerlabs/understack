@@ -173,7 +173,6 @@ following:
 | `external_dns` | DNS record automation |
 | `external_secrets` | Secrets management |
 | `global_workflows` | Argo Events and Workflows |
-| `ingress_nginx` | Ingress controller |
 | `monitoring` | Prometheus/Grafana monitoring |
 | `nautobot` | Network Source of Truth |
 | `nautobotop` | Nautobot Kubernetes operator |

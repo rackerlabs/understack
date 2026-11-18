@@ -275,7 +275,6 @@ nav:
       - deploy-guide/components/glance.md
       - deploy-guide/components/global-workflows.md
       - deploy-guide/components/horizon.md
-      - deploy-guide/components/ingress-nginx.md
       - deploy-guide/components/ironic.md
       - deploy-guide/components/ironic-hardware-exporter.md
       - deploy-guide/components/keystone.md

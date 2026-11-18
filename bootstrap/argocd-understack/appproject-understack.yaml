@@ -26,8 +26,6 @@ spec:
     server: '*'
   - namespace: 'external-secrets'
     server: '*'
-  - namespace: 'ingress-nginx'
-    server: '*'
   - namespace: 'kube-system'
     server: '*'
   - namespace: 'mariadb-operator'

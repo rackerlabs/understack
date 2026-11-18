@@ -121,12 +121,6 @@ global:
     # @default -- false
     enabled: false
 
-  # -- ingress-nginx
-  ingress_nginx:
-    # -- Enable/disable deploying ingress-nginx
-    # @default -- false
-    enabled: false
-
   # -- Monitoring via kube-prometheus-stack
   monitoring:
     # -- Enable/disable deploying kube-prometheus-stack
@@ -290,12 +284,6 @@ site:
   # etcd backup
   etcdbackup:
     # Enable/disable deploying etcdbackup
-    # @default -- false
-    enabled: false
-
-  # -- ingress-nginx
-  ingress_nginx:
-    # -- Enable/disable deploying ingress-nginx
     # @default -- false
     enabled: false
 

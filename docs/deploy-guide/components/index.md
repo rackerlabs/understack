@@ -84,7 +84,6 @@ enablement defaults, validation, and troubleshooting notes.
 | [external-dns](./external-dns.md) | global, site |
 | [external-secrets](./external-secrets.md) | global, site |
 | [global-workflows](./global-workflows.md) | global |
-| [ingress-nginx](./ingress-nginx.md) | global, site |
 | [mariadb-operator](./mariadb-operator.md) | site |
 | [monitoring](./monitoring.md) | global, site |
 | [nautobot](./nautobot.md) | global |
