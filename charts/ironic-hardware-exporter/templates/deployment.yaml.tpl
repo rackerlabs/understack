@@ -36,7 +36,7 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Values.understackRef | default "latest" }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http

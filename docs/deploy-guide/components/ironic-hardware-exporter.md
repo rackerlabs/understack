@@ -1,6 +1,6 @@
 ---
 charts:
-- ironic-hardware-exporter
+- charts/ironic-hardware-exporter
 source_text: ArgoCD renders both the exporter Helm chart and the deploy-repo
   directory declared as a second source.
 deploy_overrides:
@@ -18,6 +18,7 @@ RabbitMQ-driven Prometheus exporter for Ironic hardware and node-state metrics.
 
 - Cluster scope: site
 - Values key: `site.ironic_hardware_exporter`
+- Helm chart: `charts/ironic-hardware-exporter/`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-ironic-hardware-exporter.yaml`
 
 ## How ArgoCD Builds It
@@ -52,4 +53,4 @@ Optional additions:
 ## Notes
 
 - This component uses a deploy-repo second source, so enabling it should normally create a site directory like `$CLUSTER_NAME/ironic-hardware-exporter/`.
-- The chart itself lives in `go/ironic-hardware-exporter/helm` inside the UnderStack repo.
+- The chart itself lives in `charts/ironic-hardware-exporter` inside the UnderStack repo and is released with the repository-wide `vX.Y.Z` tag. The image follows `understack_ref` when it is a release tag and is `latest` otherwise. Pin it in `$CLUSTER_NAME/ironic-hardware-exporter/values.yaml` with `image.tag`.
