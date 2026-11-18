@@ -16,20 +16,16 @@ from typing import Any
 from unittest import mock
 
 import pytest
-from openstack import exceptions as openstack_exceptions
 
 import openstack_sync.utils as utils
 from openstack_sync.hooks import segment_ranges as hook
 from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import HookConfig
-from openstack_sync.hooks.framework import PruneRequest
 from openstack_sync.hooks.framework import ReconcileResult
 from openstack_sync.hooks.framework import SyncPlan
 from openstack_sync.hooks.framework import SyncResource
 from openstack_sync.plugins.neutron.segment_ranges.config import BINDING_NAME
 from openstack_sync.plugins.neutron.segment_ranges.config import ENV_PREFIX
-from openstack_sync.plugins.neutron.segment_ranges.markers import NAME_PREFIX
-from openstack_sync.plugins.neutron.segment_ranges.markers import managed_name
 
 CRD_API_VERSION = "neutron.understack.rackspace.net/v1alpha1"
 CRD_KIND = "NeutronSegmentRange"
@@ -106,11 +102,11 @@ def write_binding_context(path: Path, contexts: list[dict]) -> str:
     return str(context_path)
 
 
-def _managed_range(name: str, **overrides: Any) -> types.SimpleNamespace:
-    """A Neutron range as the operator itself created it (prefixed name)."""
+def _range(name: str, **overrides: Any) -> types.SimpleNamespace:
+    """A Neutron range named exactly as the CR declares it (no prefix)."""
     attrs: dict[str, Any] = {
         "id": f"{name}-id",
-        "name": managed_name(name),
+        "name": name,
         "network_type": "vlan",
         "physical_network": "physnet1",
         "minimum": 100,
@@ -125,7 +121,7 @@ def _managed_range(name: str, **overrides: Any) -> types.SimpleNamespace:
 def _neutron_conn(ranges: list[Any] | None = None) -> Any:
     conn = mock.MagicMock()
     conn.network.network_segment_ranges.return_value = list(
-        ranges if ranges is not None else [_managed_range("vlan-a")]
+        ranges if ranges is not None else [_range("vlan-a")]
     )
     return conn
 
@@ -192,38 +188,30 @@ def test_plugin_wait_for_api_uses_configured_retry_budget():
     wait.assert_called_once_with(conn, retries=5, delay=0.25)
 
 
-def test_plugin_prune_forwards_authoritative_empty_when_enabled():
+# ---------------------------------------------------------------------------
+# Cleanup policy: a segment range outlives its CR, so the plugin never prunes
+# ---------------------------------------------------------------------------
+
+
+def test_plugin_never_prunes_even_when_prune_flag_is_set():
+    """A segment range is never deleted by the operator.
+
+    The plugin defines no prune step, so the framework's cleanup policy is NONE
+    regardless of the chart's prune flag: no prune pass, no finalizer.
+    """
     plugin = hook.SegmentRangePlugin(_config(prune=True))
-    conn = mock.MagicMock()
-    specs = [{"name": "vlan-a"}]
-
-    with mock.patch.object(hook.prune_module, "prune_removed_ranges") as prune:
-        plugin.prune_resources(
-            conn,
-            PruneRequest(
-                credentials=("infrasetup", "understack"),
-                desired_specs=specs,
-                authoritative_empty=True,
-            ),
-        )
-
-    prune.assert_called_once_with(conn, specs, authoritative_empty=True)
-
-
-def test_plugin_cleanup_policy_has_no_prune_step_when_disabled():
-    plugin = hook.SegmentRangePlugin(_config(prune=False))
 
     assert plugin.cleanup_policy() is CleanupPolicy.NONE
     assert plugin.should_run_prune() is False
     assert plugin.uses_finalizer() is False
 
 
-def test_plugin_uses_finalized_prune_when_enabled():
-    plugin = hook.SegmentRangePlugin(_config(prune=True))
+def test_plugin_cleanup_policy_is_none_when_prune_disabled():
+    plugin = hook.SegmentRangePlugin(_config(prune=False))
 
-    assert plugin.cleanup_policy() is CleanupPolicy.FINALIZED_PRUNE
-    assert plugin.should_run_prune() is True
-    assert plugin.uses_finalizer() is True
+    assert plugin.cleanup_policy() is CleanupPolicy.NONE
+    assert plugin.should_run_prune() is False
+    assert plugin.uses_finalizer() is False
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +241,7 @@ def test_run_sync_reports_synced_for_a_clean_reconcile():
         secret_name="infrasetup",
         cloud_name="understack",
     )
-    conn = _neutron_conn([_managed_range("vlan-a")])
+    conn = _neutron_conn([_range("vlan-a")])
     inputs = SyncPlan(
         resources_to_reconcile=[resource],
         desired_resources_for_prune=[resource],
@@ -344,7 +332,7 @@ def test_main_reconciles_an_already_converged_range(monkeypatch, tmp_path):
     set_crd_identity(monkeypatch)
     monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
     monkeypatch.setenv("POD_NAMESPACE", "openstack")
-    conn = _neutron_conn([_managed_range("vlan-a")])
+    conn = _neutron_conn([_range("vlan-a")])
 
     code, patch_status = _run_main(
         monkeypatch, tmp_path, _schedule_context("vlan-a"), conn
@@ -356,12 +344,12 @@ def test_main_reconciles_an_already_converged_range(monkeypatch, tmp_path):
     conn.network.update_network_segment_range.assert_not_called()
 
 
-def test_main_creates_a_missing_range_with_the_prefixed_name(monkeypatch, tmp_path):
+def test_main_creates_a_missing_range_with_the_declared_name(monkeypatch, tmp_path):
     clear_env(monkeypatch)
     set_crd_identity(monkeypatch)
     monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
     conn = _neutron_conn([])
-    conn.network.create_network_segment_range.return_value = _managed_range("vlan-a")
+    conn.network.create_network_segment_range.return_value = _range("vlan-a")
 
     code, patch_status = _run_main(
         monkeypatch, tmp_path, _schedule_context("vlan-a"), conn
@@ -370,59 +358,67 @@ def test_main_creates_a_missing_range_with_the_prefixed_name(monkeypatch, tmp_pa
     assert code == 0
     assert patch_status.call_args.kwargs["sync_status"] == "Synced"
     create_kwargs = conn.network.create_network_segment_range.call_args.kwargs
-    assert create_kwargs["name"] == f"{NAME_PREFIX}vlan-a"
+    # The CR's logical name is the real Neutron name; no owner prefix.
+    assert create_kwargs["name"] == "vlan-a"
+
+
+def test_main_adopts_a_range_created_out_of_band(monkeypatch, tmp_path):
+    """A range with the CR's name but divergent minimum is adopted and updated.
+
+    No ownership marker gates adoption: the plugin matches an existing range by
+    its name.
+    """
+    clear_env(monkeypatch)
+    set_crd_identity(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
+    existing = _range("vlan-a", minimum=50)
+    conn = _neutron_conn([existing])
+    conn.network.update_network_segment_range.return_value = _range("vlan-a")
+
+    code, patch_status = _run_main(
+        monkeypatch, tmp_path, _schedule_context("vlan-a"), conn
+    )
+
+    assert code == 0
+    assert patch_status.call_args.kwargs["sync_status"] == "Synced"
+    conn.network.create_network_segment_range.assert_not_called()
+    update_kwargs = conn.network.update_network_segment_range.call_args.kwargs
+    assert update_kwargs == {"minimum": 100}
 
 
 def test_main_fails_when_immutable_field_diverges(monkeypatch, tmp_path):
     clear_env(monkeypatch)
     set_crd_identity(monkeypatch)
     monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
-    monkeypatch.setenv(f"{ENV_PREFIX}_PRUNE", "true")
     # Existing range differs on physical_network, which Neutron cannot update.
-    conn = _neutron_conn([_managed_range("vlan-a", physical_network="physnet2")])
+    conn = _neutron_conn([_range("vlan-a", physical_network="physnet2")])
 
-    with mock.patch.object(hook.prune_module, "prune_removed_ranges") as prune:
-        code, patch_status = _run_main(
-            monkeypatch, tmp_path, _schedule_context("vlan-a"), conn
-        )
+    code, patch_status = _run_main(
+        monkeypatch, tmp_path, _schedule_context("vlan-a"), conn
+    )
 
     assert code == 1
     assert patch_status.call_args.kwargs["sync_status"] == "Failed"
     assert "physical_network" in patch_status.call_args.kwargs["message"]
-    prune.assert_not_called()
 
 
-def test_main_prunes_after_a_successful_reconcile(monkeypatch, tmp_path):
+def test_main_never_deletes_a_range_when_its_cr_is_absent(monkeypatch, tmp_path):
+    """A managed range with no surviving CR is left in place, not pruned.
+
+    Even with the prune flag set, the plugin defines no prune step, so a range
+    whose CR was removed survives for an operator to drain and delete.
+    """
     clear_env(monkeypatch)
     set_crd_identity(monkeypatch)
     monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
     monkeypatch.setenv(f"{ENV_PREFIX}_PRUNE", "true")
-    conn = _neutron_conn([_managed_range("vlan-a")])
-
-    with mock.patch.object(hook.prune_module, "prune_removed_ranges") as prune:
-        code, _ = _run_main(monkeypatch, tmp_path, _schedule_context("vlan-a"), conn)
-
-    assert code == 0
-    prune.assert_called_once()
-    assert [spec["name"] for spec in prune.call_args.args[1]] == ["vlan-a"]
-
-
-def test_main_reports_failure_when_prune_leaves_an_in_use_range(monkeypatch, tmp_path):
-    """An in-use range raises from prune, failing the run and holding the CR."""
-    clear_env(monkeypatch)
-    set_crd_identity(monkeypatch)
-    monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
-    monkeypatch.setenv(f"{ENV_PREFIX}_PRUNE", "true")
-    # A desired range plus a stale managed range that Neutron refuses to delete.
-    stale = _managed_range("vlan-stale", id="stale-id")
-    conn = _neutron_conn([_managed_range("vlan-a"), stale])
-    conn.network.delete_network_segment_range.side_effect = (
-        openstack_exceptions.ConflictException("still in use")
-    )
+    # Neutron holds a stale range; only vlan-a has a CR in the snapshot.
+    conn = _neutron_conn([_range("vlan-a"), _range("vlan-stale", id="stale-id")])
 
     code, _ = _run_main(monkeypatch, tmp_path, _schedule_context("vlan-a"), conn)
 
-    assert code == 1
+    assert code == 0
+    conn.network.delete_network_segment_range.assert_not_called()
 
 
 def test_main_uses_the_credentials_named_by_each_cr(monkeypatch, tmp_path):
@@ -442,7 +438,7 @@ def test_main_uses_the_credentials_named_by_each_cr(monkeypatch, tmp_path):
         mock.patch.object(hook.sys, "argv", ["segment_ranges.py"]),
         mock.patch(
             "openstack_sync.hooks.framework.get_openstack_connection",
-            return_value=_neutron_conn([_managed_range("vlan-a")]),
+            return_value=_neutron_conn([_range("vlan-a")]),
         ) as connect,
         mock.patch("openstack_sync.hooks.framework.patch_resource_status"),
         mock.patch.object(hook, "wait_for_openstack_network"),
@@ -450,3 +446,249 @@ def test_main_uses_the_credentials_named_by_each_cr(monkeypatch, tmp_path):
         assert hook.main() == 0
 
     connect.assert_called_once_with("other-secret", "other-cloud")
+
+
+# ---------------------------------------------------------------------------
+# Same-named unshared ranges in different projects share one credential group
+# ---------------------------------------------------------------------------
+
+
+def _project_resource(name: str, project_id: str) -> SyncResource:
+    return SyncResource(
+        spec={
+            "name": name,
+            "network_type": "vlan",
+            "physical_network": "physnet1",
+            "minimum": 100,
+            "maximum": 200,
+            "shared": False,
+            "project_id": project_id,
+        },
+        name=f"{name}-{project_id}",
+        namespace="openstack",
+        generation=3,
+        secret_name="infrasetup",
+        cloud_name="understack",
+    )
+
+
+def _filtering_conn(ranges: list[Any]) -> Any:
+    """A conn whose range listing honours the name/project_id filters."""
+
+    def list_ranges(**query: Any) -> list[Any]:
+        return [
+            r
+            for r in ranges
+            if all(getattr(r, field) == value for field, value in query.items())
+        ]
+
+    conn = mock.MagicMock()
+    conn.network.network_segment_ranges.side_effect = list_ranges
+    return conn
+
+
+def _run_sync_group(resources: list[SyncResource], conn: Any) -> tuple[int, Any]:
+    plugin = hook.SegmentRangePlugin(_config(status_enabled=True))
+    inputs = SyncPlan(
+        resources_to_reconcile=resources,
+        desired_resources_for_prune=resources,
+        deleted_resources=[],
+        prune_credentials=frozenset(),
+        unreadable_resources=frozenset(),
+    )
+    with (
+        mock.patch(
+            "openstack_sync.hooks.framework.get_openstack_connection",
+            return_value=conn,
+        ),
+        mock.patch(
+            "openstack_sync.hooks.framework.patch_resource_status"
+        ) as patch_status,
+        mock.patch.object(hook, "wait_for_openstack_network"),
+    ):
+        code = hook.run_sync(plugin, inputs)
+    return code, patch_status
+
+
+def test_run_sync_matches_same_named_ranges_to_their_own_projects():
+    """Two projects each own a range named tenant-vlans; both CRs converge.
+
+    Both CRs share one credential group and therefore one cache. Keying that
+    cache by name alone would hand P1's range to P2's CR and fail it with a
+    false project_id drift.
+    """
+    conn = _filtering_conn(
+        [
+            _range("tenant-vlans", id="p1-range", shared=False, project_id="p1"),
+            _range("tenant-vlans", id="p2-range", shared=False, project_id="p2"),
+        ]
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 0
+    statuses = [c.kwargs["sync_status"] for c in patch_status.call_args_list]
+    assert statuses == ["Synced", "Synced"]
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_not_called()
+
+
+def test_run_sync_creates_a_range_for_a_project_that_lacks_one():
+    """P1 already has tenant-vlans; P2's same-named CR creates its own."""
+    conn = _filtering_conn(
+        [_range("tenant-vlans", id="p1-range", shared=False, project_id="p1")]
+    )
+    conn.network.create_network_segment_range.return_value = _range(
+        "tenant-vlans", id="p2-range", shared=False, project_id="p2"
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 0
+    statuses = [c.kwargs["sync_status"] for c in patch_status.call_args_list]
+    assert statuses == ["Synced", "Synced"]
+    conn.network.create_network_segment_range.assert_called_once()
+    create_kwargs = conn.network.create_network_segment_range.call_args.kwargs
+    assert create_kwargs["project_id"] == "p2"
+    assert create_kwargs["shared"] is False
+    conn.network.update_network_segment_range.assert_not_called()
+
+
+def test_run_sync_scopes_by_project_even_when_neutron_ignores_filters():
+    """An unfiltered listing still resolves each CR to its own project's range."""
+    conn = _neutron_conn(
+        [
+            _range("tenant-vlans", id="p1-range", shared=False, project_id="p1"),
+            _range("tenant-vlans", id="p2-range", shared=False, project_id="p2"),
+        ]
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 0
+    statuses = [c.kwargs["sync_status"] for c in patch_status.call_args_list]
+    assert statuses == ["Synced", "Synced"]
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_not_called()
+
+
+def test_run_sync_creates_for_missing_project_even_when_neutron_ignores_filters():
+    conn = _neutron_conn(
+        [_range("tenant-vlans", id="p1-range", shared=False, project_id="p1")]
+    )
+    conn.network.create_network_segment_range.return_value = _range(
+        "tenant-vlans", id="p2-range", shared=False, project_id="p2"
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 0
+    statuses = [c.kwargs["sync_status"] for c in patch_status.call_args_list]
+    assert statuses == ["Synced", "Synced"]
+    create_kwargs = conn.network.create_network_segment_range.call_args.kwargs
+    assert create_kwargs["project_id"] == "p2"
+
+
+# ---------------------------------------------------------------------------
+# Upgrade from the name-prefix release
+# ---------------------------------------------------------------------------
+
+
+def test_main_renames_a_legacy_prefixed_range_on_upgrade(monkeypatch, tmp_path):
+    """A range the previous release created as understack-sr:vlan-a is migrated.
+
+    The plain-name lookup misses it; without the legacy fallback the operator
+    would create a second vlan-a beside it and orphan the original.
+    """
+    clear_env(monkeypatch)
+    set_crd_identity(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
+    conn = _neutron_conn([_range("understack-sr:vlan-a", id="legacy-id")])
+    conn.network.update_network_segment_range.return_value = _range(
+        "vlan-a", id="legacy-id"
+    )
+
+    code, patch_status = _run_main(
+        monkeypatch, tmp_path, _schedule_context("vlan-a"), conn
+    )
+
+    assert code == 0
+    assert patch_status.call_args.kwargs["sync_status"] == "Synced"
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_called_once_with(
+        "legacy-id", name="vlan-a"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Ambiguous matches
+# ---------------------------------------------------------------------------
+
+
+def test_main_fails_when_the_name_matches_several_ranges(monkeypatch, tmp_path):
+    """Two Neutron ranges named vlan-a: the CR fails instead of picking one."""
+    clear_env(monkeypatch)
+    set_crd_identity(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
+    conn = _neutron_conn([_range("vlan-a", id="a"), _range("vlan-a", id="b")])
+
+    code, patch_status = _run_main(
+        monkeypatch, tmp_path, _schedule_context("vlan-a"), conn
+    )
+
+    assert code == 1
+    assert patch_status.call_args.kwargs["sync_status"] == "Failed"
+    assert "matched 2 ranges" in patch_status.call_args.kwargs["message"]
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_not_called()
+
+
+def test_run_sync_ambiguous_cr_does_not_block_its_neighbour():
+    """P1 holds two tenant-vlans ranges; P2's CR in the same group still syncs."""
+    conn = _filtering_conn(
+        [
+            _range("tenant-vlans", id="p1-a", shared=False, project_id="p1"),
+            _range("tenant-vlans", id="p1-b", shared=False, project_id="p1"),
+            _range("tenant-vlans", id="p2-range", shared=False, project_id="p2"),
+        ]
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 1
+    statuses = {
+        c.kwargs["name"]: c.kwargs["sync_status"] for c in patch_status.call_args_list
+    }
+    assert statuses == {"tenant-vlans-p1": "Failed", "tenant-vlans-p2": "Synced"}
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_not_called()
