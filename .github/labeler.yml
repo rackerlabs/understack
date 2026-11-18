@@ -16,8 +16,6 @@
       - changed-files:
           - all-globs-to-all-files: ["go/dexop/**"]
       - changed-files:
-          - all-globs-to-all-files: ["go/ironic-hardware-exporter/**"]
-      - changed-files:
           - all-globs-to-all-files: ["python/kubectl-us/**"]
       # images built and tagged on their own, not on the platform v* tag
       - changed-files:

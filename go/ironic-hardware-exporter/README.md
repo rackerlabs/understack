@@ -128,7 +128,6 @@ internal/
   cache/      NodeEntry cache with TTL/size-based eviction
   metrics/    metric transformation and Prometheus text rendering
   server/     HTTP server (/metrics, /health, /ready)
-helm/         Helm chart for Kubernetes deployment
 ```
 
 ## How To Build
@@ -159,22 +158,11 @@ docker build -t ironic-hardware-exporter:dev .
 
 ### Release build
 
-Release automation is defined in:
-
-- `.goreleaser.yaml`
-- `../../.github/workflows/build-ironic-hardware-exporter.yaml`
-
-Merging a PR does not trigger a build. To publish a new image and Helm chart,
-push a tag in the form `ironic-hardware-exporter/vX.Y.Z`:
-
-```bash
-git tag ironic-hardware-exporter/v0.2.0
-git push origin ironic-hardware-exporter/v0.2.0
-```
-
-The workflow builds the container image and pushes the Helm chart to GHCR.
-There is no ArgoCD template for this component yet, so after the build you
-must deploy manually with `helm upgrade --install` (see How To Deploy below).
+The image is built by `../../.github/workflows/containers.yaml` on every
+repository-wide `vX.Y.Z` tag and on changes under `go/ironic-hardware-exporter/`.
+There is no separate tag for this component. The Helm chart lives in
+`../../charts/ironic-hardware-exporter/` and is deployed from git at
+`understack_ref`.
 
 ## How To Validate
 
@@ -217,22 +205,14 @@ ironic_node_temperature_celsius
 
 ## How To Deploy
 
-This service currently deploys as a standalone Helm chart. There is release
-automation for the image and chart, but there is not yet an ArgoCD application
-template for it in this repository.
+In an UnderStack site the exporter is deployed by the ArgoCD Application in
+`charts/argocd-understack/templates/application-ironic-hardware-exporter.yaml`
+(enable `site.ironic_hardware_exporter`). It is released with the
+repository-wide tag: when `understack_ref` is a release tag the image tag
+follows it, otherwise the image is `latest`. Pin a tag with `image.tag` in the
+site's `ironic-hardware-exporter/values.yaml`.
 
-### What gets built
-
-Release automation is defined in:
-
-- `.goreleaser.yaml`
-- `../../.github/workflows/build-ironic-hardware-exporter.yaml`
-
-That workflow:
-
-- builds the container image
-- packages the Helm chart from `helm/`
-- publishes the chart to GHCR as an OCI chart
+The rest of this section covers installing the chart by hand.
 
 ### What the chart deploys
 
@@ -265,7 +245,7 @@ Usually you will also set:
 
 Important chart values live in:
 
-- `helm/values.yaml`
+- `../../charts/ironic-hardware-exporter/values.yaml`
 
 The most important keys are:
 
@@ -327,7 +307,7 @@ stringData:
 ```yaml title="values-ironic-hardware-exporter.yaml"
 image:
   repository: ghcr.io/rackerlabs/understack/ironic-hardware-exporter
-  tag: "0.1.0"
+  tag: "<tag>"
 
 rabbitmq:
   host: rabbitmq.openstack.svc.cluster.local
@@ -359,23 +339,11 @@ serviceMonitor:
 ### Install from the local chart
 
 ```bash
-helm upgrade --install ironic-hardware-exporter ./helm \
+helm upgrade --install ironic-hardware-exporter ../../charts/ironic-hardware-exporter \
   --namespace openstack \
   --create-namespace \
   -f values-ironic-hardware-exporter.yaml
 ```
-
-### Install from the published OCI chart
-
-```bash
-helm upgrade --install ironic-hardware-exporter \
-  oci://ghcr.io/rackerlabs/charts/ironic-hardware-exporter \
-  --version <chart-version> \
-  --namespace openstack \
-  --create-namespace \
-  -f values-ironic-hardware-exporter.yaml
-```
-
 
 ### Post-install checks
 

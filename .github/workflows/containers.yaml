@@ -14,6 +14,7 @@ on:
       - "containers/ironic-vnc-container/**"
       - "containers/openstack-sync-operator/**"
       - "go/nautobotop/**"
+      - "go/ironic-hardware-exporter/**"
       - "containers/understack-tests/**"
       - "python/**"
       - ".github/workflows/containers.yaml"
@@ -52,6 +53,10 @@ jobs:
             target: ''
             dockerfile_path: ./go/nautobotop/Dockerfile
             context_path: "./go/nautobotop/"
+          - name: ironic-hardware-exporter
+            target: ''
+            dockerfile_path: ./go/ironic-hardware-exporter/Dockerfile
+            context_path: "./go/ironic-hardware-exporter/"
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
