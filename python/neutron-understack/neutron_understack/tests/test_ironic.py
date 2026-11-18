@@ -60,6 +60,12 @@ def _pool(client, candidates, children=None):
     client.irclient.nodes.side_effect = nodes
 
 
+def _wait_for(node, state):
+    """Wait like the SDK: only watch the node, so a missed transition times out."""
+    if node.provision_state != state:
+        raise sdk_exc.ResourceTimeout(f"{node.id} did not reach {state}")
+
+
 class _FakeBaremetal:
     def __init__(
         self,
@@ -150,7 +156,7 @@ class _FakeBaremetal:
         return self._copy()
 
     def wait_for_nodes_provision_state(self, nodes, state, timeout=None):
-        self.node.provision_state = state
+        _wait_for(self.node, state)
         return [self._copy()]
 
 
@@ -1055,8 +1061,7 @@ class _FakeIronic:
 
     def wait_for_nodes_provision_state(self, nodes, state, timeout=None):
         node_id = self._id(nodes[0])
-        if self.by_id[node_id].provision_state != state:
-            raise RuntimeError(f"{node_id} did not reach {state}")
+        _wait_for(self.by_id[node_id], state)
         return [self._copy(node_id)]
 
 

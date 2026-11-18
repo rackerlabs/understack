@@ -37,6 +37,7 @@ def _node(
         provision_state=provision_state,
         driver_info=driver_info or {},
         extra=extra or {},
+        last_error=None,
     )
 
 
@@ -642,6 +643,7 @@ def _ha_node(uuid, *, serial, mate_serial, **fields):
             "parent_node": None,
             "driver_info": {},
             "extra": extra,
+            "last_error": None,
             **fields,
         }
     )
