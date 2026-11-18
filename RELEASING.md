@@ -11,6 +11,11 @@ charts are deployed straight from `charts/nautobotop/` and
 `charts/ironic-hardware-exporter/` at `understack_ref`, like
 `openstack-sync-operator`.
 
+The Argo workflow templates in `workflows/argo-events/` are applied at
+`understack_ref` too, and the `ironic-nautobot-client` image they run is pinned
+to the same release tag through `kustomize.images` in the ArgoCD Application.
+For any other ref the templates keep using `latest`.
+
 Per-artifact tags (`kubectl-us/vX.Y.Z`, `dexop-vX.Y.Z`, `ironic-ipxe/vX.Y.Z`)
 are released independently. See
 [Separately released artifacts](#separately-released-artifacts) below.

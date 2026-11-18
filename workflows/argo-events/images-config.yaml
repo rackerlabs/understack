@@ -1,0 +1,13 @@
+---
+# Teaches kustomize where Argo keeps container images, so that the `images`
+# override set by the ArgoCD Application (kustomize.images) reaches them.
+# By default kustomize only knows about pod specs.
+images:
+  - path: spec/templates/container/image
+    kind: WorkflowTemplate
+  - path: spec/templates/script/image
+    kind: WorkflowTemplate
+  - path: spec/workflowSpec/templates/container/image
+    kind: CronWorkflow
+  - path: spec/workflowSpec/templates/script/image
+    kind: CronWorkflow
