@@ -1,26 +1,11 @@
 """Reconcile a NeutronSegmentRange CR onto Neutron.
 
-Find the range the CR describes by its name, adopt it when present, or create
-it when absent; then reconcile its mutable fields (``minimum`` and ``maximum``).
+Match a range by ``spec.name`` (project-scoped when unshared), adopting an
+existing one or creating it, then update ``minimum``/``maximum``. A legacy
+``understack-sr:<name>`` range is renamed in place. Ranges are never deleted.
 
-The operator identifies a range by the resource's own fields, not by an
-ownership marker stamped into it. A range is matched on its user-facing
-``name`` (scoped by project when the spec is unshared), so ``spec.name`` is the
-real Neutron name -- the operator neither prefixes it nor otherwise mangles it.
-A range created out-of-band with the same name is adopted and converged rather
-than duplicated.
-
-A segment range outlives any single CR: it is shared infrastructure other
-resources bind to, so the operator only ever finds, adopts, or creates one and
-never deletes it. Deleting a CR leaves its range in place for an operator to
-drain and remove.
-
-Neutron's NetworkSegmentRange API only accepts ``name``, ``minimum`` and
-``maximum`` on a PUT (see ``allow_put`` in
-``neutron_lib/api/definitions/network_segment_range.py``); ``network_type``,
-``physical_network``, ``shared`` and ``project_id`` are all immutable, so a
-mismatch on any of them fails the CR loudly rather than silently diverging or
-sending a PUT Neutron rejects with a bare 400.
+Only ``name``, ``minimum`` and ``maximum`` are PUT-able in Neutron; a mismatch
+on any other field fails the CR.
 """
 
 from __future__ import annotations
@@ -36,6 +21,11 @@ from openstack_sync.plugins.neutron.segment_ranges.config import PHYSICAL_NETWOR
 from openstack_sync.plugins.neutron.segment_ranges.config import TUNNEL_NETWORK_TYPES
 
 LOG = logging.getLogger(__name__)
+
+#: Prefix earlier releases stamped on every operator-created range name. Used
+#: only to find and rename those ranges on upgrade; nothing new is created with
+#: it. Safe to remove once every deployment has reconciled past this release.
+LEGACY_NAME_PREFIX = "understack-sr:"
 
 #: Identity of a range within one credential group: ``(name, project_id)``,
 #: where ``project_id`` is ``None`` for a shared spec.
@@ -93,6 +83,42 @@ def _validate_spec(spec: dict[str, Any]) -> None:
         raise ConfigError("project_id is required when shared is false")
 
 
+def _in_scope(segment_range: Any, name: str, project_id: str | None) -> bool:
+    """Return True when *segment_range* has *name* and, if given, *project_id*.
+
+    A shared spec (``project_id`` None) matches on name alone, mirroring the
+    query :func:`find_range` sends.
+    """
+    if str(get_value(segment_range, "name", default="")) != name:
+        return False
+    if not project_id:
+        return True
+    return get_value(segment_range, "project_id", default=None) == project_id
+
+
+def _lookup(conn: Any, name: str, project_id: str | None) -> Any | None:
+    """Return the single range named *name* in scope, None if absent.
+
+    More than one match is ambiguous and raises rather than guessing which
+    range to converge.
+    """
+    query: dict[str, Any] = {"name": name}
+    if project_id:
+        query["project_id"] = project_id
+
+    matches = [
+        segment_range
+        for segment_range in conn.network.network_segment_ranges(**query)
+        if _in_scope(segment_range, name, project_id)
+    ]
+    if len(matches) > 1:
+        raise ConfigError(
+            f"Segment range name {name!r} matched {len(matches)} ranges; "
+            "set spec.project_id to disambiguate"
+        )
+    return matches[0] if matches else None
+
+
 def find_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> Any | None:
     """Return the range the spec names, adopting one created out-of-band.
 
@@ -100,6 +126,17 @@ def find_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> Any | None
     unshared spec also scopes the match by ``project_id`` so two projects can
     hold same-named ranges without colliding. More than one match is ambiguous
     and raises rather than guessing which range to converge.
+
+    When no range has the plain name, the lookup falls back to the legacy
+    ``understack-sr:<name>`` an earlier release created, under the same scope.
+    The returned range then still carries the legacy name;
+    :func:`sync_segment_range` renames it. The legacy lookup only runs on a
+    miss, so a deployment that has already migrated pays no extra API call.
+
+    The scope is passed to Neutron as list filters and then re-checked on each
+    returned range, so the match does not depend on the server honouring the
+    filters: an admin-scoped or filter-ignoring listing that returns every
+    project's same-named range still resolves to this spec's project only.
 
     The *cache* is shared across a credential group's CRs and keyed by
     :func:`_cache_key`, so a hit always matches the scope the query would have
@@ -110,21 +147,9 @@ def find_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> Any | None
         return cache[key]
 
     name, project_id = key
-    query: dict[str, Any] = {"name": name}
-    if project_id:
-        query["project_id"] = project_id
-
-    matches = [
-        segment_range
-        for segment_range in conn.network.network_segment_ranges(**query)
-        if str(get_value(segment_range, "name", default="")) == name
-    ]
-    if len(matches) > 1:
-        raise ConfigError(
-            f"Segment range name {name!r} matched {len(matches)} ranges; "
-            "set spec.project_id to disambiguate"
-        )
-    match = matches[0] if matches else None
+    match = _lookup(conn, name, project_id)
+    if match is None and not name.startswith(LEGACY_NAME_PREFIX):
+        match = _lookup(conn, f"{LEGACY_NAME_PREFIX}{name}", project_id)
     if match is not None:
         cache[key] = match
     return match
@@ -239,19 +264,33 @@ def sync_segment_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> li
         )
         return []
 
-    LOG.info("Reusing segment range %s (%s)", name, resource_id(existing))
+    have_name = str(get_value(existing, "name", default=""))
+    legacy = have_name != name
+    LOG.info(
+        "Reusing segment range %s (%s)%s",
+        name,
+        resource_id(existing),
+        f" found under legacy name {have_name}" if legacy else "",
+    )
 
+    # Checked before any rename so a legacy range built differently fails the
+    # CR untouched rather than being renamed and then rejected.
     drift = _immutable_drift(existing, spec)
     if drift:
+        found_as = f" (found as legacy {have_name!r})" if legacy else ""
         raise ConfigError(
-            f"Segment range {name!r} already exists in Neutron with a different "
-            f"immutable field ({drift}). Neutron only allows updating minimum "
-            f"and maximum on an existing range; network_type, physical_network, "
-            f"shared and project_id are fixed at creation. Rename the CR or "
-            f"delete the existing range to let the operator recreate it."
+            f"Segment range {name!r}{found_as} already exists in Neutron with a "
+            f"different immutable field ({drift}). Neutron only allows updating "
+            "minimum and maximum on an existing range; network_type, "
+            "physical_network, shared and project_id are fixed at creation. Rename "
+            "the CR or delete the existing range to let the operator recreate it."
         )
 
     updates = _mutable_updates(existing, spec)
+    if legacy:
+        # Same PUT as any minimum/maximum drift: one write migrates the range.
+        LOG.info("Migrating legacy segment range %s to %s", have_name, name)
+        updates["name"] = name
     if not updates:
         LOG.info("Segment range %s already matches the spec", name)
         return []

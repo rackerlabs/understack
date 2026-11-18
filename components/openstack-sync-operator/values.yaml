@@ -96,7 +96,6 @@ pluginData:
         # Total wait is READY_RETRIES * READY_DELAY seconds.
         READY_RETRIES: 30
         READY_DELAY: 10
-        # When true, removing a NeutronSegmentRange CR also deletes its
-        # operator-managed OpenStack segment range. Enable this before
-        # removing the CR.
+        # No effect: segment ranges are shared infrastructure and are never
+        # deleted. Removing a NeutronSegmentRange CR leaves its range in place.
         PRUNE: false

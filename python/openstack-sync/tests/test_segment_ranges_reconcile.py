@@ -322,8 +322,9 @@ def test_shared_and_unshared_specs_with_one_name_use_distinct_cache_entries():
 
     found = reconcile.find_range(conn, _spec(shared=False, project_id="p1"), cache)
 
+    # The shared entry is not a hit for the unshared key: Neutron is queried.
     assert found is None
-    conn.network.network_segment_ranges.assert_called_once_with(
+    assert conn.network.network_segment_ranges.call_args_list[0] == mock.call(
         name="example-range", project_id="p1"
     )
 
@@ -348,3 +349,287 @@ def test_sync_caches_an_updated_range_under_its_project_key():
     reconcile.sync_segment_range(conn, _spec(shared=False, project_id="p1"), cache)
 
     assert cache == {("example-range", "p1"): updated}
+
+
+# ---------------------------------------------------------------------------
+# Client-side scoping: correct even when Neutron ignores the list filters
+# ---------------------------------------------------------------------------
+
+
+def _unfiltered_conn(ranges: list[dict]) -> mock.MagicMock:
+    """A conn that returns every range regardless of the query filters.
+
+    Models an admin-scoped or filter-ignoring listing: the plugin must not rely
+    on Neutron to apply ``name``/``project_id``.
+    """
+    conn = mock.MagicMock()
+    conn.network.network_segment_ranges.return_value = list(ranges)
+    return conn
+
+
+def test_in_scope_matches_name_and_project():
+    segment_range = _neutron_range("example-range", "p1")
+
+    assert reconcile._in_scope(segment_range, "example-range", "p1")
+    assert not reconcile._in_scope(segment_range, "example-range", "p2")
+    assert not reconcile._in_scope(segment_range, "other-range", "p1")
+
+
+def test_in_scope_ignores_project_for_shared_lookup():
+    segment_range = _neutron_range("example-range", "p1")
+
+    assert reconcile._in_scope(segment_range, "example-range", None)
+
+
+def test_find_range_picks_own_project_from_an_unfiltered_listing():
+    """Neutron returns both projects' ranges; P2's spec must get P2's only.
+
+    Without client-side scoping this either raises as ambiguous or, with a
+    single stray result, adopts the other project's range.
+    """
+    p1 = _neutron_range("example-range", "p1")
+    p2 = _neutron_range("example-range", "p2")
+    conn = _unfiltered_conn([p1, p2])
+
+    found = reconcile.find_range(conn, _spec(shared=False, project_id="p2"), {})
+
+    assert found is p2
+
+
+def test_find_range_ignores_another_projects_range_in_an_unfiltered_listing():
+    """Only P1 holds the name; P2's spec finds nothing rather than P1's range."""
+    conn = _unfiltered_conn([_neutron_range("example-range", "p1")])
+
+    assert reconcile.find_range(conn, _spec(shared=False, project_id="p2"), {}) is None
+
+
+def test_find_range_ignores_other_names_in_an_unfiltered_listing():
+    conn = _unfiltered_conn(
+        [_neutron_range("other-range", "p1"), _neutron_range("example-range", "p1")]
+    )
+
+    found = reconcile.find_range(conn, _spec(shared=False, project_id="p1"), {})
+
+    assert found["name"] == "example-range"
+
+
+def test_sync_creates_in_own_project_when_listing_holds_only_another_project():
+    conn = _unfiltered_conn([_neutron_range("example-range", "p1")])
+    conn.network.create_network_segment_range.return_value = _neutron_range(
+        "example-range", "p2"
+    )
+
+    reconcile.sync_segment_range(conn, _spec(shared=False, project_id="p2"), {})
+
+    create_kwargs = conn.network.create_network_segment_range.call_args.kwargs
+    assert create_kwargs["project_id"] == "p2"
+    conn.network.update_network_segment_range.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Upgrade: ranges created as understack-sr:<name> are renamed in place
+# ---------------------------------------------------------------------------
+
+LEGACY = f"{reconcile.LEGACY_NAME_PREFIX}example-range"
+
+
+def test_legacy_prefix_matches_what_earlier_releases_created():
+    """Pin the prefix: changing it would orphan every pre-upgrade range."""
+    assert reconcile.LEGACY_NAME_PREFIX == "understack-sr:"
+
+
+def test_legacy_range_is_renamed_not_duplicated():
+    legacy = _neutron_range(LEGACY, None, id="legacy-id")
+    conn = _filtering_conn([legacy])
+    conn.network.update_network_segment_range.return_value = _neutron_range(
+        "example-range", None, id="legacy-id"
+    )
+
+    reconcile.sync_segment_range(conn, _spec(), {})
+
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_called_once_with(
+        "legacy-id", name="example-range"
+    )
+
+
+def test_legacy_range_rename_and_bounds_drift_share_one_put():
+    legacy = _neutron_range(LEGACY, None, id="legacy-id", maximum=150)
+    conn = _filtering_conn([legacy])
+    conn.network.update_network_segment_range.return_value = _neutron_range(
+        "example-range", None, id="legacy-id"
+    )
+
+    reconcile.sync_segment_range(conn, _spec(), {})
+
+    conn.network.update_network_segment_range.assert_called_once_with(
+        "legacy-id", name="example-range", maximum=200
+    )
+
+
+def test_legacy_range_with_immutable_drift_fails_without_rename():
+    legacy = _neutron_range(LEGACY, None, physical_network="physnet2")
+    conn = _filtering_conn([legacy])
+
+    with pytest.raises(ConfigError, match="found as legacy") as excinfo:
+        reconcile.sync_segment_range(conn, _spec(), {})
+
+    assert "physical_network" in str(excinfo.value)
+    conn.network.update_network_segment_range.assert_not_called()
+    conn.network.create_network_segment_range.assert_not_called()
+
+
+def test_plain_range_present_skips_the_legacy_lookup():
+    """A migrated deployment pays no extra Neutron call per reconcile."""
+    conn = _filtering_conn([_neutron_range("example-range", None)])
+
+    reconcile.find_range(conn, _spec(), {})
+
+    conn.network.network_segment_ranges.assert_called_once_with(name="example-range")
+
+
+def test_plain_range_wins_over_a_leftover_legacy_range():
+    plain = _neutron_range("example-range", None, id="plain-id")
+    conn = _filtering_conn([plain, _neutron_range(LEGACY, None, id="legacy-id")])
+
+    assert reconcile.find_range(conn, _spec(), {}) is plain
+
+
+def test_legacy_lookup_keeps_the_project_scope():
+    """P1's legacy range is not adopted by P2's same-named CR."""
+    conn = _filtering_conn([_neutron_range(LEGACY, "p1")])
+    conn.network.create_network_segment_range.return_value = _neutron_range(
+        "example-range", "p2"
+    )
+
+    reconcile.sync_segment_range(conn, _spec(shared=False, project_id="p2"), {})
+
+    conn.network.update_network_segment_range.assert_not_called()
+    assert (
+        conn.network.create_network_segment_range.call_args.kwargs["project_id"] == "p2"
+    )
+    conn.network.network_segment_ranges.assert_called_with(name=LEGACY, project_id="p2")
+
+
+def test_legacy_lookup_scopes_client_side_on_an_unfiltered_listing():
+    p1 = _neutron_range(LEGACY, "p1", id="p1-legacy")
+    p2 = _neutron_range(LEGACY, "p2", id="p2-legacy")
+    conn = _unfiltered_conn([p1, p2])
+
+    found = reconcile.find_range(conn, _spec(shared=False, project_id="p2"), {})
+
+    assert found is p2
+
+
+def test_ambiguous_legacy_ranges_raise():
+    conn = _filtering_conn(
+        [
+            _neutron_range(LEGACY, None, id="a"),
+            _neutron_range(LEGACY, None, id="b"),
+        ]
+    )
+
+    with pytest.raises(ConfigError, match="matched 2 ranges"):
+        reconcile.find_range(conn, _spec(), {})
+
+
+def test_already_prefixed_spec_name_is_not_prefixed_twice():
+    conn = _filtering_conn([])
+
+    assert reconcile.find_range(conn, _spec(name=LEGACY), {}) is None
+    conn.network.network_segment_ranges.assert_called_once_with(name=LEGACY)
+
+
+def test_migrated_range_is_cached_under_the_plain_key():
+    conn = _filtering_conn([_neutron_range(LEGACY, None, id="legacy-id")])
+    renamed = _neutron_range("example-range", None, id="legacy-id")
+    conn.network.update_network_segment_range.return_value = renamed
+    cache: reconcile.RangeCache = {}
+
+    reconcile.sync_segment_range(conn, _spec(), cache)
+
+    assert cache == {("example-range", None): renamed}
+
+
+# ---------------------------------------------------------------------------
+# Ambiguous matches: more than one range in scope fails rather than guesses
+# ---------------------------------------------------------------------------
+
+
+def test_two_same_named_ranges_in_one_project_raise():
+    """Neutron does not enforce unique names, so one project can hold two."""
+    conn = _filtering_conn(
+        [
+            _neutron_range("example-range", "p1", id="a"),
+            _neutron_range("example-range", "p1", id="b"),
+        ]
+    )
+
+    with pytest.raises(ConfigError, match="matched 2 ranges"):
+        reconcile.find_range(conn, _spec(shared=False, project_id="p1"), {})
+
+
+def test_shared_spec_matching_ranges_in_several_projects_raises():
+    """A shared lookup is by name only, so ranges in P1 and P2 both match.
+
+    The error points at ``spec.project_id`` as the way to pick one.
+    """
+    conn = _filtering_conn(
+        [
+            _neutron_range("example-range", "p1", id="a"),
+            _neutron_range("example-range", "p2", id="b"),
+        ]
+    )
+
+    with pytest.raises(ConfigError, match="set spec.project_id to disambiguate"):
+        reconcile.find_range(conn, _spec(), {})
+
+
+def test_ambiguity_is_detected_after_client_side_scoping():
+    """An unfiltered listing still raises when two ranges share the scope.
+
+    A third range in another project is filtered out and not counted.
+    """
+    conn = _unfiltered_conn(
+        [
+            _neutron_range("example-range", "p1", id="a"),
+            _neutron_range("example-range", "p1", id="b"),
+            _neutron_range("example-range", "p2", id="c"),
+        ]
+    )
+
+    with pytest.raises(ConfigError, match="matched 2 ranges"):
+        reconcile.find_range(conn, _spec(shared=False, project_id="p1"), {})
+
+
+def test_ambiguous_plain_name_does_not_fall_back_to_legacy_lookup():
+    """The plain lookup raising stops the search; no legacy query is sent."""
+    conn = _filtering_conn(
+        [
+            _neutron_range("example-range", None, id="a"),
+            _neutron_range("example-range", None, id="b"),
+            _neutron_range(LEGACY, None, id="legacy"),
+        ]
+    )
+
+    with pytest.raises(ConfigError, match="matched 2 ranges"):
+        reconcile.find_range(conn, _spec(), {})
+
+    conn.network.network_segment_ranges.assert_called_once_with(name="example-range")
+
+
+def test_ambiguous_match_writes_nothing_and_caches_nothing():
+    conn = _filtering_conn(
+        [
+            _neutron_range("example-range", None, id="a", maximum=150),
+            _neutron_range("example-range", None, id="b", maximum=150),
+        ]
+    )
+    cache: reconcile.RangeCache = {}
+
+    with pytest.raises(ConfigError, match="matched 2 ranges"):
+        reconcile.sync_segment_range(conn, _spec(), cache)
+
+    assert cache == {}
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_not_called()

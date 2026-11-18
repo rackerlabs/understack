@@ -564,3 +564,131 @@ def test_run_sync_creates_a_range_for_a_project_that_lacks_one():
     assert create_kwargs["project_id"] == "p2"
     assert create_kwargs["shared"] is False
     conn.network.update_network_segment_range.assert_not_called()
+
+
+def test_run_sync_scopes_by_project_even_when_neutron_ignores_filters():
+    """An unfiltered listing still resolves each CR to its own project's range."""
+    conn = _neutron_conn(
+        [
+            _range("tenant-vlans", id="p1-range", shared=False, project_id="p1"),
+            _range("tenant-vlans", id="p2-range", shared=False, project_id="p2"),
+        ]
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 0
+    statuses = [c.kwargs["sync_status"] for c in patch_status.call_args_list]
+    assert statuses == ["Synced", "Synced"]
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_not_called()
+
+
+def test_run_sync_creates_for_missing_project_even_when_neutron_ignores_filters():
+    conn = _neutron_conn(
+        [_range("tenant-vlans", id="p1-range", shared=False, project_id="p1")]
+    )
+    conn.network.create_network_segment_range.return_value = _range(
+        "tenant-vlans", id="p2-range", shared=False, project_id="p2"
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 0
+    statuses = [c.kwargs["sync_status"] for c in patch_status.call_args_list]
+    assert statuses == ["Synced", "Synced"]
+    create_kwargs = conn.network.create_network_segment_range.call_args.kwargs
+    assert create_kwargs["project_id"] == "p2"
+
+
+# ---------------------------------------------------------------------------
+# Upgrade from the name-prefix release
+# ---------------------------------------------------------------------------
+
+
+def test_main_renames_a_legacy_prefixed_range_on_upgrade(monkeypatch, tmp_path):
+    """A range the previous release created as understack-sr:vlan-a is migrated.
+
+    The plain-name lookup misses it; without the legacy fallback the operator
+    would create a second vlan-a beside it and orphan the original.
+    """
+    clear_env(monkeypatch)
+    set_crd_identity(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
+    conn = _neutron_conn([_range("understack-sr:vlan-a", id="legacy-id")])
+    conn.network.update_network_segment_range.return_value = _range(
+        "vlan-a", id="legacy-id"
+    )
+
+    code, patch_status = _run_main(
+        monkeypatch, tmp_path, _schedule_context("vlan-a"), conn
+    )
+
+    assert code == 0
+    assert patch_status.call_args.kwargs["sync_status"] == "Synced"
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_called_once_with(
+        "legacy-id", name="vlan-a"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Ambiguous matches
+# ---------------------------------------------------------------------------
+
+
+def test_main_fails_when_the_name_matches_several_ranges(monkeypatch, tmp_path):
+    """Two Neutron ranges named vlan-a: the CR fails instead of picking one."""
+    clear_env(monkeypatch)
+    set_crd_identity(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
+    conn = _neutron_conn([_range("vlan-a", id="a"), _range("vlan-a", id="b")])
+
+    code, patch_status = _run_main(
+        monkeypatch, tmp_path, _schedule_context("vlan-a"), conn
+    )
+
+    assert code == 1
+    assert patch_status.call_args.kwargs["sync_status"] == "Failed"
+    assert "matched 2 ranges" in patch_status.call_args.kwargs["message"]
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_not_called()
+
+
+def test_run_sync_ambiguous_cr_does_not_block_its_neighbour():
+    """P1 holds two tenant-vlans ranges; P2's CR in the same group still syncs."""
+    conn = _filtering_conn(
+        [
+            _range("tenant-vlans", id="p1-a", shared=False, project_id="p1"),
+            _range("tenant-vlans", id="p1-b", shared=False, project_id="p1"),
+            _range("tenant-vlans", id="p2-range", shared=False, project_id="p2"),
+        ]
+    )
+
+    code, patch_status = _run_sync_group(
+        [
+            _project_resource("tenant-vlans", "p1"),
+            _project_resource("tenant-vlans", "p2"),
+        ],
+        conn,
+    )
+
+    assert code == 1
+    statuses = {
+        c.kwargs["name"]: c.kwargs["sync_status"] for c in patch_status.call_args_list
+    }
+    assert statuses == {"tenant-vlans-p1": "Failed", "tenant-vlans-p2": "Synced"}
+    conn.network.create_network_segment_range.assert_not_called()
+    conn.network.update_network_segment_range.assert_not_called()
