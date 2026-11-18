@@ -65,8 +65,9 @@ conf:
       force_config_drive: true
     quota:
       # adjust default quotas to make it possible to use baremetal
-      cores: 512
-      ram: "1024000"
+      instances: 6
+      cores: 2560
+      ram: "13841204"
     api:
       dhcp_domain: ""
     neutron:
