@@ -12,6 +12,7 @@ on:
       - "containers/dnsmasq/**"
       - "containers/ironic-nautobot-client/**"
       - "containers/ironic-vnc-container/**"
+      - "containers/nautobot/**"
       - "containers/openstack-sync-operator/**"
       - "go/nautobotop/**"
       - "go/ironic-hardware-exporter/**"

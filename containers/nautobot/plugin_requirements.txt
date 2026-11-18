@@ -4,7 +4,7 @@ nautobot[sso]==3.1.8
 
 # Updated Nov 2026 to support nornir-nautobot 5.x with scrapli extras
 nautobot-golden-config==3.1.0
-nautobot-plugin-nornir==3.3.0
+nautobot-plugin-nornir==3.4.0
 
 # Pin scrapli to avoid breaking changes in 2026.x that removed the Scrapli class
 # Golden Config and nornir-scrapli require the legacy API
