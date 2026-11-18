@@ -5,6 +5,7 @@ images:
 
   tags:
     # these are common across all these OpenStack Helm installations
+    dep_check: "quay.io/airshipit/kubernetes-entrypoint:latest-ubuntu_noble"
     bootstrap: "ghcr.io/rackerlabs/understack/ansible:latest"
     db_init: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
     db_drop: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
