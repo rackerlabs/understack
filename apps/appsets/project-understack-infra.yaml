@@ -11,8 +11,6 @@ spec:
   destinations:
   - namespace: 'cert-manager'
     server: '*'
-  - namespace: 'ingress-nginx'
-    server: '*'
   - namespace: 'cilium'
     server: '*'
   - namespace: 'envoy-gateway'

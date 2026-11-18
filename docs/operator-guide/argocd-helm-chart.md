@@ -245,7 +245,7 @@ Applications are organized into three ArgoCD projects:
 | Project | Purpose | Components |
 |---------|---------|------------|
 | `understack` | Main project | OpenStack services, workflows, dex, nautobot |
-| `understack-infra` | Infrastructure | Cilium, cert-manager, ingress-nginx, sealed-secrets |
+| `understack-infra` | Infrastructure | Cilium, cert-manager, sealed-secrets |
 | `understack-operators` | Operators | CNPG, MariaDB, External Secrets, RabbitMQ, monitoring |
 
 ## Sync Policies
