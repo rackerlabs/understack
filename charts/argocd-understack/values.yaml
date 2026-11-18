@@ -419,7 +419,7 @@ site:
     wave: 3
     # -- Chart version for Nova
     # renovate: datasource=helm depName=nova registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.2.25+db466b55f
+    chartVersion: 2026.2.26+172833344
 
   # -- Octavia (Load Balancer Service)
   octavia:
