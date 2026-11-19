@@ -2,6 +2,7 @@ from ironic.drivers.modules import noop
 from ironic.drivers.modules.storage import noop as noop_storage
 
 from ironic_understack.drivers.netdev_hardware import NetdevHardware
+from ironic_understack.drivers.netdev_power import NetdevPower
 
 
 def _interface_names(ifaces):
@@ -21,6 +22,17 @@ def test_netdev_bios():
 def test_netdev_network():
     hw = NetdevHardware()
     assert _interface_names(hw.supported_network_interfaces) == ["NeutronNetwork"]
+
+
+def test_netdev_power_opts_out_of_power_sync():
+    # New nodes get NetdevPower; nodes already on fake power keep working.
+    hw = NetdevHardware()
+    assert _interface_names(hw.supported_power_interfaces) == [
+        "NetdevPower",
+        "AgentPower",
+        "FakePower",
+    ]
+    assert NetdevPower().supports_power_sync(task=None) is False
 
 
 def test_netdev_noop_interfaces():

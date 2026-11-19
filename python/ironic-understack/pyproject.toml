@@ -40,6 +40,9 @@ panos = "ironic_understack.drivers.panos_inspect:PanosInspect"
 [project.entry-points."ironic.hardware.interfaces.management"]
 panos = "ironic_understack.drivers.panos_management:PanosManagement"
 
+[project.entry-points."ironic.hardware.interfaces.power"]
+netdev = "ironic_understack.drivers.netdev_power:NetdevPower"
+
 [project.entry-points."ironic.api.middleware"]
 portgroup-name-validation = "ironic_understack.middleware.portgroup_name_middleware:PortgroupNameValidationMiddleware"
 
