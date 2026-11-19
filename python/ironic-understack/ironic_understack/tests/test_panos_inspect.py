@@ -86,6 +86,23 @@ def test_inspect_failure(task, client, error):
     task.node.save.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        exception.HardwareInspectionFailure("only 1 LLDP neighbor"),
+        panos_api.PanosApiError("LLDP commit failed"),
+    ],
+    ids=["too-few-neighbors", "api-error"],
+)
+def test_failed_port_discovery_fails_inspection(task, client, error):
+    panos_inspect._discover_and_update_ports.side_effect = error
+
+    with pytest.raises(exception.HardwareInspectionFailure):
+        PanosInspect().inspect_hardware(task)
+    panos_inspect._validate_firewall_readiness.assert_not_called()
+    panos_inspect._handle_ha_configuration.assert_not_called()
+
+
 def test_apply_system_info_ignores_empty_fields(task):
     panos_inspect._apply_system_info(task.node, {"model": "", "serial": ""})
     assert task.node.properties == {}
