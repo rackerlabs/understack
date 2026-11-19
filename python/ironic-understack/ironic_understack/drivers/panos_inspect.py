@@ -13,13 +13,15 @@ from ironic.drivers import base
 from ironic.objects import port
 from oslo_log import log
 
+from ironic_understack.drivers import panos_firmware
+from ironic_understack.drivers.panos_base import PanosInterface
 from ironic_understack.utils import panos_api
 from ironic_understack.utils import vlan_group_name_convention
 
 LOG = log.getLogger(__name__)
 
 
-class PanosInspect(base.InspectInterface):
+class PanosInspect(PanosInterface, base.InspectInterface):
     """Inspect a PAN-OS appliance over its XML API.
 
     No ramdisk is involved; everything goes over the management address in
@@ -29,18 +31,6 @@ class PanosInspect(base.InspectInterface):
     # A firewall has no memory_mb/local_gb/cpu_arch to report.
     ESSENTIAL_PROPERTIES: ClassVar[set] = set()
 
-    def get_properties(self):
-        return {
-            "management_ip": "Address of the appliance's management interface, "
-            "used for the XML API. Required.",
-        }
-
-    def validate(self, task):
-        if not task.node.driver_info.get("management_ip"):
-            raise exception.MissingParameterValue(
-                f"Node {task.node.uuid} is missing driver_info management_ip"
-            )
-
     def inspect_hardware(self, task):
         node = task.node
         address = node.driver_info["management_ip"]
@@ -49,6 +39,8 @@ class PanosInspect(base.InspectInterface):
             client.login()
             system = client.system_info()
             _apply_system_info(node, system)
+            # Keep the node's firmware list current on every inspection.
+            panos_firmware.record_versions(task, system)
             # Discover data plane connectivity via LLDP. A failure fails
             # inspection so ports from an earlier run are never trusted.
             _discover_and_update_ports(task, client)
@@ -96,8 +88,6 @@ def _apply_system_info(node, system: dict[str, str]) -> None:
                 found,
                 target[key],
             )
-    if system.get("sw-version"):
-        properties["firmware_version"] = system["sw-version"]
     node.properties = properties
     node.extra = extra
 

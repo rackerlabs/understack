@@ -13,7 +13,7 @@ def test_panos_is_a_netdev():
 
 
 def test_panos_matches_netdev_except_inspect_and_management():
-    # Only inspect and management diverge. This pins that, so adding another
+    # Only firmware, inspect and management diverge. This pins that, so adding another
     # real interface later is a deliberate change rather than an accident.
     pa = PanosHardware()
     netdev = NetdevHardware()
@@ -22,7 +22,6 @@ def test_panos_matches_netdev_except_inspect_and_management():
         "supported_boot_interfaces",
         "supported_console_interfaces",
         "supported_deploy_interfaces",
-        "supported_firmware_interfaces",
         "supported_network_interfaces",
         "supported_power_interfaces",
         "supported_raid_interfaces",
@@ -57,3 +56,11 @@ def test_panos_deploy_is_noop():
 def test_panos_network_is_neutron():
     hw = PanosHardware()
     assert _interface_names(hw.supported_network_interfaces) == ["NeutronNetwork"]
+
+
+def test_panos_firmware_defaults_to_panos():
+    hw = PanosHardware()
+    assert _interface_names(hw.supported_firmware_interfaces) == [
+        "PanosFirmware",
+        "NoFirmware",
+    ]
