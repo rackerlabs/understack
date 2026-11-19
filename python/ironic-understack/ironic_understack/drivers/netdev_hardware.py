@@ -3,6 +3,8 @@ from ironic.drivers.modules import noop
 from ironic.drivers.modules.network import neutron
 from ironic.drivers.modules.storage import noop as noop_storage
 
+from ironic_understack.drivers.netdev_power import NetdevPower
+
 
 class NetdevHardware(generic.ManualManagementHardware):
     """Hardware type for network devices.
@@ -11,9 +13,9 @@ class NetdevHardware(generic.ManualManagementHardware):
     routers). Deploy is intentionally a no-op; Neutron is the only supported
     network interface. All other interfaces use the no-* noop variants.
 
-    Boot, power, and management are inherited from ManualManagementHardware
-    (NoopManagement / FakePower / iPXE+PXE boot) because Ironic has no
-    NoBoot or NoPower equivalents.
+    Boot and management are inherited from ManualManagementHardware
+    (NoopManagement / iPXE+PXE boot) because Ironic has no NoBoot
+    equivalent. Power defaults to NetdevPower.
     """
 
     @property
@@ -39,6 +41,10 @@ class NetdevHardware(generic.ManualManagementHardware):
     @property
     def supported_network_interfaces(self):
         return [neutron.NeutronNetwork]
+
+    @property
+    def supported_power_interfaces(self):
+        return [NetdevPower, *super().supported_power_interfaces]
 
     @property
     def supported_raid_interfaces(self):

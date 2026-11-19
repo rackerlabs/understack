@@ -226,7 +226,14 @@ def _ha_pair(
     mate_device.get_ha_status.return_value = _ha_status(
         *mate_peer, ha2=mate_ha2, enabled=mate_enabled
     )
+    mocker.patch.object(panos_inspect.conductor_utils.node_history, "NodeHistory")
     return device
+
+
+def _history():
+    """Return the events written to the (stubbed) node history table."""
+    table = panos_inspect.conductor_utils.node_history.NodeHistory
+    return [c.kwargs["event"] for c in table.call_args_list]
 
 
 def _validate_ha(task, device):
@@ -277,6 +284,8 @@ def test_an_unhealthy_pair_is_not_operational(mocker, task, change, reason):
 
     assert node.extra["ha_operational"] is False
     assert reason in node.last_error
+    # Kept in history too, once: Ironic's power sync clears last_error.
+    assert _history() == [node.last_error]
 
 
 @pytest.mark.parametrize(
@@ -316,3 +325,4 @@ def test_a_device_timeout_is_recorded_not_raised(mocker, task):
 
     assert node.extra["ha_operational"] is False
     assert node.last_error == "read timed out"
+    assert _history() == ["read timed out"]
