@@ -47,31 +47,17 @@ class PanosInspect(base.InspectInterface):
         try:
             client.login()
             system = client.system_info()
+            _apply_system_info(node, system)
+            # Discover data plane connectivity via LLDP. A failure fails
+            # inspection so ports from an earlier run are never trusted.
+            _discover_and_update_ports(task, client)
         except (panos_api.PanosApiError, requests.RequestException) as e:
             raise exception.HardwareInspectionFailure(
                 error=f"PAN-OS {address}: {e}"
             ) from e
 
-        _apply_system_info(node, system)
-
-        # Discover data plane connectivity via LLDP
-        ports_discovered = False
-        try:
-            _discover_and_update_ports(task, client)
-            ports_discovered = True
-        except Exception as e:
-            LOG.warning(
-                "[node:%s] Could not discover ports via LLDP: %s",
-                node.uuid,
-                e,
-                exc_info=True,
-            )
-            # Don't fail inspect if port discovery fails
-
         # Validate that the device is usable before marking as manageable
-        # Only validate if port discovery succeeded
-        if ports_discovered:
-            _validate_firewall_readiness(task)
+        _validate_firewall_readiness(task)
 
         # Handle HA configuration if this is part of an HA pair
         # Note: HA configuration is attempted but won't block inspection
