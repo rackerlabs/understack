@@ -38,7 +38,6 @@ def _node(
         driver_info=driver_info or {},
         extra=extra or {},
         last_error=None,
-        maintenance=False,
     )
 
 
@@ -749,22 +748,6 @@ def test_ha_unit_waits_for_its_mate_until_the_pair_is_confirmed(mocker):
     steps = _promote(mocker, ironic, "primary")
 
     assert steps == [("fw-this", "inspect")]
-    assert ironic.updates == []
-
-
-def test_ha_unit_in_maintenance_fails_with_the_reason(mocker):
-    # Inspection found a cabling fault; DC ops must fix it before a re-run.
-    ironic = _pair(
-        "primary",
-        this={
-            "ha_operational": False,
-            "maintenance": True,
-            "maintenance_reason": "HA pair cabling error: same switch",
-        },
-    )
-
-    with pytest.raises(RuntimeError, match="In maintenance: HA pair cabling error"):
-        _promote(mocker, ironic, "primary")
     assert ironic.updates == []
 
 

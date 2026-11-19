@@ -775,19 +775,6 @@ def _warn_if_hsci_slower(node_uuid: str, ports, ha_iface_status: dict) -> None:
             )
 
 
-def _hold_for_cabling_fault(node, reason: str) -> None:
-    """Put the node in maintenance for a cabling fault that DC ops must fix.
-
-    A reason already there (another hold, or this fault from an earlier run)
-    is kept.
-    """
-    LOG.error("[node:%s] %s; putting it in maintenance", node.uuid, reason)
-    current = (node.maintenance and node.maintenance_reason) or ""
-    if reason not in current:
-        node.maintenance_reason = f"{current}; {reason}" if current else reason
-    node.maintenance = True
-
-
 def _validate_and_pair_ha(
     task,
     client: panos_api.PanosClient,
@@ -806,13 +793,13 @@ def _validate_and_pair_ha(
     5. Pre-flight compatibility checks (resource_class, roles)
 
     Sets extra.ha_operational = True only when ALL checks pass;
-    otherwise the reason goes in last_error. A cabling fault (wrong peer,
-    same switch) puts the node in maintenance with maintenance_reason instead.
+    otherwise the reason goes in last_error.
     Does NOT modify mate node's extra fields or transition states.
     The enroll-fw workflow will read ha_operational from both devices
     and decide whether to promote.
 
-    :raises: Logs warnings but does not raise - allows inspection to complete
+    :raises: HardwareInspectionFailure for a cabling fault (wrong peer, same
+        switch). Other failures are recorded and inspection completes.
     """
     # Default to False - only set True if all checks pass
     extra["ha_operational"] = False
@@ -854,8 +841,9 @@ def _validate_and_pair_ha(
                 f"HA peer serial mismatch: got {peer_serial}, "
                 f"expected {mate_serial}"
             )
-            _hold_for_cabling_fault(node, reason)
-            return
+            LOG.warning("[node:%s] %s", node.uuid, reason)
+            node.last_error = reason
+            raise exception.HardwareInspectionFailure(reason)
 
         LOG.info("[node:%s] HA peer connected: %s", node.uuid, peer_serial)
 
@@ -968,8 +956,9 @@ def _validate_and_pair_ha(
                 f"({', '.join(sorted(switch_overlap))}). "
                 "HA pair must be on different switches."
             )
-            _hold_for_cabling_fault(node, error_msg)
-            return
+            LOG.error("[node:%s] %s", node.uuid, error_msg)
+            node.last_error = error_msg
+            raise exception.HardwareInspectionFailure(error_msg)
 
         LOG.info(
             "[node:%s] Switch diversity validated: %d switches on this device, "
@@ -995,6 +984,8 @@ def _validate_and_pair_ha(
         # Clear any previous failure reason
         node.last_error = None
 
+    except exception.HardwareInspectionFailure:
+        raise  # a cabling fault stops inspection
     except Exception as e:
         LOG.exception(
             "[node:%s] HA validation/pairing failed: %s",
