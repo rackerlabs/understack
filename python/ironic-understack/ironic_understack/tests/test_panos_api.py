@@ -17,6 +17,11 @@ SYSTEM_INFO = b"""<response status="success"><result><system>
 <serial>000000000001</serial>
 <sw-version>11.0.0</sw-version>
 </system></result></response>"""
+HA_STATUS = b"""<response status="success"><result><enabled>yes</enabled><group>
+<local-info><state>active</state></local-info>
+<peer-info><conn-ha2><conn-status>up</conn-status></conn-ha2>
+<conn-status>up</conn-status><serial-num>000000000002</serial-num></peer-info>
+</group></result></response>"""
 
 
 def _resp(status_code, content):
@@ -156,3 +161,15 @@ def test_op_error_status_is_raised(conf):
 
     with pytest.raises(panos_api.PanosApiError, match="bad command"):
         client.op("<show><nope/></show>")
+
+
+def test_ha_status_reads_ha2_link_status_from_peer_info(conf):
+    session = Mock()
+    session.post.return_value = _resp(200, HA_STATUS)
+    client = panos_api.PanosClient("192.0.2.10", session=session)
+    client.api_key = "KEY"
+
+    status = client.get_ha_status()
+
+    assert status["enabled"] == "yes"
+    assert status["peer"]["conn_ha2_status"] == "up"
