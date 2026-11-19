@@ -1003,12 +1003,16 @@ class _FakeNeutron:
         self.port_security = True
         self.log = []  # deletes and subport changes, in order
 
-    def get_ports(self, _ctx, filters):
+    @staticmethod
+    def _matching(objects, filters):
         return [
-            copy.deepcopy(port)
-            for port in self.ports.values()
-            if all(port.get(key) in values for key, values in filters.items())
+            copy.deepcopy(obj)
+            for obj in objects.values()
+            if all(obj.get(key) in values for key, values in filters.items())
         ]
+
+    def get_ports(self, _ctx, filters):
+        return self._matching(self.ports, filters)
 
     def create_port(self, _ctx, body):
         port = {**copy.deepcopy(body["port"]), "id": body["port"]["name"]}
@@ -1026,11 +1030,7 @@ class _FakeNeutron:
         return {"id": network_id, "port_security_enabled": self.port_security}
 
     def get_trunks(self, _ctx, filters):
-        return [
-            copy.deepcopy(trunk)
-            for trunk in self.trunks.values()
-            if trunk["name"] in filters["name"]
-        ]
+        return self._matching(self.trunks, filters)
 
     def get_trunk(self, _ctx, trunk_id):
         return copy.deepcopy(self.trunks[trunk_id])
@@ -1176,6 +1176,41 @@ class TestHaPairWiring:
         with pytest.raises(palo_alto_wiring.PaloAltoHaSecondaryMissing):
             wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
         assert pair.neutron.ports == {}
+
+    def test_a_tenants_lookalikes_are_never_used(self, wiring, pair):
+        # A tenant can name its own port and trunk like ours.
+        neutron = pair.neutron
+        tenant = {"project_id": "tenant", "device_id": "", "sub_ports": []}
+        neutron.ports["tenant-port"] = {
+            **tenant,
+            "id": "tenant-port",
+            "name": _MIRROR_GW,
+        }
+        neutron.trunks["tenant-trunk"] = {
+            **tenant,
+            "id": "tenant-trunk",
+            "name": "palo-alto-router-trunk-r1-outside",
+        }
+
+        wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
+        assert neutron.vlans("palo-alto-router-trunk-r1-outside") == {"gw-1": 200}
+        assert neutron.vlans("palo-alto-router-trunk-r1-outside-secondary") == {
+            _MIRROR_GW: 200
+        }
+        wiring.cleanup_attachment("r1", "gw-1", "gateway")
+
+        assert neutron.trunks == {"tenant-trunk": neutron.trunks["tenant-trunk"]}
+        assert neutron.trunks["tenant-trunk"]["sub_ports"] == []
+        assert "tenant-port" in neutron.ports
+
+    def test_two_of_our_mirrors_are_refused(self, wiring, pair):
+        wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
+        pair.neutron.ports["dup"] = {**pair.neutron.ports[_MIRROR_GW], "id": "dup"}
+
+        with pytest.raises(
+            palo_alto_wiring.PaloAltoWiringAmbiguous, match="2 Palo Alto mirror port"
+        ):
+            wiring.cleanup_attachment("r1", "gw-1", "gateway")
 
     def test_no_address_pairs_where_port_security_is_off(self, wiring, pair):
         pair.neutron.port_security = False
