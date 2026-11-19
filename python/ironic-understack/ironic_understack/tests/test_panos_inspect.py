@@ -221,12 +221,10 @@ def test_a_healthy_pair_is_operational(mocker, task):
     ("change", "reason"),
     [
         ({"peer": ("S2", "down")}, "HA peer connection not up"),
-        ({"peer": ("S9", "up")}, "HA peer serial mismatch"),
         ({"mate_peer": ("S9", "up")}, "Mate peer serial mismatch"),
         ({"mate_peer": ("S1", "down")}, "Mate peer connection not up"),
-        ({"mate_switch": "leaf-1"}, "same switch"),
     ],
-    ids=["peer-down", "wrong-peer", "mate-sees-other", "mate-down", "same-switch"],
+    ids=["peer-down", "mate-sees-other", "mate-down"],
 )
 def test_an_unhealthy_pair_is_not_operational(mocker, task, change, reason):
     device = _ha_pair(mocker, task, **change)
@@ -235,6 +233,25 @@ def test_an_unhealthy_pair_is_not_operational(mocker, task, change, reason):
 
     assert node.extra["ha_operational"] is False
     assert reason in node.last_error
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        ({"peer": ("S9", "up")}, "HA peer serial mismatch"),
+        ({"mate_switch": "leaf-1"}, "same switch"),
+    ],
+    ids=["wrong-peer", "same-switch"],
+)
+def test_a_cabling_fault_fails_inspection(mocker, task, change, reason):
+    device = _ha_pair(mocker, task, **change)
+
+    with pytest.raises(exception.HardwareInspectionFailure, match=reason):
+        _validate_ha(task, device)
+
+    assert task.node.extra["ha_operational"] is False
+    assert reason in task.node.last_error
+    task.node.save.assert_called_once()
 
 
 def test_a_local_link_down_never_contacts_the_mate(mocker, task):

@@ -798,7 +798,8 @@ def _validate_and_pair_ha(
     The enroll-fw workflow will read ha_operational from both devices
     and decide whether to promote.
 
-    :raises: Logs warnings but does not raise - allows inspection to complete
+    :raises: HardwareInspectionFailure for a cabling fault (wrong peer, same
+        switch). Other failures are recorded and inspection completes.
     """
     # Default to False - only set True if all checks pass
     extra["ha_operational"] = False
@@ -842,7 +843,7 @@ def _validate_and_pair_ha(
             )
             LOG.warning("[node:%s] %s", node.uuid, reason)
             node.last_error = reason
-            return
+            raise exception.HardwareInspectionFailure(reason)
 
         LOG.info("[node:%s] HA peer connected: %s", node.uuid, peer_serial)
 
@@ -983,6 +984,8 @@ def _validate_and_pair_ha(
         # Clear any previous failure reason
         node.last_error = None
 
+    except exception.HardwareInspectionFailure:
+        raise  # a cabling fault stops inspection
     except Exception as e:
         LOG.exception(
             "[node:%s] HA validation/pairing failed: %s",
