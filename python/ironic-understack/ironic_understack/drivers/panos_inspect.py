@@ -8,6 +8,7 @@ from typing import ClassVar
 import requests
 from ironic.common import exception
 from ironic.common import states
+from ironic.conductor import utils as conductor_utils
 from ironic.drivers import base
 from ironic.objects import port
 from oslo_log import log
@@ -761,6 +762,19 @@ def _warn_if_hsci_slower(node_uuid: str, ports, ha_iface_status: dict) -> None:
             )
 
 
+def _record_ha_reason(node, reason: str, log=LOG.warning) -> None:
+    """Log why the pair is not ready; keep it in last_error and node history.
+
+    Ironic's power sync clears last_error on these nodes within a minute;
+    the history entry stays. Pass log=None if the caller already logged it.
+    """
+    if log:
+        log("[node:%s] %s", node.uuid, reason)
+    conductor_utils.node_history_record(
+        node, event=reason, event_type=states.INTROSPECTION, error=True
+    )
+
+
 def _validate_and_pair_ha(
     task,
     client: panos_api.PanosClient,
@@ -779,7 +793,7 @@ def _validate_and_pair_ha(
     5. Pre-flight compatibility checks (resource_class, roles)
 
     Sets extra.ha_operational = True only when ALL checks pass;
-    otherwise the reason goes in last_error.
+    otherwise the reason goes in last_error and node history.
     Does NOT modify mate node's extra fields or transition states.
     The enroll-fw workflow will read ha_operational from both devices
     and decide whether to promote.
@@ -802,8 +816,7 @@ def _validate_and_pair_ha(
                 f"HA interfaces not all up: ha1-a={ha1_a_state}, "
                 f"ha1-b={ha1_b_state}, hsci={hsci_state}"
             )
-            LOG.info("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason, LOG.info)
             return
 
         LOG.info("[node:%s] HA interfaces operational", node.uuid)
@@ -818,8 +831,7 @@ def _validate_and_pair_ha(
                 f"HA peer connection not up: "
                 f"conn={peer_conn}, peer_serial={peer_serial}"
             )
-            LOG.info("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason, LOG.info)
             return
 
         if peer_serial != mate_serial:
@@ -837,8 +849,7 @@ def _validate_and_pair_ha(
         mate = _find_mate_node(task, mate_serial)
         if not mate:
             reason = f"Mate node {mate_serial} not found in Ironic"
-            LOG.info("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason, LOG.info)
             return
 
         # Step 4: Pre-flight compatibility checks
@@ -852,8 +863,7 @@ def _validate_and_pair_ha(
                 f"Mate serial mismatch: mate expects {mate_mate_serial}, "
                 f"my serial is {my_serial}"
             )
-            LOG.warning("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason)
             return
 
         # Check resource class match
@@ -862,8 +872,7 @@ def _validate_and_pair_ha(
                 f"Resource class mismatch: self={node.resource_class}, "
                 f"mate={mate.resource_class}"
             )
-            LOG.warning("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason)
             return
 
         # Check opposite HA roles
@@ -871,14 +880,12 @@ def _validate_and_pair_ha(
         mate_role = _get_ha_role(mate)
         if not my_role or not mate_role:
             reason = f"Missing HA roles: self={my_role}, mate={mate_role}"
-            LOG.warning("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason)
             return
 
         if my_role == mate_role:
             reason = f"Same HA role on both devices: {my_role}"
-            LOG.warning("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason)
             return
 
         LOG.info(
@@ -893,8 +900,7 @@ def _validate_and_pair_ha(
         mate_address = mate.driver_info.get("management_ip")
         if not mate_address:
             reason = "Mate has no management_ip"
-            LOG.warning("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason)
             return
 
         mate_client = panos_api.PanosClient(mate_address)
@@ -908,14 +914,12 @@ def _validate_and_pair_ha(
                 f"Mate peer serial mismatch: "
                 f"got {mate_peer_serial}, expected {my_serial}"
             )
-            LOG.warning("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason)
             return
 
         if mate_peer_conn != "up":
             reason = f"Mate peer connection not up: {mate_peer_conn}"
-            LOG.warning("[node:%s] %s", node.uuid, reason)
-            node.last_error = reason
+            _record_ha_reason(node, reason)
             return
 
         LOG.info("[node:%s] Bidirectional HA validation passed", node.uuid)
@@ -979,7 +983,7 @@ def _validate_and_pair_ha(
             e,
         )
         # Set failure reason for troubleshooting
-        node.last_error = str(e)
+        _record_ha_reason(node, str(e), log=None)
         # Don't raise - allow inspection to complete even if pairing fails
     finally:
         # Always save ha_operational status (True if all checks passed, False otherwise)
