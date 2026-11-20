@@ -164,18 +164,6 @@ class PaloAltoWiringAmbiguous(n_exc.Conflict):
     )
 
 
-def _only(found: list[dict], kind: str, name: str) -> dict | None:
-    """Return the one match, or None; refuse to guess between several."""
-    if len(found) > 1:
-        raise PaloAltoWiringAmbiguous(
-            count=len(found),
-            kind=kind,
-            name=name,
-            ids=", ".join(obj["id"] for obj in found),
-        )
-    return found[0] if found else None
-
-
 def _stack_name(name: str, side: Side | None, member: Member) -> str:
     """Add the side, and -secondary for the HA secondary's stack."""
     if side:
@@ -292,16 +280,26 @@ class PaloAltoWiring:
         return n_context.get_admin_context()
 
     def _project_id(self) -> str:
-        """The project our wiring objects live in; tenants cannot create there."""
+        """The project our wiring lives in; tenants cannot create there."""
         return self._admin_context().project_id or ""
 
-    def _owned(self, name: str) -> dict:
-        """Lookup filters for one of our wiring objects: its name, our project.
+    def _find_one(self, lister, kind: str, name: str, **filters) -> dict | None:
+        """Return our wiring object with this name, or None; refuse duplicates.
 
-        Names are not unique and tenants pick their own, so a name alone
-        could match a tenant's port or trunk.
+        Scoped to our project: names are not unique and tenants pick their own.
         """
-        return {"name": [name], "project_id": [self._project_id()]}
+        found = lister(
+            self._admin_context(),
+            filters={"name": [name], "project_id": [self._project_id()], **filters},
+        )
+        if len(found) > 1:
+            raise PaloAltoWiringAmbiguous(
+                count=len(found),
+                kind=kind,
+                name=name,
+                ids=", ".join(obj["id"] for obj in found),
+            )
+        return found[0] if found else None
 
     def _tag_plugin(self):
         return directory.get_plugin(tagging.TAG_PLUGIN_TYPE)
@@ -358,12 +356,8 @@ class PaloAltoWiring:
         """Create the shared sentinel anchor network if it does not exist."""
         core_plugin = self._core_plugin()
         admin_context = self._admin_context()
-        existing = _only(
-            core_plugin.get_networks(
-                admin_context, filters=self._owned(ANCHOR_NETWORK_NAME)
-            ),
-            "anchor network",
-            ANCHOR_NETWORK_NAME,
+        existing = self._find_one(
+            core_plugin.get_networks, "anchor network", ANCHOR_NETWORK_NAME
         )
         if existing is not None:
             LOG.debug(
@@ -422,13 +416,12 @@ class PaloAltoWiring:
         self, router_id: str, side: Side | None = None, member: Member = "primary"
     ) -> dict | None:
         """Return the router's existing anchor-network parent port, or None."""
-        name = _parent_port_name(router_id, side, member)
-        anchor_network = self.ensure_anchor_network()
-        ports = self._core_plugin().get_ports(
-            self._admin_context(),
-            filters={**self._owned(name), "network_id": [anchor_network["id"]]},
+        return self._find_one(
+            self._core_plugin().get_ports,
+            "parent port",
+            _parent_port_name(router_id, side, member),
+            network_id=[self.ensure_anchor_network()["id"]],
         )
-        return _only(ports, "parent port", name)
 
     def _create_parent_port(
         self, router_id: str, side: Side | None = None, member: Member = "primary"
@@ -596,11 +589,11 @@ class PaloAltoWiring:
         self, router_id: str, side: Side | None = None, member: Member = "primary"
     ) -> dict | None:
         """Return the router's existing trunk (by deterministic name), or None."""
-        name = _trunk_name(router_id, side, member)
-        trunks = self._trunk_plugin().get_trunks(
-            self._admin_context(), filters=self._owned(name)
+        return self._find_one(
+            self._trunk_plugin().get_trunks,
+            "trunk",
+            _trunk_name(router_id, side, member),
         )
-        return _only(trunks, "trunk", name)
 
     def _create_trunk(
         self,
@@ -701,11 +694,11 @@ class PaloAltoWiring:
 
     def _mirror_port(self, router_id: str, port_id: str) -> dict | None:
         """Return the secondary's stand-in for a router port, or None."""
-        name = _mirror_port_name(router_id, port_id)
-        ports = self._core_plugin().get_ports(
-            self._admin_context(), filters=self._owned(name)
+        return self._find_one(
+            self._core_plugin().get_ports,
+            "mirror port",
+            _mirror_port_name(router_id, port_id),
         )
-        return _only(ports, "mirror port", name)
 
     def _mirror_port_id(self, router_id: str, port_id: str) -> str | None:
         """Return the id of the secondary's stand-in for a router port, or None."""
