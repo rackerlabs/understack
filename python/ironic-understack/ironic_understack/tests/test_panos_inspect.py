@@ -170,8 +170,15 @@ def test_warns_only_when_hsci_is_slower_than_data_ports(mocker, hsci_speed, warn
     assert log.warning.called is warns
 
 
-def _ha_status(serial, conn):
-    return {"peer": {"serial": serial, "conn_status": conn}}
+def _ha_status(serial, conn, ha2="up", enabled="yes"):
+    return {
+        "enabled": enabled,
+        "peer": {
+            "serial": serial,
+            "conn_status": conn,
+            "conn_ha2_status": ha2,
+        },
+    }
 
 
 def _ha_pair(
@@ -179,8 +186,14 @@ def _ha_pair(
     task,
     *,
     hsci="up",
+    ha1_a="up",
+    ha1_b="up",
     peer=("S2", "up"),
     mate_peer=("S1", "up"),
+    ha2="up",
+    mate_ha2="up",
+    enabled="yes",
+    mate_enabled="yes",
     mate_switch="leaf-2",
 ):
     """A primary, its secondary in Ironic and both devices; returns this device."""
@@ -204,13 +217,15 @@ def _ha_pair(
     )
     device = Mock()
     device.get_ha_interface_status.return_value = {
-        "ha1-a": {"state": "up"},
-        "ha1-b": {"state": "up"},
+        "ha1-a": {"state": ha1_a},
+        "ha1-b": {"state": ha1_b},
         "hsci": {"state": hsci},
     }
-    device.get_ha_status.return_value = _ha_status(*peer)
+    device.get_ha_status.return_value = _ha_status(*peer, ha2=ha2, enabled=enabled)
     mate_device = mocker.patch.object(panos_api, "PanosClient").return_value
-    mate_device.get_ha_status.return_value = _ha_status(*mate_peer)
+    mate_device.get_ha_status.return_value = _ha_status(
+        *mate_peer, ha2=mate_ha2, enabled=mate_enabled
+    )
     mocker.patch.object(panos_inspect.conductor_utils.node_history, "NodeHistory")
     return device
 
@@ -232,7 +247,7 @@ def _validate_ha(task, device):
 
 
 def test_a_healthy_pair_is_operational(mocker, task):
-    device = _ha_pair(mocker, task)
+    device = _ha_pair(mocker, task, hsci="ukn")
     task.node.last_error = "stale"
 
     node = _validate_ha(task, device)
@@ -247,8 +262,20 @@ def test_a_healthy_pair_is_operational(mocker, task):
         ({"peer": ("S2", "down")}, "HA peer connection not up"),
         ({"mate_peer": ("S9", "up")}, "Mate peer serial mismatch"),
         ({"mate_peer": ("S1", "down")}, "Mate peer connection not up"),
+        ({"ha2": "down"}, "HA2/HSCI link not up"),
+        ({"mate_ha2": "down"}, "Mate HA2/HSCI link not up"),
+        ({"enabled": "no"}, "HA is not enabled on this device"),
+        ({"mate_enabled": "no"}, "HA is not enabled on mate"),
     ],
-    ids=["peer-down", "mate-sees-other", "mate-down"],
+    ids=[
+        "peer-down",
+        "mate-sees-other",
+        "mate-down",
+        "ha2-down",
+        "mate-ha2-down",
+        "local-ha-disabled",
+        "mate-ha-disabled",
+    ],
 )
 def test_an_unhealthy_pair_is_not_operational(mocker, task, change, reason):
     device = _ha_pair(mocker, task, **change)
@@ -280,13 +307,13 @@ def test_a_cabling_fault_fails_inspection(mocker, task, change, reason):
     task.node.save.assert_called_once()
 
 
-def test_a_local_link_down_never_contacts_the_mate(mocker, task):
-    device = _ha_pair(mocker, task, hsci="down")
+def test_a_local_ha1_link_down_never_contacts_the_mate(mocker, task):
+    device = _ha_pair(mocker, task, ha1_a="down")
 
     node = _validate_ha(task, device)
 
     assert node.extra["ha_operational"] is False
-    assert "HA interfaces not all up" in node.last_error
+    assert "HA1 interfaces not all up" in node.last_error
     panos_api.PanosClient.assert_not_called()
 
 

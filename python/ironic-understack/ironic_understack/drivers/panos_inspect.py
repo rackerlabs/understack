@@ -786,7 +786,7 @@ def _validate_and_pair_ha(
     """Validate HA pairing and set ha_operational flag for this device.
 
     Performs comprehensive validation:
-    1. HA interface states (ha1-a, ha1-b, hsci)
+    1. HA1 interface states and HA2/HSCI link status
     2. Peer connection status
     3. Bidirectional serial validation (checks mate device too)
     4. Interface speed validation (hsci vs data plane)
@@ -805,26 +805,37 @@ def _validate_and_pair_ha(
     extra["ha_operational"] = False
 
     try:
-        # Step 1: Check HA interface states
+        # HSCI can report an unknown state through the generic interface API
+        # even when PAN-OS reports the HA2 link as up.
         ha_iface_status = client.get_ha_interface_status()
         ha1_a_state = ha_iface_status.get("ha1-a", {}).get("state")
         ha1_b_state = ha_iface_status.get("ha1-b", {}).get("state")
-        hsci_state = ha_iface_status.get("hsci", {}).get("state")
 
-        if ha1_a_state != "up" or ha1_b_state != "up" or hsci_state != "up":
+        if ha1_a_state != "up" or ha1_b_state != "up":
+            link_states = f"ha1-a={ha1_a_state}, ha1-b={ha1_b_state}"
+            reason = f"HA1 interfaces not all up: {link_states}"
+            _record_ha_reason(node, reason, LOG.info)
+            return
+
+        # Step 2: Validate HA configuration, HA2/HSCI, and peer connection.
+        ha_status = client.get_ha_status()
+        if str(ha_status.get("enabled", "")).strip().lower() != "yes":
             reason = (
-                f"HA interfaces not all up: ha1-a={ha1_a_state}, "
-                f"ha1-b={ha1_b_state}, hsci={hsci_state}"
+                "HA is not enabled on this device: "
+                f"{ha_status.get('enabled', 'unknown')}"
             )
             _record_ha_reason(node, reason, LOG.info)
             return
 
-        LOG.info("[node:%s] HA interfaces operational", node.uuid)
+        peer_status = ha_status.get("peer") or {}
+        ha2_status = peer_status.get("conn_ha2_status", "unknown")
+        if str(ha2_status).strip().lower() != "up":
+            reason = f"HA2/HSCI link not up: conn-ha2={ha2_status}"
+            _record_ha_reason(node, reason, LOG.info)
+            return
 
-        # Step 2: Query HA status and check peer connection
-        ha_status = client.get_ha_status()
-        peer_serial = ha_status.get("peer", {}).get("serial")
-        peer_conn = ha_status.get("peer", {}).get("conn_status")
+        peer_serial = peer_status.get("serial")
+        peer_conn = peer_status.get("conn_status")
 
         if peer_conn != "up":
             reason = (
@@ -906,8 +917,15 @@ def _validate_and_pair_ha(
         mate_client = panos_api.PanosClient(mate_address)
         mate_client.login()
         mate_ha_status = mate_client.get_ha_status()
-        mate_peer_serial = mate_ha_status.get("peer", {}).get("serial")
-        mate_peer_conn = mate_ha_status.get("peer", {}).get("conn_status")
+        if str(mate_ha_status.get("enabled", "")).strip().lower() != "yes":
+            mate_ha_enabled = mate_ha_status.get("enabled", "unknown")
+            reason = f"HA is not enabled on mate: {mate_ha_enabled}"
+            _record_ha_reason(node, reason)
+            return
+
+        mate_peer_status = mate_ha_status.get("peer") or {}
+        mate_peer_serial = mate_peer_status.get("serial")
+        mate_peer_conn = mate_peer_status.get("conn_status")
 
         if mate_peer_serial != my_serial:
             reason = (
@@ -919,6 +937,12 @@ def _validate_and_pair_ha(
 
         if mate_peer_conn != "up":
             reason = f"Mate peer connection not up: {mate_peer_conn}"
+            _record_ha_reason(node, reason)
+            return
+
+        mate_ha2_status = mate_peer_status.get("conn_ha2_status", "unknown")
+        if str(mate_ha2_status).strip().lower() != "up":
+            reason = f"Mate HA2/HSCI link not up: conn-ha2={mate_ha2_status}"
             _record_ha_reason(node, reason)
             return
 

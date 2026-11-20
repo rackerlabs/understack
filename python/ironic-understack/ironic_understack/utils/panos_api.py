@@ -362,7 +362,7 @@ class PanosClient:
             - enabled: "yes" or "no"
             - local: dict with state, version, mode, priority
             - peer: dict with state, conn_status, conn_ha1_up, conn_ha1_backup_up,
-                    version, serial, mgmt_ip
+                    conn_ha2_status, version, serial, mgmt_ip
             - group_id: HA group ID
             - error: error message if query fails
         """
@@ -397,6 +397,10 @@ class PanosClient:
                     "conn_ha1_backup_up": (
                         result.findtext(".//peer-info/conn-ha1-backup/conn-status")
                         == "up"
+                    ),
+                    "conn_ha2_status": (
+                        result.findtext(".//peer-info/conn-ha2/conn-status")
+                        or "unknown"
                     ),
                     "version": result.findtext(".//peer-info/build-rel") or "unknown",
                     "serial": result.findtext(".//peer-info/serial-num") or "unknown",
