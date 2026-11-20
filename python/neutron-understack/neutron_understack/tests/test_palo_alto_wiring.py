@@ -1203,14 +1203,30 @@ class TestHaPairWiring:
         assert neutron.trunks["tenant-trunk"]["sub_ports"] == []
         assert "tenant-port" in neutron.ports
 
-    def test_two_of_our_mirrors_are_refused(self, wiring, pair):
+    @pytest.mark.parametrize(
+        ("name", "kind"),
+        [
+            (_MIRROR_GW, "mirror port"),
+            ("palo-alto-router-anchor-r1-outside", "parent port"),
+        ],
+    )
+    def test_two_of_ours_with_one_name_are_refused(self, wiring, pair, name, kind):
         wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
-        pair.neutron.ports["dup"] = {**pair.neutron.ports[_MIRROR_GW], "id": "dup"}
+        pair.neutron.ports["dup"] = {**pair.neutron.ports[name], "id": "dup"}
 
         with pytest.raises(
-            palo_alto_wiring.PaloAltoWiringAmbiguous, match="2 Palo Alto mirror port"
+            palo_alto_wiring.PaloAltoWiringAmbiguous, match=f"2 Palo Alto {kind}"
         ):
-            wiring.cleanup_attachment("r1", "gw-1", "gateway")
+            wiring.attach_port("r1", dict(_HA_GATEWAY), "gateway")
+
+    def test_two_anchor_networks_are_refused(self, wiring, core_plugin):
+        core_plugin.get_networks.return_value = [{"id": "anchor-net"}, {"id": "dup"}]
+
+        with pytest.raises(
+            palo_alto_wiring.PaloAltoWiringAmbiguous,
+            match=r"2 Palo Alto anchor network .*\(anchor-net, dup\)",
+        ):
+            wiring.ensure_anchor_network()
 
     def test_no_address_pairs_where_port_security_is_off(self, wiring, pair):
         pair.neutron.port_security = False

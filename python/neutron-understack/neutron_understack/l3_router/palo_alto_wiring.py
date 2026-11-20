@@ -158,15 +158,21 @@ class PaloAltoHaSecondaryMissing(n_exc.Conflict):
 # Conflict -> HTTP 409: more than one of our wiring objects has this name.
 class PaloAltoWiringAmbiguous(n_exc.Conflict):
     message = (
-        "Found %(count)s Palo Alto %(kind)s objects named %(name)s, expected "
-        "one; remove the extra ones and retry."
+        "Found %(count)s Palo Alto %(kind)s objects named %(name)s (%(ids)s), "
+        "expected one. Check which one the router's wiring uses before "
+        "removing the others."
     )
 
 
 def _only(found: list[dict], kind: str, name: str) -> dict | None:
     """Return the one match, or None; refuse to guess between several."""
     if len(found) > 1:
-        raise PaloAltoWiringAmbiguous(count=len(found), kind=kind, name=name)
+        raise PaloAltoWiringAmbiguous(
+            count=len(found),
+            kind=kind,
+            name=name,
+            ids=", ".join(obj["id"] for obj in found),
+        )
     return found[0] if found else None
 
 
@@ -352,16 +358,20 @@ class PaloAltoWiring:
         """Create the shared sentinel anchor network if it does not exist."""
         core_plugin = self._core_plugin()
         admin_context = self._admin_context()
-        existing = core_plugin.get_networks(
-            admin_context, filters=self._owned(ANCHOR_NETWORK_NAME)
+        existing = _only(
+            core_plugin.get_networks(
+                admin_context, filters=self._owned(ANCHOR_NETWORK_NAME)
+            ),
+            "anchor network",
+            ANCHOR_NETWORK_NAME,
         )
-        if existing:
+        if existing is not None:
             LOG.debug(
                 "Reusing existing anchor network %s (id=%s)",
                 ANCHOR_NETWORK_NAME,
-                existing[0]["id"],
+                existing["id"],
             )
-            return existing[0]
+            return existing
         LOG.info("Creating shared anchor network %s", ANCHOR_NETWORK_NAME)
         # Calling the core plugin directly (not via the REST API) skips the
         # API layer that fills in extension-attribute defaults, so we must
@@ -412,17 +422,13 @@ class PaloAltoWiring:
         self, router_id: str, side: Side | None = None, member: Member = "primary"
     ) -> dict | None:
         """Return the router's existing anchor-network parent port, or None."""
-        core_plugin = self._core_plugin()
-        admin_context = self._admin_context()
+        name = _parent_port_name(router_id, side, member)
         anchor_network = self.ensure_anchor_network()
-        ports = core_plugin.get_ports(
-            admin_context,
-            filters={
-                "name": [_parent_port_name(router_id, side, member)],
-                "network_id": [anchor_network["id"]],
-            },
+        ports = self._core_plugin().get_ports(
+            self._admin_context(),
+            filters={**self._owned(name), "network_id": [anchor_network["id"]]},
         )
-        return ports[0] if ports else None
+        return _only(ports, "parent port", name)
 
     def _create_parent_port(
         self, router_id: str, side: Side | None = None, member: Member = "primary"
