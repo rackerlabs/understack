@@ -155,6 +155,15 @@ class PaloAltoHaSecondaryMissing(n_exc.Conflict):
     )
 
 
+# Conflict -> HTTP 409: more than one of our wiring objects has this name.
+class PaloAltoWiringAmbiguous(n_exc.Conflict):
+    message = (
+        "Found %(count)s Palo Alto %(kind)s objects named %(name)s (%(ids)s), "
+        "expected one. Check which one the router's wiring uses before "
+        "removing the others."
+    )
+
+
 def _stack_name(name: str, side: Side | None, member: Member) -> str:
     """Add the side, and -secondary for the HA secondary's stack."""
     if side:
@@ -270,6 +279,28 @@ class PaloAltoWiring:
     def _admin_context(self):
         return n_context.get_admin_context()
 
+    def _project_id(self) -> str:
+        """The project our wiring lives in; tenants cannot create there."""
+        return self._admin_context().project_id or ""
+
+    def _find_one(self, lister, kind: str, name: str, **filters) -> dict | None:
+        """Return our wiring object with this name, or None; refuse duplicates.
+
+        Scoped to our project: names are not unique and tenants pick their own.
+        """
+        found = lister(
+            self._admin_context(),
+            filters={"name": [name], "project_id": [self._project_id()], **filters},
+        )
+        if len(found) > 1:
+            raise PaloAltoWiringAmbiguous(
+                count=len(found),
+                kind=kind,
+                name=name,
+                ids=", ".join(obj["id"] for obj in found),
+            )
+        return found[0] if found else None
+
     def _tag_plugin(self):
         return directory.get_plugin(tagging.TAG_PLUGIN_TYPE)
 
@@ -325,16 +356,16 @@ class PaloAltoWiring:
         """Create the shared sentinel anchor network if it does not exist."""
         core_plugin = self._core_plugin()
         admin_context = self._admin_context()
-        existing = core_plugin.get_networks(
-            admin_context, filters={"name": [ANCHOR_NETWORK_NAME]}
+        existing = self._find_one(
+            core_plugin.get_networks, "anchor network", ANCHOR_NETWORK_NAME
         )
-        if existing:
+        if existing is not None:
             LOG.debug(
                 "Reusing existing anchor network %s (id=%s)",
                 ANCHOR_NETWORK_NAME,
-                existing[0]["id"],
+                existing["id"],
             )
-            return existing[0]
+            return existing
         LOG.info("Creating shared anchor network %s", ANCHOR_NETWORK_NAME)
         # Calling the core plugin directly (not via the REST API) skips the
         # API layer that fills in extension-attribute defaults, so we must
@@ -349,7 +380,7 @@ class PaloAltoWiring:
                     "admin_state_up": True,
                     "shared": False,
                     "router:external": False,
-                    "project_id": admin_context.project_id or "",
+                    "project_id": self._project_id(),
                 }
             },
         )
@@ -385,17 +416,12 @@ class PaloAltoWiring:
         self, router_id: str, side: Side | None = None, member: Member = "primary"
     ) -> dict | None:
         """Return the router's existing anchor-network parent port, or None."""
-        core_plugin = self._core_plugin()
-        admin_context = self._admin_context()
-        anchor_network = self.ensure_anchor_network()
-        ports = core_plugin.get_ports(
-            admin_context,
-            filters={
-                "name": [_parent_port_name(router_id, side, member)],
-                "network_id": [anchor_network["id"]],
-            },
+        return self._find_one(
+            self._core_plugin().get_ports,
+            "parent port",
+            _parent_port_name(router_id, side, member),
+            network_id=[self.ensure_anchor_network()["id"]],
         )
-        return ports[0] if ports else None
 
     def _create_parent_port(
         self, router_id: str, side: Side | None = None, member: Member = "primary"
@@ -424,7 +450,7 @@ class PaloAltoWiring:
                     "device_id": router_id,
                     "mac_address": "",
                     "fixed_ips": [],
-                    "project_id": admin_context.project_id or "",
+                    "project_id": self._project_id(),
                     portbindings.VNIC_TYPE: portbindings.VNIC_BAREMETAL,
                 }
             },
@@ -563,11 +589,11 @@ class PaloAltoWiring:
         self, router_id: str, side: Side | None = None, member: Member = "primary"
     ) -> dict | None:
         """Return the router's existing trunk (by deterministic name), or None."""
-        admin_context = self._admin_context()
-        trunks = self._trunk_plugin().get_trunks(
-            admin_context, filters={"name": [_trunk_name(router_id, side, member)]}
+        return self._find_one(
+            self._trunk_plugin().get_trunks,
+            "trunk",
+            _trunk_name(router_id, side, member),
         )
-        return trunks[0] if trunks else None
 
     def _create_trunk(
         self,
@@ -592,7 +618,7 @@ class PaloAltoWiring:
                     "name": trunk_name,
                     "port_id": parent_port["id"],
                     "admin_state_up": True,
-                    "project_id": admin_context.project_id or "",
+                    "project_id": self._project_id(),
                     "sub_ports": [],
                 }
             },
@@ -668,11 +694,11 @@ class PaloAltoWiring:
 
     def _mirror_port(self, router_id: str, port_id: str) -> dict | None:
         """Return the secondary's stand-in for a router port, or None."""
-        ports = self._core_plugin().get_ports(
-            self._admin_context(),
-            filters={"name": [_mirror_port_name(router_id, port_id)]},
+        return self._find_one(
+            self._core_plugin().get_ports,
+            "mirror port",
+            _mirror_port_name(router_id, port_id),
         )
-        return ports[0] if ports else None
 
     def _mirror_port_id(self, router_id: str, port_id: str) -> str | None:
         """Return the id of the secondary's stand-in for a router port, or None."""
@@ -703,7 +729,7 @@ class PaloAltoWiring:
             "device_id": "",
             "mac_address": "",
             "fixed_ips": [],
-            "project_id": admin_context.project_id or "",
+            "project_id": self._project_id(),
         }
         network = core_plugin.get_network(admin_context, router_port["network_id"])
         # Neutron refuses address pairs where port security is off; nothing is
