@@ -17,6 +17,7 @@ from ironic_understack.utils import netdev_credentials
 LOG = log.getLogger(__name__)
 
 TIMEOUT = 30
+COMMIT_TIMEOUT = 240
 
 # Passwords are tried in this order. An appliance that has been through initial
 # setup takes the standard password, one part way through takes preconfig, and
@@ -238,7 +239,7 @@ class PanosClient:
             "details": job.findtext("details") or "",
         }
 
-    def wait_for_commit(self, job_id: str, timeout: int = 60) -> bool:
+    def wait_for_commit(self, job_id: str, timeout: int = COMMIT_TIMEOUT) -> bool:
         """Wait for a commit job to complete.
 
         :param job_id: Job ID from commit()
@@ -263,7 +264,12 @@ class PanosClient:
                     )
                     return False
 
-        LOG.error("PAN-OS %s commit timed out", self.address)
+        LOG.error(
+            "PAN-OS %s commit job %s still running after %ss",
+            self.address,
+            job_id,
+            timeout,
+        )
         return False
 
     def get_interface_macs(self) -> dict[str, str]:
@@ -603,7 +609,7 @@ class PanosClient:
                 role,
             )
             job_id = self.commit(f"HA Configuration - {role}")
-            if job_id and not self.wait_for_commit(job_id, timeout=120):
+            if job_id and not self.wait_for_commit(job_id):
                 LOG.error("PAN-OS %s: Failed to commit HA configuration", self.address)
                 return False
 
