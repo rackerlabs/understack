@@ -141,6 +141,15 @@ def test_system_info(conf):
     assert session.post.call_args.kwargs["headers"] == {"X-PAN-KEY": "KEY"}
 
 
+def test_a_slow_commit_is_waited_for(conf, mocker):
+    mocker.patch("time.sleep")
+    client = panos_api.PanosClient("192.0.2.10", session=Mock())
+    running, done = {"status": "ACT"}, {"status": "FIN", "result": "OK"}
+    mocker.patch.object(client, "check_job", side_effect=[running] * 39 + [done])
+
+    assert client.wait_for_commit("12") is True
+
+
 def test_op_requires_login(conf):
     client = panos_api.PanosClient("192.0.2.10", session=Mock())
     with pytest.raises(panos_api.PanosApiError, match="not logged in"):
