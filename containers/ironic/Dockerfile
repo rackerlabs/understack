@@ -15,9 +15,9 @@ ARG IRONIC_GIT_REF=fdcd0ca29428429db0e1f7d27a39ecfe4f8e1bb0
 ADD --keep-git-dir=true https://github.com/rackerlabs/ironic.git#${IRONIC_GIT_REF} /src/ironic
 RUN git -C /src/ironic fetch --unshallow --tags
 
-# renovate: name=openstack/sushy repo=https://github.com/openstack/sushy.git branch=stable/2026.2
-ARG SUSHY_GIT_REF=1711b77bd17cbe710fe1f161b391d0cf1c65eb73
-ADD --keep-git-dir=true https://github.com/openstack/sushy.git#${SUSHY_GIT_REF} /src/sushy
+# renovate: name=openstack/sushy repo=https://github.com/rackerlabs/sushy.git branch=understack/2026.2
+ARG SUSHY_GIT_REF=3c7502c9a15b0ba03a7c811e01f7703b6e24cd72
+ADD --keep-git-dir=true https://github.com/rackerlabs/sushy.git#${SUSHY_GIT_REF} /src/sushy
 RUN git -C /src/sushy fetch --unshallow --tags && \
     sed -i '/sushy==.*/d' /upper-constraints.txt
 
