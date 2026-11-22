@@ -40,8 +40,19 @@ site:
 
 Required or commonly required items:
 
-- `values.yaml`: Provide CDN ingress, object-bucket, cache, and runtime settings in `$CLUSTER_NAME/understack-cdn/values.yaml`.
+- `values.yaml`: Provide CDN object-bucket and cache settings in `$CLUSTER_NAME/understack-cdn/values.yaml`.
 
 Optional additions:
 
-- `Object storage credential Secret`: If your values reference an authenticated backend instead of anonymous access, create the Secret name referenced by the chart and populate it with the key names that backend expects.
+- Enable `supportassist.enabled` to create a separate private `supportassist`
+  bucket and signing sidecar. Rook generates its credentials Secret and
+  endpoint ConfigMap; do not create a public bucket policy.
+- Add a site HTTPRoute on the internal gateway for PUT `/supportassist/` to
+  `understack-cdn/cdn-edge` port `8081`. The firmware listener uses port `80`.
+  An IP-based URL works for iDRACs without DNS configured.
+
+SupportAssist uploads are limited to one active request per CDN pod and a
+1 GiB body. Concurrent uploads return 503; oversized uploads return 413.
+The signer buffers uploads and has a 6 GiB memory limit. See the
+[CDN README](https://github.com/rackerlabs/understack/blob/main/components/understack-cdn/README.md#supportassist-uploads)
+for resource requirements and access behavior.

@@ -60,6 +60,11 @@ data:
         proxy_hide_header x-amz-request-id;
         proxy_hide_header x-amz-id-2;
 
+{{- if .Values.supportassist.enabled }}
+        # The signer buffers each upload; bound concurrency across workers.
+        limit_conn_zone $server_name zone=supportassist_uploads:1m;
+{{- end }}
+
         include /etc/nginx/conf.d/*.conf;
     }
   default.conf: |
@@ -151,3 +156,40 @@ data:
             deny all;
         }
     }
+{{- if .Values.supportassist.enabled }}
+
+    # Only the internal SupportAssist route targets this listener.
+    server {
+        listen 8081;
+        server_name supportassist;
+
+        location /supportassist/ {
+            if ($request_method != PUT) { return 405; }
+            if ($is_args != "") { return 400; }
+            if ($content_length = "") { return 411; }
+
+            client_max_body_size 1g;
+            client_body_timeout 300s;
+            limit_conn supportassist_uploads 1;
+            limit_conn_status 503;
+
+            proxy_pass http://127.0.0.1:8082;
+            proxy_http_version 1.1;
+            proxy_request_buffering off;
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_next_upstream off;
+            proxy_send_timeout 300s;
+            proxy_read_timeout 600s;
+
+            # Do not let clients supply S3 ACL, copy or signing headers.
+            proxy_pass_request_headers off;
+            proxy_set_header Host $proxy_host;
+            proxy_set_header Connection "";
+            proxy_set_header Content-Length $content_length;
+            proxy_set_header Content-Type application/zip;
+        }
+
+        location / { return 404; }
+    }
+{{- end }}

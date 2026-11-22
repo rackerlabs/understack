@@ -5,8 +5,80 @@ Images are stored in Object Store
 Caching reverse-proxies at each fabric will fetch the images from Object Store
 and make them available via HTTPS.
 
+When enabled, the same pod also accepts SupportAssist HTTP uploads into a
+separate private `supportassist` bucket.
+
 This allows a device to access firmware images via an HTTPS request to a
 cluster-local tendot IP address.
+
+## SupportAssist uploads
+
+Enable `supportassist.enabled` in the site's CDN values to provision a local
+`supportassist` ObjectBucketClaim and start the signing sidecar. Its bucket
+quota defaults to `40G` (`supportassist.bucketMaxSize`). Rook supplies the
+endpoint ConfigMap and credentials Secret, both named `supportassist`. No
+anonymous bucket policy is needed. Firmware configuration is unchanged.
+
+Route `/supportassist/` to Service `cdn-edge`, port **8081**, using an HTTPRoute
+attached only to the internal gateway. The existing firmware Service port 80
+does not expose uploads. Sites own this route; the CDN chart does not choose
+a gateway or address. For iad3-dev, the share URL is
+`http://10.46.100.83/supportassist/`. The IP-based route supports iDRACs without
+DNS servers configured. Use the IP URL: the existing CDN hostname routes to
+the firmware listener.
+
+iDRAC appends the collection filename and sends a PUT with Content-Length and
+the raw ZIP body. NGINX streams it to a loopback-only AWS SigV4 proxy, which
+signs the request for RGW with the generated bucket credentials. NGINX accepts
+only PUT beneath `/supportassist/`, rejects query strings and strips incoming
+headers before forwarding. GET, listing, deletion, ACL changes and S3 copy
+requests are not exposed through this listener. Retrieve archives with an
+authenticated S3 client using the `supportassist` bucket credentials.
+
+### Retention and archiving
+
+Collections have no automatic expiration or archive transition. The bucket's
+`40G` default quota limits capacity; it does not remove old collections.
+Operators must manage capacity until a lifecycle policy is configured.
+
+A transition to archival storage after **90 days** is deferred. Repository
+configuration and live iad3-dev RGW settings checked on 2026-11-21 provide
+only the `STANDARD` object-storage class, backed by a 2+1 erasure-coded pool,
+with no archive tier or external archive destination. Another bucket on that
+same pool would not reduce storage usage or cost.
+
+Revisit the 90-day transition once an archive destination is available, and
+verify retrieval behavior before enabling it. Automatic deletion is not part
+of the agreed policy.
+
+### Upload limits and memory
+
+The pinned [AWS SigV4 proxy v1.13 source](https://github.com/awslabs/aws-sigv4-proxy/blob/v1.13/handler/proxy_client.go)
+buffers the complete body twice, even with `--unsigned-payload`. NGINX request
+buffering is disabled, but this does not remove the signer's buffers. Uploads
+therefore have these explicit limits:
+
+- Maximum archive: **1 GiB**; larger requests return HTTP 413.
+- One active upload per CDN pod, shared across NGINX workers. An overlapping
+  upload returns HTTP 503 and must be retried later; it is not queued.
+- Signer memory limit: **6 GiB**, with Go's soft memory target at 3 GiB.
+  Its 128 MiB memory request covers idle operation, not peak upload demand;
+  the node needs headroom for a large collection.
+
+A local test of the pinned proxy source on macOS/amd64 with Go 1.27.3 measured
+peak signer RSS of about 910 MiB for a 256 MiB body and 3.16 GiB for a 1 GiB
+body. These are development measurements, not Kubernetes container results;
+verify peak memory against the deployed image before increasing size or
+concurrency. The container memory limit remains the final bound, including
+requests that outlive a disconnected or timed-out client. An OOM restart will
+fail affected uploads. NGINX's active-request limit does not cancel work
+already running in the signer.
+
+The internal route allows 15 minutes per request. NGINX allows 300 seconds
+without upload progress and 600 seconds without a response from the signer.
+Firmware downloads do not share the upload concurrency limit. Archives go to
+RGW, not the firmware cache PVC. This is a credential-free internal ingress;
+clients that can reach it can upload or overwrite objects in the bucket.
 
 ## Proxy configuration
 

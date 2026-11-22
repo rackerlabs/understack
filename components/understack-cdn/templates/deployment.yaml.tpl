@@ -34,6 +34,10 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+{{- if .Values.supportassist.enabled }}
+            - containerPort: 8081
+              name: supportassist
+{{- end }}
 
           resources:
             requests:
@@ -78,6 +82,46 @@ spec:
             runAsUser: 101      # nginx user in nginx:alpine
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+
+{{- if .Values.supportassist.enabled }}
+        - name: supportassist-signer
+          image: public.ecr.aws/aws-observability/aws-sigv4-proxy:1.13
+          args:
+            - --port=127.0.0.1:8082
+            - --name=s3
+            - --region=us-east-1
+            - --host=$(BUCKET_HOST):$(BUCKET_PORT)
+            - --upstream-url-scheme=http
+          envFrom:
+            - secretRef:
+                name: supportassist
+          env:
+            - name: BUCKET_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: supportassist
+                  key: BUCKET_HOST
+            - name: BUCKET_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: supportassist
+                  key: BUCKET_PORT
+            - name: GOMEMLIMIT
+              value: 3GiB
+          # v1.13 buffers the body twice. NGINX admits one upload up to 1 GiB.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "2"
+              memory: 6Gi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+{{- end }}
 
       volumes:
         - name: nginx-config

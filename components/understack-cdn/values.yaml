@@ -16,3 +16,7 @@ cdn:
   objectBucketIsLocal: false
   # If above is true, how much space to claim for this object bucket:
   bucketMaxSize: 40g
+
+supportassist:
+  enabled: false
+  bucketMaxSize: 40g
