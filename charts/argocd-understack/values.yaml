@@ -159,6 +159,9 @@ global:
     # -- Enable/disable deploying nodedash
     # @default -- false
     enabled: false
+    # -- NodeDash Helm chart version
+    # renovate: datasource=docker depName=ghcr.io/rackerlabs/charts/nodedash
+    chartVersion: 0.2.3
     # -- Namespace to deploy nodedash into
     # @default -- nodedash
     namespace: nodedash
