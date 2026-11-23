@@ -616,7 +616,7 @@ def create_netdev_port(
 
 
 def make_manageable(node: Node, state: str) -> None:
-    """Drive the node to "manageable" from enroll or available.
+    """Drive the node to "manageable" from enroll, available or inspect failed.
 
     ``state`` is passed in for the same reason as in make_available.
     """

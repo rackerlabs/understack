@@ -151,9 +151,9 @@ def enroll_fw(
     }
 
     # Look up the node first so we can tell an in-service (active) firewall from
-    # one we may (re)enroll. Only the active case is special-cased here; every
-    # other state is handled by the shared engine (which rejects the states it
-    # cannot enroll).
+    # one we may (re)enroll. Only active and inspect failed are special-cased
+    # here; every other state is handled by the shared engine (which rejects
+    # the states it cannot enroll).
     client = IronicClient()
     node = _get_node_or_none(client, name)
 
@@ -165,6 +165,10 @@ def enroll_fw(
             **node_fields,
         )
         return node.uuid
+
+    # Retry a failed inspection: back to manageable, as `node manage` would.
+    if node is not None and node.provision_state == "inspect failed":
+        netdev_reconciler.make_manageable(node, node.provision_state)
 
     node_uuid = _make_manageable(client=client, name=name, **node_fields)
     _inspect_and_provide(client, node_uuid, physical_network, ha_role)
