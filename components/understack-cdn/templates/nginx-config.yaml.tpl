@@ -135,6 +135,19 @@ data:
             proxy_buffering on;
         }
 
+{{- if .Values.supportassist.enabled }}
+        location /supportassist-archives/ {
+            limit_except GET { deny all; }
+            auth_basic "SupportAssist archives";
+            auth_basic_user_file /etc/nginx/supportassist-auth/htpasswd;
+            alias /var/lib/nginx/supportassist/;
+            autoindex on;
+            autoindex_format json;
+            add_header Cache-Control "private, no-store" always;
+            add_header X-Content-Type-Options nosniff always;
+        }
+{{- end }}
+
         # Health check endpoint (used by k8s liveness/readiness probes)
         location /healthz {
             access_log off;
@@ -151,3 +164,26 @@ data:
             deny all;
         }
     }
+{{- if .Values.supportassist.enabled }}
+
+    # Only the internal SupportAssist route targets this listener.
+    server {
+        listen 8081;
+        server_name supportassist;
+
+        location /supportassist/ {
+            if ($request_method != PUT) { return 405; }
+            if ($is_args != "") { return 400; }
+            if ($content_length = "") { return 411; }
+
+            root /var/lib/nginx;
+            client_body_temp_path /var/lib/nginx/client_temp;
+            client_max_body_size 2g;
+            client_body_timeout 300s;
+            dav_methods PUT;
+            create_full_put_path on;
+        }
+
+        location / { return 404; }
+    }
+{{- end }}

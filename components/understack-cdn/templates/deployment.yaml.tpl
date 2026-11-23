@@ -10,10 +10,10 @@ spec:
     matchLabels:
       app: cdn-edge
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+    # Avoid overlapping pods using the same persistent storage during upgrades.
+    type: Recreate
+    # Clear existing rolling-update settings so Argo CD can apply Recreate.
+    rollingUpdate: null
   template:
     metadata:
       labels:
@@ -27,6 +27,14 @@ spec:
           volumeMounts:
             - name: nginx-cache
               mountPath: /var/cache/nginx
+{{- if .Values.supportassist.enabled }}
+        - name: supportassist-dir-init
+          image: busybox:1.36
+          command: ["sh", "-c", "mkdir -p /var/lib/nginx/supportassist /var/lib/nginx/client_temp && chown 101:101 /var/lib/nginx/supportassist /var/lib/nginx/client_temp"]
+          volumeMounts:
+            - name: supportassist
+              mountPath: /var/lib/nginx
+{{- end }}
 
       containers:
         - name: nginx
@@ -34,6 +42,10 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+{{- if .Values.supportassist.enabled }}
+            - containerPort: 8081
+              name: supportassist
+{{- end }}
 
           resources:
             requests:
@@ -52,6 +64,13 @@ spec:
               subPath: default.conf
             - name: nginx-cache
               mountPath: /var/cache/nginx
+{{- if .Values.supportassist.enabled }}
+            - name: supportassist
+              mountPath: /var/lib/nginx
+            - name: supportassist-auth
+              mountPath: /etc/nginx/supportassist-auth
+              readOnly: true
+{{- end }}
 
           livenessProbe:
             httpGet:
@@ -86,5 +105,13 @@ spec:
         - name: nginx-cache
           persistentVolumeClaim:
             claimName: nginx-cache
+{{- if .Values.supportassist.enabled }}
+        - name: supportassist
+          persistentVolumeClaim:
+            claimName: supportassist
+        - name: supportassist-auth
+          secret:
+            secretName: supportassist-download-auth
+{{- end }}
 
       terminationGracePeriodSeconds: 30

@@ -25,6 +25,7 @@ spec:
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
   - ref: deploy
+    path: {{ include "understack.deploy_path" $ }}/understack-cdn
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
   syncPolicy:

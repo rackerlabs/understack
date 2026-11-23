@@ -5,8 +5,75 @@ Images are stored in Object Store
 Caching reverse-proxies at each fabric will fetch the images from Object Store
 and make them available via HTTPS.
 
+When enabled, the same pod also accepts SupportAssist HTTP uploads into a
+dedicated `supportassist` PVC.
+
 This allows a device to access firmware images via an HTTPS request to a
 cluster-local tendot IP address.
+
+## SupportAssist uploads
+
+Enable `supportassist.enabled` in the site's CDN values to provision a dedicated
+`supportassist` PVC. It defaults to `40Gi` on `openebs-lvm`; set
+`supportassist.storageSize` and `supportassist.storageClassName` for the site.
+Diagnostic archives are separate from the firmware cache and object bucket.
+
+Route `/supportassist/` to Service `cdn-edge`, port **8081**, using an HTTPRoute
+attached only to the internal gateway. The existing firmware Service port 80
+does not expose uploads. Sites own this route; the CDN chart does not choose
+a gateway or address. For iad3-dev, the share URL is
+`http://10.46.100.83/supportassist/`. The IP-based route supports iDRACs without
+DNS servers configured. Use the IP URL: the existing CDN hostname routes to
+the firmware listener.
+
+iDRAC appends the collection filename and sends a PUT with Content-Length and
+the raw ZIP body. NGINX WebDAV writes the body to a temporary file on the same
+PVC, then renames it into `/var/lib/nginx/supportassist/`. Only PUT beneath
+`/supportassist/` is allowed; query strings are rejected. HTTP download,
+listing and deletion are not exposed on this listener. Clients that can reach this
+credential-free internal listener can upload or overwrite archives.
+
+### Authenticated archive reads
+
+With SupportAssist enabled, the chart requires a Secret named
+`supportassist-download-auth` in the CDN namespace, with an `htpasswd` key
+containing an NGINX-compatible password file. The pod does not start until it
+exists. This exposes `/supportassist-archives/` on the existing
+firmware listener (Service port 80). Use the existing HTTPS gateway hostname;
+do not expose this password-protected endpoint over plain HTTP.
+
+Authenticated GET/HEAD requests can list archives as JSON or read a ZIP. Other
+methods are denied, and responses carry `Cache-Control: private, no-store`.
+Uploads remain on the separate internal listener.
+
+NodeDash can use a dedicated reader credential server-side, checking Ironic's
+vendor passthru policy and reading only the selected node's UUID directory before returning
+metadata or streaming a file. The CDN credential itself grants read access to
+all archives; never give it to browser clients. There is no per-node policy in
+NGINX. Rotate the password file and NodeDash credential together.
+
+### Retrieval and capacity
+
+Without NodeDash downloads configured, use Kubernetes access to find the pod
+and copy a completed archive locally:
+
+```sh
+kubectl -n understack-cdn get pods -l app=cdn-edge
+kubectl -n understack-cdn exec <pod-name> -c nginx -- ls -lh /var/lib/nginx/supportassist
+kubectl -n understack-cdn cp <pod-name>:/var/lib/nginx/supportassist/<filename>.zip ./<filename>.zip -c nginx
+```
+
+Concurrent uploads share the PVC's available space; uploads fail when the
+volume fills. Monitor free space, for example with
+`kubectl -n understack-cdn exec <pod-name> -c nginx -- df -h /var/lib/nginx`.
+NGINX permits 300 seconds without upload progress; the iad3-dev internal route
+allows 15 minutes per request. Verify large collections against these limits
+on the target iDRAC firmware.
+
+Archives are retained on the PVC. Operators manage retention, capacity and
+archiving. Archival storage after **90 days**
+requires an archive destination and transfer mechanism; verify retrieval
+before enabling it.
 
 ## Proxy configuration
 

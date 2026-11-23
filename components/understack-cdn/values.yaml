@@ -16,3 +16,10 @@ cdn:
   objectBucketIsLocal: false
   # If above is true, how much space to claim for this object bucket:
   bucketMaxSize: 40g
+
+supportassist:
+  enabled: false
+  storageClassName: openebs-lvm
+  storageSize: 40Gi
+  # Requires a Secret named supportassist-download-auth with an htpasswd key,
+  # used for authenticated archive reads on the HTTPS CDN route.
