@@ -103,6 +103,19 @@ def test_failed_port_discovery_fails_inspection(task, client, error):
     panos_inspect._handle_ha_configuration.assert_not_called()
 
 
+def test_checks_after_discovery_reload_the_ports(task, client):
+    # Ironic loads task.ports once, before discovery creates and deletes ports.
+    task.ports = ["stale"]
+    seen = []
+    panos_inspect._validate_firewall_readiness.side_effect = lambda t: seen.append(
+        t.ports
+    )
+
+    PanosInspect().inspect_hardware(task)
+
+    assert seen == [None]  # None makes Ironic reload them from the database
+
+
 def test_apply_system_info_ignores_empty_fields(task):
     panos_inspect._apply_system_info(task.node, {"model": "", "serial": ""})
     assert task.node.properties == {}
