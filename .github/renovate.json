@@ -75,6 +75,17 @@
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>\\S+?)(?: versioning=(?<versioning>\\S+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*(?<currentValue>\\S+)"
       ],
       "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Update chartVersion in the argocd-understack values for OCI charts carrying a renovate comment",
+      "managerFilePatterns": [
+        "/^charts\\/argocd-understack\\/values\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>docker)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*chartVersion:\\s*['\"]?(?<currentValue>[\\w\\.\\-\\+]+)['\"]?"
+      ],
+      "versioningTemplate": "semver"
     }
   ],
   "argocd": {
