@@ -790,7 +790,7 @@ def _validate_and_pair_ha(
 
     Performs comprehensive validation:
     1. HA1 interface states and HA2/HSCI link status
-    2. Peer connection status
+    2. Peer connection status and matching PAN-OS versions
     3. Bidirectional serial validation (checks mate device too)
     4. Interface speed validation (hsci vs data plane)
     5. Pre-flight compatibility checks (resource_class, roles)
@@ -858,6 +858,17 @@ def _validate_and_pair_ha(
             raise exception.HardwareInspectionFailure(reason)
 
         LOG.info("[node:%s] HA peer connected: %s", node.uuid, peer_serial)
+
+        # HA peers must run the same PAN-OS release.
+        local_version = (ha_status.get("local") or {}).get("version")
+        peer_version = peer_status.get("version")
+        if local_version != peer_version:
+            reason = (
+                f"HA pair runs different PAN-OS versions: {local_version} here, "
+                f"{peer_version} on the peer"
+            )
+            _record_ha_reason(node, reason)
+            return
 
         # Step 3: Find mate node in Ironic
         mate = _find_mate_node(task, mate_serial)
