@@ -42,8 +42,13 @@ standard password first, then preconfig, then factory, so it works with
 appliances at any point in their setup. `[netdev_panos] verify_ssl`
 (default off) controls TLS verification.
 
-To use it, add `panos` to `enabled_hardware_types`, `enabled_inspect_interfaces`,
-and `enabled_management_interfaces`. Nodes enrolled before the `panos`
-interfaces existed keep their stored `no-inspect` and `noop` interfaces until
-they are switched with
-`openstack baremetal node set --inspect-interface panos --management-interface panos`.
+To use it, add `panos` to `enabled_hardware_types`, `enabled_firmware_interfaces`,
+`enabled_inspect_interfaces`, and `enabled_management_interfaces`. Nodes
+enrolled before the `panos` interfaces existed keep their stored `no-firmware`,
+`no-inspect` and `noop` interfaces until they are switched with
+`openstack baremetal node set --firmware-interface panos --inspect-interface panos --management-interface panos`.
+
+The firmware interface does not flash anything. Its `cache_firmware_components`
+step (a verify, manual clean, and service step) records the PAN-OS release and
+the installed content versions (applications, antivirus, WildFire, GlobalProtect
+client, device dictionary) as the node's firmware components.

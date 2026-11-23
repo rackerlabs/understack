@@ -5,27 +5,17 @@ from ironic.drivers import base
 from ironic.drivers.modules import noop_mgmt
 from oslo_log import log
 
+from ironic_understack.drivers.panos_base import PanosInterface
+
 LOG = log.getLogger(__name__)
 
 
-class PanosManagement(noop_mgmt.NoopManagement):
+class PanosManagement(PanosInterface, noop_mgmt.NoopManagement):
     """Lifecycle steps for PAN-OS appliances.
 
     Boot device methods don't apply to a firewall, so those are inherited from
     NoopManagement.
     """
-
-    def get_properties(self):
-        return {
-            "management_ip": "Address of the appliance's management interface, "
-            "used for the XML API. Required.",
-        }
-
-    def validate(self, task):
-        if not task.node.driver_info.get("management_ip"):
-            raise exception.MissingParameterValue(
-                f"Node {task.node.uuid} is missing driver_info management_ip"
-            )
 
     @base.verify_step(priority=10)
     def setup_initial_configuration(self, task):

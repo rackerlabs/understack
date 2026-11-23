@@ -100,7 +100,7 @@ conf:
       enabled_boot_interfaces: http-ipxe,ipxe,redfish-virtual-media,redfish-https,idrac-redfish-virtual-media,fake
       enabled_console_interfaces: redfish-graphical,no-console
       enabled_deploy_interfaces: direct,ramdisk,noop
-      enabled_firmware_interfaces: redfish,no-firmware
+      enabled_firmware_interfaces: redfish,panos,no-firmware
       enabled_inspect_interfaces: redfish,idrac-redfish,agent,panos,no-inspect
       enabled_management_interfaces: redfish,idrac-redfish,panos,noop
       enabled_network_interfaces: neutron,noop

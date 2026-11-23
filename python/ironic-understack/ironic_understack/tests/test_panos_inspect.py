@@ -33,6 +33,7 @@ def client(mocker):
     mocker.patch.object(panos_inspect, "_discover_and_update_ports")
     mocker.patch.object(panos_inspect, "_validate_firewall_readiness")
     mocker.patch.object(panos_inspect, "_handle_ha_configuration")
+    mocker.patch.object(panos_inspect.panos_firmware, "record_versions")
     return client
 
 
@@ -54,8 +55,9 @@ def test_inspect_records_system_info(task, client):
     assert PanosInspect().inspect_hardware(task) == states.MANAGEABLE
 
     panos_api.PanosClient.assert_called_once_with("192.0.2.10")
-    assert task.node.properties == {"model": "PA-1410", "firmware_version": "11.0.0"}
+    assert task.node.properties == {"model": "PA-1410"}
     assert task.node.extra == {"serial": "000000000001"}
+    panos_inspect.panos_firmware.record_versions.assert_called_once_with(task, SYSTEM)
     task.node.save.assert_called_once()
 
 
@@ -66,11 +68,7 @@ def test_inspect_keeps_enrolled_model_and_serial(task, client):
 
     PanosInspect().inspect_hardware(task)
 
-    assert task.node.properties == {
-        "model": "PA-1410-NB",
-        "vendor": "Palo Alto",
-        "firmware_version": "11.0.0",
-    }
+    assert task.node.properties == {"model": "PA-1410-NB", "vendor": "Palo Alto"}
     assert task.node.extra == {"serial": "nautobot-serial", "mate_serial": "mate"}
 
 
