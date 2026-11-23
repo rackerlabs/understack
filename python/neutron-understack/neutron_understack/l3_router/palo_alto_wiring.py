@@ -1061,11 +1061,20 @@ class PaloAltoWiring:
         """Return the router's wiring to the state recorded in the snapshot.
 
         Re-reads current state rather than replaying the calls that succeeded,
-        because a remote call can apply its change and still raise.
+        because a remote call can apply its change and still raise. Each unit is
+        undone even if the other fails: a stuck secondary must not leave the
+        router port (and its IP) on the primary's trunk.
         """
-        if snapshot.secondary is not None:
-            self._undo_stack(snapshot.secondary)
-        self._undo_stack(snapshot)
+        errors = []
+        for stack in (snapshot.secondary, snapshot):
+            if stack is None:
+                continue
+            try:
+                self._undo_stack(stack)
+            except Exception as error:
+                errors.append(error)
+        if errors:
+            raise ExceptionGroup("Palo Alto attachment undo incomplete", errors)
 
     def _undo_stack(self, snapshot: AttachmentSnapshot) -> None:
         """Undo one unit's part of an attach; a mirror this attach made goes too."""
