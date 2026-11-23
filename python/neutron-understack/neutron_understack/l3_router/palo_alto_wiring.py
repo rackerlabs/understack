@@ -155,6 +155,14 @@ class PaloAltoHaSecondaryMissing(n_exc.Conflict):
     )
 
 
+# Conflict -> HTTP 409: the HA pair's units ended up on different VLANs.
+class PaloAltoHaVlanMismatch(n_exc.Conflict):
+    message = (
+        "Palo Alto router %(router_id)s port %(port_id)s is on VLAN %(primary)s "
+        "on the HA primary but %(secondary)s on the secondary; retry."
+    )
+
+
 # Conflict -> HTTP 409: more than one of our wiring objects has this name.
 class PaloAltoWiringAmbiguous(n_exc.Conflict):
     message = (
@@ -852,9 +860,17 @@ class PaloAltoWiring:
             )
         for secondary_stack in secondary_stacks:
             mirror = self._ensure_mirror_port(router_id, port)
-            self._add_router_port_subport(
+            mirror_vlan = self._add_router_port_subport(
                 router_id, secondary_stack.trunk, mirror, label, lambda: vlan
             )
+            # A fabric_vlan set mid-wiring overrides the primary's VLAN here.
+            if mirror_vlan != vlan:
+                raise PaloAltoHaVlanMismatch(
+                    router_id=router_id,
+                    port_id=port["id"],
+                    primary=vlan,
+                    secondary=mirror_vlan,
+                )
         LOG.info(
             "Attached Palo Alto router %s %s port %s via parent %s trunk %s%s",
             router_id,
@@ -1061,11 +1077,20 @@ class PaloAltoWiring:
         """Return the router's wiring to the state recorded in the snapshot.
 
         Re-reads current state rather than replaying the calls that succeeded,
-        because a remote call can apply its change and still raise.
+        because a remote call can apply its change and still raise. Each unit is
+        undone even if the other fails: a stuck secondary must not leave the
+        router port (and its IP) on the primary's trunk.
         """
-        if snapshot.secondary is not None:
-            self._undo_stack(snapshot.secondary)
-        self._undo_stack(snapshot)
+        errors = []
+        for stack in (snapshot.secondary, snapshot):
+            if stack is None:
+                continue
+            try:
+                self._undo_stack(stack)
+            except Exception as error:
+                errors.append(error)
+        if errors:
+            raise ExceptionGroup("Palo Alto attachment undo incomplete", errors)
 
     def _undo_stack(self, snapshot: AttachmentSnapshot) -> None:
         """Undo one unit's part of an attach; a mirror this attach made goes too."""

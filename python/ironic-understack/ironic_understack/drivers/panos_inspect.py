@@ -52,6 +52,9 @@ class PanosInspect(base.InspectInterface):
             # Discover data plane connectivity via LLDP. A failure fails
             # inspection so ports from an earlier run are never trusted.
             _discover_and_update_ports(task, client)
+            # task.ports was loaded before discovery changed the ports; None
+            # makes Ironic reload them for the checks below.
+            task.ports = None
         except (panos_api.PanosApiError, requests.RequestException) as e:
             raise exception.HardwareInspectionFailure(
                 error=f"PAN-OS {address}: {e}"

@@ -1166,6 +1166,16 @@ class TestHaPairWiring:
             "palo-alto-router-mirror-r1-intf-1": 250
         }
 
+    def test_the_units_must_share_one_vlan(self, mocker, wiring, pair):
+        # A fabric_vlan set while only the primary is wired reaches the secondary.
+        wiring.attach_port("r1", dict(_HA_INTERFACE), "interface")
+        secondary = pair.neutron.trunks["palo-alto-router-trunk-r1-inside-secondary"]
+        secondary["sub_ports"] = []
+        mocker.patch("neutron_understack.utils.network_fabric_vlan", return_value=3005)
+
+        with pytest.raises(palo_alto_wiring.PaloAltoHaVlanMismatch):
+            wiring.attach_port("r1", dict(_HA_INTERFACE), "interface")
+
     def test_an_ha_primary_without_its_secondary_is_refused(self, wiring, ironic, pair):
         ironic.secondaries_for_router.return_value = []
 
@@ -1276,3 +1286,26 @@ class TestHaPairWiring:
         assert pair.neutron.ports == {}
         assert pair.neutron.trunks == {}
         assert pair.vifs == {}
+
+    def test_a_stuck_secondary_still_frees_the_primary(
+        self, wiring, pair, trunk_plugin
+    ):
+        # Else the router port stays a subport, Neutron cannot delete it, and
+        # its IP blocks every retry of the subnet add.
+        snapshot = wiring.snapshot_attachment("r1", "intf-1", "interface")
+        wiring.attach_port("r1", dict(_HA_INTERFACE), "interface")
+        remove = pair.neutron.remove_subports
+
+        def stuck_on_the_secondary(ctx, trunk_id, body):
+            if trunk_id.endswith("-secondary"):
+                raise RuntimeError("secondary stuck")
+            return remove(ctx, trunk_id, body)
+
+        trunk_plugin.remove_subports.side_effect = stuck_on_the_secondary
+
+        with pytest.raises(ExceptionGroup):
+            wiring.undo_attachment(snapshot)
+
+        assert list(pair.neutron.trunks) == [
+            "palo-alto-router-trunk-r1-inside-secondary"
+        ]
