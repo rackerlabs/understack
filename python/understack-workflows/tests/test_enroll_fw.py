@@ -60,9 +60,9 @@ def _patch_paths(update_node_call) -> dict[str, Any]:
 def _mock_enroll(mocker, *, created=True):
     """Mock creating or reusing the node, and the inspection that follows it."""
     node = _node(provision_state="enroll" if created else "available")
-    mocker.patch.object(enroll_fw.netdev_reconciler, "make_manageable")
     return SimpleNamespace(
         node=node,
+        manage=mocker.patch.object(enroll_fw.netdev_reconciler, "make_manageable"),
         create=mocker.patch.object(
             enroll_fw.netdev_reconciler,
             "find_or_create_netdev_node",
@@ -122,6 +122,17 @@ def test_enroll_fw_sets_the_ha_role_trait(mocker, ha_role, traits):
     enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, ha_role=ha_role)
 
     assert enroll.traits.call_args.kwargs["traits"] == traits
+
+
+def test_enroll_fw_retries_a_failed_inspection(mocker):
+    failed = _node(provision_state="inspect failed")
+    _mock_client(mocker, node=failed)
+    enroll = _mock_enroll(mocker, created=False)
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
+
+    enroll.manage.assert_any_call(failed, "inspect failed")
+    enroll.inspect.assert_called_once()
 
 
 def test_enroll_fw_records_the_cmdb_id_in_extra(mocker):
