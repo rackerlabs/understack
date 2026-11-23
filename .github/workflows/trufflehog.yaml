@@ -38,6 +38,6 @@ jobs:
           ref: ${{steps.git-intel.outputs.result.branch}}
           fetch-depth: ${{steps.git-intel.outputs.result.depth}}
       - name: Secret Scanning
-        uses: trufflesecurity/trufflehog@ffdee00aded8ed6e545aba48ef7956522d3b076e # main
+        uses: trufflesecurity/trufflehog@5c3387cb1fb9ff5adae11f3d7a98eeb760b2ae11 # main
         with:
           extra_args: --results=verified,unknown
