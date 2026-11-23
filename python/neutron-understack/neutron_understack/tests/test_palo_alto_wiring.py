@@ -1166,6 +1166,16 @@ class TestHaPairWiring:
             "palo-alto-router-mirror-r1-intf-1": 250
         }
 
+    def test_the_units_must_share_one_vlan(self, mocker, wiring, pair):
+        # A fabric_vlan set while only the primary is wired reaches the secondary.
+        wiring.attach_port("r1", dict(_HA_INTERFACE), "interface")
+        secondary = pair.neutron.trunks["palo-alto-router-trunk-r1-inside-secondary"]
+        secondary["sub_ports"] = []
+        mocker.patch("neutron_understack.utils.network_fabric_vlan", return_value=3005)
+
+        with pytest.raises(palo_alto_wiring.PaloAltoHaVlanMismatch):
+            wiring.attach_port("r1", dict(_HA_INTERFACE), "interface")
+
     def test_an_ha_primary_without_its_secondary_is_refused(self, wiring, ironic, pair):
         ironic.secondaries_for_router.return_value = []
 
