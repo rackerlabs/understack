@@ -1,13 +1,11 @@
 """Reconcile a NeutronSegmentRange CR onto Neutron.
 
-Find the operator-managed range by its owner-prefixed name; create it when
-absent, or reconcile its mutable fields (``minimum`` and ``maximum``) when
-present. Neutron's NetworkSegmentRange API only accepts ``name``, ``minimum``
-and ``maximum`` on a PUT (see ``allow_put`` in
-``neutron_lib/api/definitions/network_segment_range.py``); ``network_type``,
-``physical_network``, ``shared`` and ``project_id`` are all immutable, so a
-mismatch on any of them fails the CR loudly rather than silently diverging or
-sending a PUT Neutron rejects with a bare 400.
+Match a range by ``spec.name`` (project-scoped when unshared), adopting an
+existing one or creating it, then update ``minimum``/``maximum``. A legacy
+``understack-sr:<name>`` range is renamed in place. Ranges are never deleted.
+
+Only ``name``, ``minimum`` and ``maximum`` are PUT-able in Neutron; a mismatch
+on any other field fails the CR.
 """
 
 from __future__ import annotations
@@ -21,13 +19,35 @@ from openstack_sync.plugins.common import get_value
 from openstack_sync.plugins.common import resource_id
 from openstack_sync.plugins.neutron.segment_ranges.config import PHYSICAL_NETWORK_TYPES
 from openstack_sync.plugins.neutron.segment_ranges.config import TUNNEL_NETWORK_TYPES
-from openstack_sync.plugins.neutron.segment_ranges.markers import logical_name
-from openstack_sync.plugins.neutron.segment_ranges.markers import managed_name
 
 LOG = logging.getLogger(__name__)
 
-#: Segment ranges already fetched this run, keyed by managed (Neutron) name.
-RangeCache = dict[str, Any]
+#: Prefix earlier releases stamped on every operator-created range name. Used
+#: only to find and rename those ranges on upgrade; nothing new is created with
+#: it. Safe to remove once every deployment has reconciled past this release.
+LEGACY_NAME_PREFIX = "understack-sr:"
+
+#: Identity of a range within one credential group: ``(name, project_id)``,
+#: where ``project_id`` is ``None`` for a shared spec.
+RangeKey = tuple[str, str | None]
+
+#: Segment ranges already fetched this run, keyed by :data:`RangeKey`.
+RangeCache = dict[RangeKey, Any]
+
+
+def _cache_key(spec: dict[str, Any]) -> RangeKey:
+    """Return the cache key for *spec*, scoped the same way as its lookup.
+
+    The key must carry every field the Neutron query filters on. An unshared
+    spec is looked up by ``name`` and ``project_id``, so two projects can each
+    hold a range with the same name; keying by name alone would hand one
+    project's range to the other project's CR. A shared spec is looked up by
+    name only, so its key has no project.
+    """
+    name = str(spec["name"])
+    if spec.get("shared", True):
+        return (name, None)
+    return (name, spec.get("project_id"))
 
 
 def _validate_spec(spec: dict[str, Any]) -> None:
@@ -63,27 +83,76 @@ def _validate_spec(spec: dict[str, Any]) -> None:
         raise ConfigError("project_id is required when shared is false")
 
 
-def load_managed_ranges(conn: Any, cache: RangeCache) -> RangeCache:
-    """Populate *cache* with every operator-managed range, keyed by name.
+def _in_scope(segment_range: Any, name: str, project_id: str | None) -> bool:
+    """Return True when *segment_range* has *name* and, if given, *project_id*.
 
-    Only ranges whose name already carries the operator prefix are cached, so
-    this finds ranges the operator itself created; a range created out-of-band
-    with a plain name is not adopted. Fetched once per credential group and
-    shared across the group's CRs so each reconcile reuses one listing.
+    A shared spec (``project_id`` None) matches on name alone, mirroring the
+    query :func:`find_range` sends.
     """
-    if cache:
-        return cache
-    for segment_range in conn.network.network_segment_ranges():
-        name = str(get_value(segment_range, "name", default=""))
-        if name.startswith(managed_name("")):
-            cache[name] = segment_range
-    return cache
+    if str(get_value(segment_range, "name", default="")) != name:
+        return False
+    if not project_id:
+        return True
+    return get_value(segment_range, "project_id", default=None) == project_id
 
 
-def find_range(conn: Any, managed: str, cache: RangeCache) -> Any | None:
-    """Return the operator-managed range named *managed*, or None."""
-    load_managed_ranges(conn, cache)
-    return cache.get(managed)
+def _lookup(conn: Any, name: str, project_id: str | None) -> Any | None:
+    """Return the single range named *name* in scope, None if absent.
+
+    More than one match is ambiguous and raises rather than guessing which
+    range to converge.
+    """
+    query: dict[str, Any] = {"name": name}
+    if project_id:
+        query["project_id"] = project_id
+
+    matches = [
+        segment_range
+        for segment_range in conn.network.network_segment_ranges(**query)
+        if _in_scope(segment_range, name, project_id)
+    ]
+    if len(matches) > 1:
+        raise ConfigError(
+            f"Segment range name {name!r} matched {len(matches)} ranges; "
+            "set spec.project_id to disambiguate"
+        )
+    return matches[0] if matches else None
+
+
+def find_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> Any | None:
+    """Return the range the spec names, adopting one created out-of-band.
+
+    Matching is by ``name`` -- the range's own user-facing identity. An
+    unshared spec also scopes the match by ``project_id`` so two projects can
+    hold same-named ranges without colliding. More than one match is ambiguous
+    and raises rather than guessing which range to converge.
+
+    When no range has the plain name, the lookup falls back to the legacy
+    ``understack-sr:<name>`` an earlier release created, under the same scope.
+    The returned range then still carries the legacy name;
+    :func:`sync_segment_range` renames it. The legacy lookup only runs on a
+    miss, so a deployment that has already migrated pays no extra API call.
+
+    The scope is passed to Neutron as list filters and then re-checked on each
+    returned range, so the match does not depend on the server honouring the
+    filters: an admin-scoped or filter-ignoring listing that returns every
+    project's same-named range still resolves to this spec's project only.
+
+    The *cache* is shared across a credential group's CRs and keyed by
+    :func:`_cache_key`, so a hit always matches the scope the query would have
+    used.
+    """
+    key = _cache_key(spec)
+    if key in cache:
+        return cache[key]
+
+    name, project_id = key
+    match = _lookup(conn, name, project_id)
+    if match is None and not name.startswith(LEGACY_NAME_PREFIX):
+        match = _lookup(conn, f"{LEGACY_NAME_PREFIX}{name}", project_id)
+    if match is not None:
+        cache[key] = match
+    return match
 
 
 def _immutable_drift(segment_range: Any, spec: dict[str, Any]) -> str | None:
@@ -91,8 +160,9 @@ def _immutable_drift(segment_range: Any, spec: dict[str, Any]) -> str | None:
 
     Neutron accepts only ``name``, ``minimum`` and ``maximum`` on a PUT, so
     ``network_type``, ``physical_network``, ``shared`` and ``project_id`` are
-    all immutable: a CR that changes any of them must fail loudly here rather
-    than send a PUT Neutron rejects with a bare 400.
+    all immutable: a CR that changes any of them, or that adopts an existing
+    range built differently, must fail loudly here rather than send a PUT
+    Neutron rejects with a bare 400.
 
     ``physical_network`` is compared as a string with the empty string standing
     for "unset": Neutron's column is non-nullable and it normalizes non-VLAN
@@ -141,9 +211,9 @@ def _mutable_updates(segment_range: Any, spec: dict[str, Any]) -> dict[str, Any]
     return updates
 
 
-def _create_kwargs(managed: str, spec: dict[str, Any]) -> dict[str, Any]:
+def _create_kwargs(spec: dict[str, Any]) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
-        "name": managed,
+        "name": str(spec["name"]),
         "network_type": spec["network_type"],
         "minimum": int(spec["minimum"]),
         "maximum": int(spec["maximum"]),
@@ -157,10 +227,10 @@ def _create_kwargs(managed: str, spec: dict[str, Any]) -> dict[str, Any]:
 
 
 def render_range(segment_range: Any) -> dict[str, Any]:
-    """Return the reconciled range as a loggable dict, with the logical name."""
+    """Return the reconciled range as a loggable dict."""
     return {
         "id": get_value(segment_range, "id"),
-        "name": logical_name(str(get_value(segment_range, "name", default=""))),
+        "name": get_value(segment_range, "name"),
         "network_type": get_value(segment_range, "network_type"),
         "physical_network": get_value(segment_range, "physical_network"),
         "minimum": get_value(segment_range, "minimum"),
@@ -175,8 +245,7 @@ def sync_segment_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> li
     _validate_spec(spec)
 
     name = str(spec["name"])
-    managed = managed_name(name)
-    existing = find_range(conn, managed, cache)
+    existing = find_range(conn, spec, cache)
 
     if existing is None:
         LOG.info(
@@ -187,27 +256,41 @@ def sync_segment_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> li
             spec["minimum"],
             spec["maximum"],
         )
-        created = conn.network.create_network_segment_range(
-            **_create_kwargs(managed, spec)
-        )
-        cache[managed] = created
+        created = conn.network.create_network_segment_range(**_create_kwargs(spec))
+        cache[_cache_key(spec)] = created
         LOG.info(
             "Reconciled segment range: %s",
             json.dumps(render_range(created), sort_keys=True),
         )
         return []
 
+    have_name = str(get_value(existing, "name", default=""))
+    legacy = have_name != name
+    LOG.info(
+        "Reusing segment range %s (%s)%s",
+        name,
+        resource_id(existing),
+        f" found under legacy name {have_name}" if legacy else "",
+    )
+
+    # Checked before any rename so a legacy range built differently fails the
+    # CR untouched rather than being renamed and then rejected.
     drift = _immutable_drift(existing, spec)
     if drift:
+        found_as = f" (found as legacy {have_name!r})" if legacy else ""
         raise ConfigError(
-            f"Segment range {name!r} already exists in Neutron with a different "
-            f"immutable field ({drift}). Neutron only allows updating minimum "
-            f"and maximum on an existing range; network_type, physical_network, "
-            f"shared and project_id are fixed at creation. Rename the CR or "
-            f"delete the existing range to let the operator recreate it."
+            f"Segment range {name!r}{found_as} already exists in Neutron with a "
+            f"different immutable field ({drift}). Neutron only allows updating "
+            "minimum and maximum on an existing range; network_type, "
+            "physical_network, shared and project_id are fixed at creation. Rename "
+            "the CR or delete the existing range to let the operator recreate it."
         )
 
     updates = _mutable_updates(existing, spec)
+    if legacy:
+        # Same PUT as any minimum/maximum drift: one write migrates the range.
+        LOG.info("Migrating legacy segment range %s to %s", have_name, name)
+        updates["name"] = name
     if not updates:
         LOG.info("Segment range %s already matches the spec", name)
         return []
@@ -216,7 +299,7 @@ def sync_segment_range(conn: Any, spec: dict[str, Any], cache: RangeCache) -> li
     updated = conn.network.update_network_segment_range(
         resource_id(existing), **updates
     )
-    cache[managed] = updated
+    cache[_cache_key(spec)] = updated
     LOG.info(
         "Reconciled segment range: %s",
         json.dumps(render_range(updated), sort_keys=True),
