@@ -155,7 +155,7 @@ conf:
       keep_ports: "present"
     redfish:
       # Redfish inspection hooks run after inspecting out-of-band using the BMC:
-      inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class,chassis_model,pci-device-capabilities"
+      inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class,chassis_model,pci-device-trait"
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
       post_boot_retry_attempts: 6
       post_boot_retry_delay: 30
