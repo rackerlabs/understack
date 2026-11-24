@@ -8,6 +8,7 @@ conf:
         debug: "False"
         endpoint_type: "publicURL"
         use_ssl: "True"
+        secure_proxy_ssl_header: true
         csrf_cookie_secure: "True"
         session_cookie_secure: "True"
         session_cookie_httponly: "True"
@@ -15,6 +16,8 @@ conf:
           - '*'
         openstack_cinder_features:
           enable_backup: "False"
+        # requires CORS settings for glance
+        horizon_images_upload_mode: "direct"
         # single domain hides the domain field, which is required
         # if its enabled it breaks SSO since its required so pin
         # to the machine domain where service accounts live
