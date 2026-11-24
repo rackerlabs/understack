@@ -1,7 +1,7 @@
 ---
 apiVersion: argoproj.io/v1alpha1
 metadata:
-  name: enroll-server
+  name: trimmed-enroll-server
   annotations:
     workflows.argoproj.io/title: Perform server discovery and update Ironic
     workflows.argoproj.io/description: |
@@ -114,7 +114,7 @@ spec:
             valueFrom:
               path: /run/enrollment/node-uuid
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-2611
         command:
           - enroll-server
         args:
