@@ -1,0 +1,189 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-metadata-sync-script
+  namespace: openstack
+  labels:
+    app.kubernetes.io/name: cluster-metadata
+    app.kubernetes.io/component: prometheus-sync
+data:
+  sync-cluster-metadata.py: |
+    #!/usr/bin/env python3
+    """Sync cluster-metadata ConfigMap data to Prometheus Pushgateway.
+
+    Reads the cluster-metadata ConfigMap mounted as files and pushes
+    its key/value pairs as labels on an info-style gauge metric to the
+    Prometheus Pushgateway. This makes cluster identity information
+    (partition, site, etc.) available for Prometheus queries and joins.
+
+    Files ending in .yaml/.yml are parsed and their top-level scalar
+    keys are flattened into individual labels. Nested structures are
+    skipped since Prometheus labels must be simple strings.
+    """
+
+    import os
+    import sys
+    import urllib.request
+
+    # PyYAML is not available in the slim image, so we use a minimal
+    # subset parser for simple key: value YAML files.
+    import json
+    import re
+
+    METADATA_DIR = "/etc/cluster-metadata"
+    PUSHGATEWAY_URL = os.environ.get(
+        "PUSHGATEWAY_URL",
+        "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091",
+    )
+    METRIC_JOB_NAME = os.environ.get("METRIC_JOB_NAME", "cluster_metadata")
+
+
+    def parse_yaml_scalars(content, prefix=""):
+        """Extract key/value pairs from a YAML file, flattening nested mappings.
+
+        Top-level scalar values become labels directly.
+        Nested mappings get their parent key prepended as a prefix
+        (e.g., site.argo_events.enabled -> site_argo_events_enabled).
+        """
+        results = {}
+        lines = content.splitlines()
+        i = 0
+        # Track indentation-based hierarchy
+        stack = []  # list of (indent_level, key_prefix)
+
+        while i < len(lines):
+            line = lines[i]
+            stripped = line.rstrip()
+            if not stripped or stripped.lstrip().startswith("#") or stripped.strip() == "---":
+                i += 1
+                continue
+
+            # Determine indentation level
+            indent = len(line) - len(line.lstrip())
+
+            # Pop stack entries that are at same or deeper indent
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+
+            # Build current prefix from stack
+            current_prefix = "_".join(s[1] for s in stack)
+            if current_prefix and prefix:
+                current_prefix = prefix + "_" + current_prefix
+            elif prefix:
+                current_prefix = prefix
+            # If no stack and no prefix, current_prefix stays ""
+
+            match = re.match(r"^(\s*)([A-Za-z_][A-Za-z0-9_.\-]*)\s*:\s*(.*)", line)
+            if match:
+                key = match.group(2)
+                value = match.group(3).strip()
+
+                # If value is empty, it's a mapping parent — push onto stack
+                if value == "" or value == "|" or value == ">":
+                    stack.append((indent, key))
+                    i += 1
+                    continue
+
+                # Strip inline comments
+                if "  #" in value:
+                    value = value[:value.index("  #")].rstrip()
+
+                # Strip surrounding quotes if present
+                if (value.startswith("'") and value.endswith("'")) or \
+                   (value.startswith('"') and value.endswith('"')):
+                    value = value[1:-1]
+
+                full_key = f"{current_prefix}_{key}" if current_prefix else key
+                results[full_key] = value
+            i += 1
+        return results
+
+
+    def read_metadata():
+        """Read all key/value pairs from the mounted ConfigMap directory.
+
+        Plain files become a single key=value pair.
+        YAML files (.yaml/.yml) are parsed and top-level scalar keys are
+        extracted as individual entries.
+        """
+        data = {}
+        for filename in os.listdir(METADATA_DIR):
+            filepath = os.path.join(METADATA_DIR, filename)
+            if not os.path.isfile(filepath) or filename.startswith(".."):
+                continue
+            with open(filepath) as f:
+                content = f.read().strip()
+
+            if filename.endswith((".yaml", ".yml")):
+                # Parse YAML and flatten all scalar keys with hierarchy as prefix
+                scalars = parse_yaml_scalars(content)
+                for key, value in scalars.items():
+                    data[key] = value
+            else:
+                data[filename] = content
+        return data
+
+
+    def format_pushgateway_payload(cm_data):
+        """Format ConfigMap data as Prometheus exposition format.
+
+        Creates an info-style gauge metric 'cluster_metadata_info' with value 1
+        and all ConfigMap keys as labels.
+        """
+        labels = {}
+        for key, value in cm_data.items():
+            label_name = key.lower().replace("-", "_").replace(".", "_")
+            label_value = (
+                value.replace("\\", "\\\\")
+                .replace("\n", "\\n")
+                .replace('"', '\\"')
+            )
+            labels[label_name] = label_value
+
+        if not labels:
+            print("WARNING: ConfigMap has no data keys, nothing to push")
+            return None
+
+        label_str = ",".join(f'{k}="{v}"' for k, v in sorted(labels.items()))
+        lines = [
+            "# HELP cluster_metadata_info Cluster metadata from ConfigMap as labels.",
+            "# TYPE cluster_metadata_info gauge",
+            f"cluster_metadata_info{{{label_str}}} 1",
+            "",
+        ]
+        return "\n".join(lines)
+
+
+    def push_to_gateway(payload):
+        """Push metrics payload to the Prometheus Pushgateway."""
+        url = f"{PUSHGATEWAY_URL}/metrics/job/{METRIC_JOB_NAME}"
+        data = payload.encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            method="PUT",
+            headers={"Content-Type": "text/plain; version=0.0.4"},
+        )
+        with urllib.request.urlopen(req) as resp:
+            if resp.status not in (200, 202):
+                print(f"ERROR: Pushgateway returned status {resp.status}")
+                sys.exit(1)
+
+
+    def main():
+        print("Reading cluster-metadata from mounted ConfigMap...")
+        cm_data = read_metadata()
+        print(f"Found {len(cm_data)} keys: {list(cm_data.keys())}")
+
+        payload = format_pushgateway_payload(cm_data)
+        if payload is None:
+            sys.exit(0)
+
+        print(f"Pushing cluster_metadata_info metric to {PUSHGATEWAY_URL}...")
+        push_to_gateway(payload)
+        print("Successfully pushed cluster metadata to Prometheus Pushgateway")
+
+
+    if __name__ == "__main__":
+        main()
