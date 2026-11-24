@@ -15,6 +15,11 @@ conf:
           - '*'
         openstack_cinder_features:
           enable_backup: "False"
+        # single domain hides the domain field, which is required
+        # if its enabled it breaks SSO since its required so pin
+        # to the machine domain where service accounts live
+        keystone_multidomain_support: "False"
+        keystone_default_domain: machine
     local_settings_d:
       # Set default options when creating a server from the
       # horizon UI for a more friendly and efficient user experience.
