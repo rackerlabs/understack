@@ -14,6 +14,7 @@ from oslo_config import cfg
 from oslo_log import log
 
 from neutron_understack import utils
+from neutron_understack.network_node_trunk import fetch_network_node_trunk_id
 
 LOG = log.getLogger(__name__)
 
@@ -227,7 +228,7 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         A subport tagged with its network's fabric_vlan is also exempt: that
         network's segment uses the same VLAN, so the tag maps to itself.
         """
-        if trunk_id == utils.fetch_network_node_trunk_id():
+        if trunk_id == fetch_network_node_trunk_id():
             return
 
         ns_ranges = utils.allowed_tenant_vlan_id_ranges()
