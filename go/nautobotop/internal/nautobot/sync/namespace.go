@@ -45,12 +45,28 @@ func (s *NamespaceSync) SyncAll(ctx context.Context, data map[string]string) err
 		namespaces.Namespace = append(namespaces.Namespace, yml...)
 	}
 
-	for _, ns := range namespaces.Namespace {
-		if err := s.syncSingleNamespace(ctx, ns); err != nil {
-			return err
-		}
+	return s.applyNamespaces(ctx, namespaces, s.syncSingleNamespace, s.deleteObsoleteNamespaces)
+}
+
+func (s *NamespaceSync) applyNamespaces(
+	ctx context.Context,
+	namespaces models.Namespaces,
+	syncOne func(context.Context, models.Namespace) error,
+	prune func(context.Context, models.Namespaces),
+) error {
+	result, err := syncItems(ctx, namespaces.Namespace, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteNamespaces(ctx, namespaces)
+
+	prune(ctx, namespaces)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("namespaceDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "namespace", Failures: result.DataFailures}
+	}
 
 	return nil
 }

@@ -54,13 +54,32 @@ func (s *DeviceSync) SyncAll(ctx context.Context, data map[string]string) error 
 		devices.Devices = append(devices.Devices, yml)
 	}
 
-	for _, device := range devices.Devices {
-		if err := s.syncSingleDevice(ctx, device); err != nil {
-			return err
-		}
+	return s.applyDevices(ctx, devices, s.syncSingleDevice, s.deleteObsoleteDevices)
+}
+
+// applyDevices contains the orchestration for a parsed set of devices:
+// apply each one (isolating per-item data errors), prune obsolete devices,
+// and report any data failures. syncOne and prune are parameters so the
+// orchestration can be exercised in tests without a live Nautobot.
+func (s *DeviceSync) applyDevices(
+	ctx context.Context,
+	devices models.Devices,
+	syncOne func(context.Context, models.Device) error,
+	prune func(context.Context, models.Devices),
+) error {
+	result, err := syncItems(ctx, devices.Devices, syncOne)
+	if err != nil {
+		return err
 	}
 
-	s.deleteObsoleteDevices(ctx, devices)
+	prune(ctx, devices)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("deviceDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "device", Failures: result.DataFailures}
+	}
 
 	log.Info("SyncAllDevices Completed")
 	return nil

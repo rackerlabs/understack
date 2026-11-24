@@ -63,6 +63,13 @@ type NautobotStatus struct {
 	Message              string              `json:"message,omitempty"`
 	SyncHash             map[string]string   `json:"syncHash,omitempty"`
 	NautobotStatusReport map[string][]string `json:"nautobotStatusReport,omitempty"`
+	// SyncItemFailures is the number of individual items that failed to sync
+	// per resource type on the last reconcile, keyed by resource name (e.g.
+	// "vlanGroup"). A non-zero value means some items were rejected by Nautobot
+	// (usually a data problem a human must fix) while the rest still synced.
+	// Entries are cleared when a resource type syncs cleanly. This is the signal
+	// to alert on.
+	SyncItemFailures map[string]int `json:"syncItemFailures,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -129,5 +136,19 @@ func (r *Nautobot) SetSyncHash(key, value string) {
 		delete(r.Status.SyncHash, key)
 	} else {
 		r.Status.SyncHash[key] = value
+	}
+}
+
+// SetSyncItemFailures records how many items failed for a resource type on the
+// last reconcile. A count of zero clears the entry so a recovered resource type
+// no longer shows (and its alert resolves).
+func (r *Nautobot) SetSyncItemFailures(resource string, count int) {
+	if r.Status.SyncItemFailures == nil {
+		r.Status.SyncItemFailures = make(map[string]int)
+	}
+	if count <= 0 {
+		delete(r.Status.SyncItemFailures, resource)
+	} else {
+		r.Status.SyncItemFailures[resource] = count
 	}
 }

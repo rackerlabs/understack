@@ -38,12 +38,32 @@ func (s *ClusterTypeSync) SyncAll(ctx context.Context, data map[string]string) e
 		clusterTypes.ClusterType = append(clusterTypes.ClusterType, yml...)
 	}
 
-	for _, ct := range clusterTypes.ClusterType {
-		if err := s.syncSingleClusterType(ctx, ct); err != nil {
-			return err
-		}
+	return s.applyClusterTypes(ctx, clusterTypes, s.syncSingleClusterType, s.deleteObsoleteClusterTypes)
+}
+
+// applyClusterTypes contains the orchestration for a parsed set of cluster types:
+// apply each one (isolating per-item data errors), prune obsolete cluster types,
+// and report any data failures. syncOne and prune are parameters so the
+// orchestration can be exercised in tests without a live Nautobot.
+func (s *ClusterTypeSync) applyClusterTypes(
+	ctx context.Context,
+	clusterTypes models.ClusterTypes,
+	syncOne func(context.Context, models.ClusterType) error,
+	prune func(context.Context, models.ClusterTypes),
+) error {
+	result, err := syncItems(ctx, clusterTypes.ClusterType, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteClusterTypes(ctx, clusterTypes)
+
+	prune(ctx, clusterTypes)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("clusterTypeDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "clusterType", Failures: result.DataFailures}
+	}
 
 	return nil
 }

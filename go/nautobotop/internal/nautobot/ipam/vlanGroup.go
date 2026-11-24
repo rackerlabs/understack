@@ -6,6 +6,7 @@ import (
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/syncerr"
 
 	"github.com/charmbracelet/log"
 	nb "github.com/nautobot/go-nautobot/v3"
@@ -27,7 +28,7 @@ func (s *VlanGroupService) Create(ctx context.Context, req nb.VLANGroupRequest) 
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("createNewVlanGroup", "failed to create", "model", req.Name, "error", err.Error(), "response_body", bodyString)
-		return nil, err
+		return nil, syncerr.Classify(req.Name, err, resp)
 	}
 	log.Info("CreateVlanGroup", "created vlan group", vlanGroup.Name)
 	cache.AddToCollection(s.client.Cache, "vlangroups", *vlanGroup)
@@ -108,7 +109,7 @@ func (s *VlanGroupService) Update(ctx context.Context, id string, req nb.VLANGro
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("UpdateVlanGroup", "failed to update UpdateVlanGroup", "id", id, "model", req.Name, "error", err.Error(), "response_body", bodyString)
-		return nil, err
+		return nil, syncerr.Classify(req.Name, err, resp)
 	}
 	log.Info("successfully updated vlan group", "id", id, "model", vlanGroup.GetName())
 

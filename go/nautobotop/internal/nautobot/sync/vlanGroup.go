@@ -43,12 +43,38 @@ func (s *VlanGroupSync) SyncAll(ctx context.Context, data map[string]string) err
 		vlanGroups.VlanGroup = append(vlanGroups.VlanGroup, yml...)
 	}
 
-	for _, vg := range vlanGroups.VlanGroup {
-		if err := s.syncSingleVlanGroup(ctx, vg); err != nil {
-			return err
-		}
+	return s.applyVlanGroups(ctx, vlanGroups, s.syncSingleVlanGroup, s.deleteObsoleteVlanGroups)
+}
+
+// applyVlanGroups contains the orchestration for a parsed set of vlan groups:
+// apply each one (isolating per-item data errors), prune obsolete groups, and
+// report any data failures. syncOne and prune are parameters so the
+// orchestration can be exercised in tests without a live Nautobot.
+func (s *VlanGroupSync) applyVlanGroups(
+	ctx context.Context,
+	vlanGroups models.VlanGroups,
+	syncOne func(context.Context, models.VlanGroup) error,
+	prune func(context.Context, models.VlanGroups),
+) error {
+	// Apply every vlan group, isolating per-item data errors (e.g. a 400 from
+	// Nautobot rejecting a range change) so one bad group does not block the
+	// rest. Infrastructure errors (auth, 5xx, transport) still abort.
+	result, err := syncItems(ctx, vlanGroups.VlanGroup, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteVlanGroups(ctx, vlanGroups)
+
+	// Only prune obsolete groups once the desired set was applied without an
+	// infrastructure failure. Per-item data failures are tolerated here: the
+	// groups that did apply are still authoritative for the prune.
+	prune(ctx, vlanGroups)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("vlanGroupDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "vlanGroup", Failures: result.DataFailures}
+	}
 
 	return nil
 }

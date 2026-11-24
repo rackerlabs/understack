@@ -577,6 +577,17 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              syncItemFailures:
+                additionalProperties:
+                  type: integer
+                description: |-
+                  SyncItemFailures is the number of individual items that failed to sync
+                  per resource type on the last reconcile, keyed by resource name (e.g.
+                  "vlanGroup"). A non-zero value means some items were rejected by Nautobot
+                  (usually a data problem a human must fix) while the rest still synced.
+                  Entries are cleared when a resource type syncs cleanly. This is the signal
+                  to alert on.
+                type: object
             type: object
         type: object
     served: true

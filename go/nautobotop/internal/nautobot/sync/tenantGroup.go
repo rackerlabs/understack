@@ -37,12 +37,29 @@ func (s *TenantGroupSync) SyncAll(ctx context.Context, data map[string]string) e
 		tenantGroups.TenantGroup = append(tenantGroups.TenantGroup, yml...)
 	}
 
-	for _, tg := range tenantGroups.TenantGroup {
-		if err := s.syncSingleTenantGroup(ctx, tg); err != nil {
-			return err
-		}
+	return s.applyTenantGroups(ctx, tenantGroups, s.syncSingleTenantGroup, s.deleteObsoleteTenantGroups)
+}
+
+func (s *TenantGroupSync) applyTenantGroups(
+	ctx context.Context,
+	tenantGroups models.TenantGroups,
+	syncOne func(context.Context, models.TenantGroup) error,
+	prune func(context.Context, models.TenantGroups),
+) error {
+	result, err := syncItems(ctx, tenantGroups.TenantGroup, syncOne)
+	if err != nil {
+		return err
 	}
-	s.deleteObsoleteTenantGroups(ctx, tenantGroups)
+
+	prune(ctx, tenantGroups)
+
+	if result.HasFailures() {
+		for _, f := range result.DataFailures {
+			s.client.AddReport("tenantGroupDataError", f.Err.Error())
+		}
+		return &PartialSyncError{Resource: "tenantGroup", Failures: result.DataFailures}
+	}
+
 	return nil
 }
 
