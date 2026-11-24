@@ -737,7 +737,14 @@ def _pair(this_role, *, this=None, mate=None, traits=None, ports=None):
 
 
 def _promote(mocker, ironic, ha_role):
-    transition = mocker.patch.object(enroll_fw.ironic_node, "transition")
+    def transition(node, target_state, **_):
+        # A healthy mate passes its own HA check when inspected again.
+        if (node.uuid, target_state) == ("fw-mate", "inspect"):
+            node.extra["ha_operational"] = True
+
+    transition = mocker.patch.object(
+        enroll_fw.ironic_node, "transition", side_effect=transition
+    )
     enroll_fw._inspect_and_provide(ironic, "fw-this", PHYSNET, ha_role)
     return [(c.args[0].uuid, c.kwargs["target_state"]) for c in transition.mock_calls]
 
@@ -774,12 +781,10 @@ def test_ha_pair_is_linked_then_both_are_provided(
     steps = _promote(mocker, ironic, this_role)
 
     # One update links the secondary with power coupling off, before provide.
-    assert ironic.updates == [
-        (secondary, _link_to(primary)),
-        ("fw-mate", SET_HA_OPERATIONAL),
-    ]
+    assert ironic.updates == [(secondary, _link_to(primary))]
     assert steps == [
         ("fw-this", "inspect"),
+        ("fw-mate", "inspect"),
         ("fw-mate", "provide"),
         ("fw-this", "provide"),
     ]

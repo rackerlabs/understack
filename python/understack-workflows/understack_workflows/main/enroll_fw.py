@@ -236,8 +236,7 @@ def _inspect_and_provide(
     (extra.ha_operational); then both units are linked and provided together.
     """
     node = client.get_node(node_uuid)
-    logger.info("[node:%s] Inspecting to discover and check the ports", node.uuid)
-    ironic_node.transition(node, target_state="inspect", expected_state="manageable")
+    _inspect(node)
     role_ports = _checked_role_ports(client, node)
     _set_physical_network(client, node, role_ports.values(), physical_network)
 
@@ -295,11 +294,18 @@ def _promote_ha_pair(
     """Link a confirmed HA pair, and provide both units.
 
     This node's inspection checked both boxes, so the mate's ha_operational
-    is set from here. Every check runs before the first write, so a failed
-    check leaves both units as they were. The mate is provided first. An
-    active mate (carrying a router) only gets its metadata updated.
+    is set from here. A manageable mate is inspected again first. Every
+    check runs before the first write, so a failed check leaves both units
+    as they were. The mate is provided first. An active mate (carrying a
+    router) only gets its metadata updated.
     """
     mate = _find_mate(client, node)
+    if mate.provision_state == "manageable":
+        # Inspection rebuilds its HA, so its own check must pass.
+        _inspect(mate)
+        mate = client.get_node(mate.uuid)
+        if _extra(mate).get("ha_operational") is not True:
+            raise _left_manageable(node, f"The mate's HA check: {mate.last_error}")
     if ha_role == "primary":
         primary, secondary, mate_role = node, mate, "secondary"
     else:
@@ -488,6 +494,12 @@ def _add(path: str, value) -> dict:
     args_array_to_patch would turn True into the string "True".
     """
     return {"op": "add", "path": path, "value": value}
+
+
+def _inspect(node) -> None:
+    """Inspect a manageable node."""
+    logger.info("[node:%s] Inspecting to discover and check the ports", node.uuid)
+    ironic_node.transition(node, target_state="inspect", expected_state="manageable")
 
 
 def _provide(node) -> None:
