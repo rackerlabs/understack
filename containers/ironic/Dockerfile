@@ -11,7 +11,7 @@ RUN apt-get update && \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2026.2
-ARG IRONIC_GIT_REF=b430b9972843d84a44d823415d0bef053d3b89ec
+ARG IRONIC_GIT_REF=92c228dd439db107dc42c618b249a401c19a1b2a
 ADD --keep-git-dir=true https://github.com/rackerlabs/ironic.git#${IRONIC_GIT_REF} /src/ironic
 RUN git -C /src/ironic fetch --unshallow --tags
 
