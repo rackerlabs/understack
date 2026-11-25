@@ -4,3 +4,15 @@ mtr-tiny:
 tcpdump:
 bind9-dnsutils:
 util-linux-extra:
+fdisk:
+multipath-tools:
+# network troubleshooting tools
+netcat-openbsd:   # nc
+traceroute:
+socat:
+curl:
+ethtool:
+iproute2:         # ip, ss
+iputils-arping:   # arping
+lldpd:            # lldpctl: which switch/port a NIC is cabled to
+lsof:

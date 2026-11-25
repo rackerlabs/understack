@@ -9,5 +9,6 @@
   - journal-to-console
   - package-installs
   - undercloud-ipa
+  - undercloud-rsyslog
   - install-static
   - undercloud-proliant-tools

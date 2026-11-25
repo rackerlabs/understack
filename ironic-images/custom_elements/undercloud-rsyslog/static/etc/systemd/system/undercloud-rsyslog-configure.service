@@ -1,0 +1,19 @@
+[Unit]
+Description=Configure rsyslog remote forwarding from kernel cmdline (undercloud)
+# Only reads /proc/cmdline and writes a file, so run as early as possible and
+# do not wait for the network. rsyslog's action queue buffers messages until the
+# network (DHCP) is up, and imjournal backfills everything already in the journal.
+DefaultDependencies=no
+After=local-fs.target systemd-journald.service
+# Generate the drop-in before rsyslog starts. Never restart rsyslog from this
+# unit: that deadlocks, because rsyslog is ordered after this unit.
+Before=rsyslog.service syslog.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/undercloud-rsyslog-configure
+
+[Install]
+WantedBy=sysinit.target
+RequiredBy=rsyslog.service
