@@ -92,6 +92,30 @@ def setup_conf():
     cfg.CONF.register_group(f5_grp)
     cfg.CONF.register_opts(f5_opts, group=f5_grp)
 
+    # Cisco NX-OS defaults for nodes whose driver_info leaves them unset
+    cisco_nxos_opts = [
+        cfg.StrOpt(
+            "username",
+            help="NX-API username for nodes without driver_info nxos_username",
+        ),
+        cfg.StrOpt(
+            "password",
+            secret=True,
+            help="NX-API password for nodes without driver_info nxos_password",
+        ),
+        cfg.StrOpt(
+            "verify_ca",
+            default="False",
+            help="For nodes without driver_info nxos_verify_ca: a Boolean, or "
+            "a path to a CA bundle, for verifying the NX-API TLS certificate. "
+            "Off by default because switches ship with self-signed "
+            "certificates.",
+        ),
+    ]
+    cisco_nxos_grp = cfg.OptGroup("cisco_nxos", title="Cisco NX-OS Defaults")
+    cfg.CONF.register_group(cisco_nxos_grp)
+    cfg.CONF.register_opts(cisco_nxos_opts, group=cisco_nxos_grp)
+
     # Network device service accounts shared across device types
     common_opts = [
         cfg.StrOpt("service_account_a_username", help="Service account A username"),

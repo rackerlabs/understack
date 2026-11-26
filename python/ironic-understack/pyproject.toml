@@ -29,13 +29,16 @@ chassis_model = "ironic_understack.hooks.inspect_hook_chassis_model:InspectHookC
 pci-device-capabilities = "ironic_understack.hooks.inspect_hook_pci_device_capabilities:PciDeviceCapabilitiesHook"
 
 [project.entry-points."ironic.hardware.types"]
+cisco_nxos = "ironic_understack.drivers.cisco_nxos_hardware:CiscoNxosHardware"
 netdev = "ironic_understack.drivers.netdev_hardware:NetdevHardware"
 panos = "ironic_understack.drivers.panos_hardware:PanosHardware"
 
 [project.entry-points."ironic.hardware.interfaces.firmware"]
+cisco_nxos = "ironic_understack.drivers.cisco_nxos_firmware:CiscoNxosFirmware"
 panos = "ironic_understack.drivers.panos_firmware:PanosFirmware"
 
 [project.entry-points."ironic.hardware.interfaces.inspect"]
+cisco_nxos = "ironic_understack.drivers.cisco_nxos_inspect:CiscoNxosInspect"
 redfish-understack = "ironic_understack.drivers.redfish_inspect_understack:UnderstackRedfishInspect"
 idrac-redfish-understack = "ironic_understack.drivers.redfish_inspect_understack:UnderstackDracRedfishInspect"
 panos = "ironic_understack.drivers.panos_inspect:PanosInspect"

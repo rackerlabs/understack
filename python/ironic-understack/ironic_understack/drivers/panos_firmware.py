@@ -1,12 +1,12 @@
 """Firmware interface for PAN-OS (Palo Alto) appliances."""
 
 import requests
-from ironic import objects
 from ironic.common import exception
 from ironic.drivers import base
 from oslo_log import log
 
 from ironic_understack.drivers.panos_base import PanosInterface
+from ironic_understack.utils import firmware_components
 from ironic_understack.utils import panos_api
 
 LOG = log.getLogger(__name__)
@@ -64,7 +64,7 @@ def record_versions(task, system: dict[str, str]) -> None:
         raise exception.UnsupportedDriverExtension(
             driver=task.node.driver, extension="firmware components"
         )
-    _sync(task, settings)
+    firmware_components.sync(task, settings)
 
 
 def _components_from_system_info(system: dict[str, str]) -> list[dict]:
@@ -84,33 +84,3 @@ def _components_from_system_info(system: dict[str, str]) -> list[dict]:
         for field, component in COMPONENT_FIELDS
         if (version := system.get(field, "")) not in NOT_INSTALLED
     ]
-
-
-def _sync(task, settings: list[dict]) -> None:
-    node_id = task.node.id
-    create_list, update_list, _ = (
-        objects.FirmwareComponentList.sync_firmware_components(
-            task.context, node_id, settings
-        )
-    )
-    for new in create_list:
-        objects.FirmwareComponent(
-            task.context,
-            node_id=node_id,
-            component=new["component"],
-            current_version=new["current_version"],
-            vendor=new["vendor"],
-            model=new["model"],
-            serial_number=new["serial_number"],
-        ).create()
-    for up in update_list:
-        existing = objects.FirmwareComponent.get(
-            task.context, node_id=node_id, name=up["component"]
-        )
-        if existing.current_version != up["current_version"]:
-            existing.last_version_flashed = up["current_version"]
-            existing.current_version = up["current_version"]
-        existing.vendor = up["vendor"]
-        existing.model = up["model"]
-        existing.serial_number = up["serial_number"]
-        existing.save()
