@@ -17,6 +17,8 @@ spec:
     server: '*'
   - namespace: 'understack-cdn'
     server: '*'
+  - namespace: 'understack-supportassist'
+    server: '*'
   - namespace: 'cert-manager'
     server: '*'
   - namespace: 'dex'
