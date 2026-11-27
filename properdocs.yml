@@ -197,6 +197,7 @@ nav:
       - operator-guide/device-types.md
       - operator-guide/flavors.md
       - operator-guide/server-firmware-update.md
+      - operator-guide/diagnostics-archives.md
       - operator-guide/bmc-password.md
     - 'Platform Services':
       - operator-guide/argocd-helm-chart.md
@@ -260,6 +261,7 @@ nav:
       - deploy-guide/components/argo-events.md
       - deploy-guide/components/argo-workflows.md
       - deploy-guide/components/cdn.md
+      - deploy-guide/components/diagnostics.md
       - deploy-guide/components/cert-manager.md
       - deploy-guide/components/chrony.md
       - deploy-guide/components/cilium.md

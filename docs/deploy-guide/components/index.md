@@ -72,6 +72,7 @@ enablement defaults, validation, and troubleshooting notes.
 | [argo-events-workflows](./argo-events-workflows.md) | global |
 | [argo-workflows](./argo-workflows.md) | site |
 | [cdn](./cdn.md) | site |
+| [diagnostics](./diagnostics.md) | site |
 | [cert-manager](./cert-manager.md) | global, site |
 | [chrony](./chrony.md) | site |
 | [cilium](./cilium.md) | global, site |

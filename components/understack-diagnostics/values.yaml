@@ -1,0 +1,4 @@
+# Volume that holds uploaded files. Files are never deleted automatically,
+# so size it for the site.
+storageClassName: openebs-lvm
+storageSize: 40Gi
