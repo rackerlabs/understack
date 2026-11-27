@@ -1,0 +1,5 @@
+apiVersion: v2
+name: understack-diagnostics
+description: Receives diagnostic files (such as Dell SupportAssist collections) uploaded by BMCs over HTTP PUT
+type: application
+version: 0.1.0

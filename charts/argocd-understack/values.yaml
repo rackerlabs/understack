@@ -608,3 +608,8 @@ site:
     # -- Enable/disable deploying undersync
     # @default -- false
     enabled: false
+  # -- Diagnostics upload receiver (understack-diagnostics)
+  understack_diagnostics:
+    # -- Enable/disable deploying the diagnostics upload receiver
+    # @default -- false
+    enabled: false

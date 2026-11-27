@@ -182,6 +182,7 @@ Components deployed on site clusters:
 | site-workflows | `site.site_workflows` | Site workflows |
 | snmp-exporter | `site.snmp_exporter` | SNMP metrics |
 | undersync | `site.undersync` | Sync service |
+| understack_diagnostics | `site.understack_diagnostics` | Diagnostics upload receiver |
 
 ### OpenStack Components
 
